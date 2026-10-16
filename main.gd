@@ -49,9 +49,6 @@ var spider_view: SpiderView
 var day_night_view: DayNightView
 var hud: Hud
 var camera: Camera2D
-## Fase 3 (menú): atenúa/aclara solo el mundo (vive en `world_vp`), nunca el HUD, para que el
-## texto siga legible aunque el jugador baje el brillo al mínimo.
-var canvas_modulate: CanvasModulate
 
 var speed := 1
 var paused := false
@@ -100,8 +97,6 @@ func _ready() -> void:
 		world_vp.add_child(n)
 	camera = Camera2D.new()
 	world_vp.add_child(camera)
-	canvas_modulate = CanvasModulate.new()
-	world_vp.add_child(canvas_modulate)
 	hud = Hud.new()
 	hud.gear_pressed.connect(func() -> void: menu_requested.emit())
 	add_child(hud)
@@ -110,9 +105,11 @@ func _ready() -> void:
 
 
 ## Fase 3 (menú): brillo del mundo, 0.6 (más oscuro) a 1.4 (más claro); 1.0 es el normal.
+## Se aplica dentro de `day_night_view` (el único CanvasModulate del mundo) en vez de con uno
+## propio: Godot solo deja uno activo por canvas, así que un segundo nodo no tendría ningún efecto.
 func set_brightness(b: float) -> void:
-	if canvas_modulate != null:
-		canvas_modulate.color = Color(b, b, b)
+	if day_night_view != null:
+		day_night_view.set_brightness(b)
 
 
 ## Qué modo arranca `start()` cuando no se pide uno explícito (F5, por ejemplo, reinicia en el
@@ -379,8 +376,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				start(seed_value)
 		KEY_I:
 			hud.toggle_status()
-		KEY_C:
-			hud.toggle_controls()
 		KEY_F6:
 			save_game()
 		KEY_F7:

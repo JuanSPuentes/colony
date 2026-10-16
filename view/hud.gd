@@ -3,34 +3,35 @@ extends CanvasLayer
 ## HUD en español. Fase 1: dibuja directo a la resolución real de la ventana (ver nota en
 ## main.gd sobre el SubViewport del mundo), así que el texto se ve nítido en vez de
 ## borroso/bloqueado. `S` escala el layout, pensado originalmente para 480x270, a la ventana real
-## (1440x810 por defecto: factor 3). `_top`/`_tools`/`_help`/`_legend` se conservan con los mismos
+## (1440x810 por defecto). `_top`/`_tools`/`_help`/`_legend` se conservan con los mismos
 ## nombres que en la Fase 0 porque `tools/ui_test.gd` los lee directamente.
 ##
 ## Un solo panel con fondo opaco arriba a la izquierda agrupa TODO el estado del mundo: tres
 ## secciones cortas (Colonia / Clima / Amenazas) y, debajo, las notificaciones. Antes eran dos
 ## cajas separadas (una sin fondo, chocando con el texto de atrás, y el aviso amarillo aparte);
 ## ahora es una sola, con margen, letra más chica y descripciones breves.
+##
+## Fase 3 (menú): la barra de abajo con todas las teclas se quitó de aquí (ocupaba media
+## pantalla); esa misma lista (`CONTROLS`) ahora vive en la sección "Controles" de
+## `OptionsScreen`, detrás de la tuerca, en vez de estar siempre encima del mundo.
 
 const ERA_NAMES: Array[String] = ["Fundación", "Colonia joven", "Colonia madura"]
 const HEADER_COLOR := Color("7fd0ff")
-## Factor de escala del layout: ventana real / 480. Con la ventana por defecto (1440x810) da 3.
-const S := 3.0
+## Factor de escala del layout: ventana real / 480, reducido para que los paneles ocupen menos
+## pantalla (antes 3.0 daba paneles casi a media ventana con la barra de abajo todavía puesta).
+const S := 2.3
 const FONT := 8.0 * S
 ## El panel de estado usa letra más chica que el resto del HUD para caber en menos espacio.
 const PANEL_FONT := 6.0 * S
 const OUTLINE := 3
-const PANEL_W := 230.0
+const PANEL_W := 200.0
 ## Margen interno de los paneles (en las mismas unidades de 8px que el resto del layout).
-const MARGIN_X := 5.0
-const MARGIN_Y := 4.0
+const MARGIN_X := 4.0
+const MARGIN_Y := 3.0
 const CONTENT_W := PANEL_W - MARGIN_X * 2.0
 ## Alto del panel de estado desplegado y plegado (solo la línea de `_top`).
-const STATUS_H := 108.0
+const STATUS_H := 100.0
 const STATUS_FOLDED_H := 7.0 + MARGIN_Y * 2.0
-## Barra de controles de abajo: ancho casi completo de la pantalla lógica (480).
-const BAR_W := 474.0
-const BAR_H := 53.0
-const BAR_FOLDED_H := 7.0 + MARGIN_Y * 2.0
 const KEY_COLOR := "ffd43c"
 ## Columnas de la barra de controles: encabezado y pares [tecla, qué hace]. Si se agrega una tecla
 ## nueva en main.gd, se agrega aquí también para que el jugador la vea.
@@ -40,14 +41,13 @@ const CONTROLS := [
 	["COLONIA", [["7", "Comprar obrera (comida)"], ["8", "Comprar soldado (comida)"], ["9", "Cambiar auto-compra"],
 		["H", "Ir a la reina"], ["Tab", "Capas de depuración"]]],
 	["CÁMARA Y TIEMPO", [["WASD / clic medio", "Mover la cámara"], ["Rueda", "Zoom"], ["Espacio", "Pausa"],
-		["F1 / F2 / F3", "Velocidad x1 / x2 / x4"], ["I / C", "Plegar estado / controles"]]],
+		["F1 / F2 / F3", "Velocidad x1 / x2 / x4"], ["I", "Plegar / desplegar estado"]]],
 	["PARTIDA", [["F6 / F7", "Guardar / cargar"], ["F5", "Reiniciar (mismo mapa)"], ["Shift+F5", "Reiniciar con mapa nuevo"],
 		["L", "Forzar lluvia"], ["F9", "+400 obreras (prueba)"]]],
 ]
 
-## Estado de plegado de cada panel. `main.gd` los cambia con I / C; los botones, con clic.
+## Estado de plegado del panel de estado. `main.gd` lo cambia con I; el botón, con clic.
 var status_open := true
-var controls_open := true
 
 ## Fase 3 (menú): `main.gd` la reenvía como `menu_requested` para que `app.gd` abra Opciones.
 signal gear_pressed
@@ -56,10 +56,6 @@ var _status_panel: Panel
 var _status_body: Array[Control] = []
 var _status_btn: Button
 var _ctrl_panel: Panel
-var _bar: Panel
-var _bar_body: Array[Control] = []
-var _bar_btn: Button
-var _root: Control
 ## Fase 3: botones de compra (obrera, soldado, auto-compra) en el panel de herramientas.
 var _buy_row: HBoxContainer
 var _buy_btns: Array[Button] = []
@@ -89,7 +85,6 @@ func _ready() -> void:
 
 	# Estado del mundo (arriba) y controles del jugador (debajo) van en dos recuadros iguales:
 	# mismo fondo, mismo borde, mismo margen, para que se lean como una sola familia de paneles.
-	_root = root
 	var panel := _make_panel(root, Vector2(3, 1), Vector2(PANEL_W, STATUS_H))
 	_status_panel = panel
 	var y := 0.0
@@ -141,7 +136,6 @@ func _ready() -> void:
 	cy += 11.0
 	_legend = _panel_rich(_ctrl_panel, cy, 8.0, CTRL_CONTENT_W)
 
-	_build_controls_bar(root)
 	_build_gear_button(root)
 	_layout()
 
@@ -153,33 +147,6 @@ func _ready() -> void:
 	_defeat.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_defeat.visible = false
 	root.add_child(_defeat)
-
-
-## Barra de abajo con todas las teclas, en columnas por tema. Cada fila es su propio
-## RichTextLabel de 7 unidades (igual que las líneas del panel de estado) para que el espaciado
-## sea idéntico en toda la interfaz.
-func _build_controls_bar(root: Control) -> void:
-	_bar = _make_panel(root, Vector2(3, 270 - BAR_H - 1), Vector2(BAR_W, BAR_H))
-	var col_w := (BAR_W - MARGIN_X * 2.0) / CONTROLS.size()
-	for i in CONTROLS.size():
-		var col: Array = CONTROLS[i]
-		var x := MARGIN_X + col_w * i
-		var h := _panel_label(_bar, 0.0, col_w - 2.0)
-		h.text = col[0]
-		h.add_theme_color_override("font_color", HEADER_COLOR)
-		h.position.x = x * S
-		_bar_body.append(h)
-		var rows: Array = col[1]
-		for r in rows.size():
-			var row := _panel_rich(_bar, 7.0 * (r + 1), 7.0, col_w - 2.0)
-			row.position.x = x * S
-			row.text = "[color=#%s]%s[/color]  %s" % [KEY_COLOR, rows[r][0], rows[r][1]]
-			_bar_body.append(row)
-	# Plegada, la barra se reduce a una sola línea que dice cómo volver a abrirla.
-	var folded := _header(_bar, 0.0, "CONTROLES   (pulsa C para verlos)")
-	folded.visible = false
-	_bar_btn = _fold_button(_bar, BAR_W, toggle_controls)
-	_bar_btn.set_meta("folded_label", folded)
 
 
 ## Botón "ocultar / mostrar" en la esquina superior derecha de un panel. Sin foco de teclado: si lo
@@ -262,27 +229,14 @@ func toggle_status() -> void:
 	_layout()
 
 
-func toggle_controls() -> void:
-	controls_open = not controls_open
-	_layout()
-
-
-## Aplica el estado de plegado: tamaños, visibilidad y el panel de herramientas pegado debajo del de
-## estado. La barra de controles se pega al borde inferior de la ventana real.
+## Aplica el estado de plegado: tamaño, visibilidad y el panel de herramientas pegado debajo del
+## de estado.
 func _layout() -> void:
 	for c in _status_body:
 		c.visible = status_open
 	_status_btn.text = "ocultar (I)" if status_open else "mostrar (I)"
 	_status_panel.size.y = (_status_open_h() if status_open else STATUS_FOLDED_H) * S
 	_ctrl_panel.position.y = _status_panel.position.y + _status_panel.size.y + 4.0 * S
-
-	for c in _bar_body:
-		c.visible = controls_open
-	(_bar_btn.get_meta("folded_label") as Label).visible = not controls_open
-	_bar_btn.text = "ocultar (C)" if controls_open else "mostrar (C)"
-	_bar.size.y = (BAR_H if controls_open else BAR_FOLDED_H) * S
-	var view_h := _root.size.y if _root.size.y > 0.0 else 270.0 * S
-	_bar.position.y = view_h - _bar.size.y - 1.0 * S
 
 
 ## Un recuadro con el mismo fondo/borde en toda la interfaz, para que se lea como una sola familia
@@ -340,21 +294,6 @@ func _header(parent: Control, y: float, text: String) -> Label:
 	var l := _panel_label(parent, y)
 	l.text = text
 	l.add_theme_color_override("font_color", HEADER_COLOR)
-	return l
-
-
-func _rich(parent: Control, p: Vector2, sz: Vector2) -> RichTextLabel:
-	var l := RichTextLabel.new()
-	l.bbcode_enabled = true
-	l.fit_content = true
-	l.scroll_active = false
-	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	l.position = p
-	l.size = sz
-	l.add_theme_font_size_override("normal_font_size", FONT)
-	l.add_theme_constant_override("outline_size", OUTLINE)
-	l.add_theme_color_override("font_outline_color", Color.BLACK)
-	parent.add_child(l)
 	return l
 
 

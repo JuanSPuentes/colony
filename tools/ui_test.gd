@@ -118,18 +118,14 @@ func _run() -> void:
 	await _key(KEY_9)
 	await _key(KEY_9)
 
-	# Paneles plegables: I pliega el estado (la línea de arriba sigue visible), C la barra de controles.
+	# Panel plegable: I pliega el estado (la línea de arriba sigue visible). La barra de controles
+	# de abajo se quitó del HUD (Fase 3): esa misma lista vive ahora en Opciones (`Hud.CONTROLS`).
 	var hud: Hud = _main.hud
 	var status_h: float = hud._status_panel.size.y
 	await _key(KEY_I)
 	_check("I pliega el panel de estado y deja la línea de arriba", not hud.status_open and hud._status_panel.size.y < status_h and hud._top.visible and not hud._weather.visible and hud._ctrl_panel.position.y < status_h)
 	await _key(KEY_I)
 	_check("I lo vuelve a desplegar", hud.status_open and hud._status_panel.size.y == status_h and hud._weather.visible)
-	var bar_h: float = hud._bar.size.y
-	await _key(KEY_C)
-	_check("C pliega la barra de controles", not hud.controls_open and hud._bar.size.y < bar_h)
-	hud._bar_btn.pressed.emit()
-	_check("el botón de la barra la vuelve a desplegar", hud.controls_open and hud._bar.size.y == bar_h)
 
 	# Pausa y velocidades.
 	await _key(KEY_SPACE)

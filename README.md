@@ -78,7 +78,6 @@ volumen, brillo) o te deja salir, sin perder la partida (vuelve exactamente a do
 | **F6** | Guardar partida |
 | **F7** | Cargar la última partida guardada |
 | **I** | Plegar / desplegar el panel de estado (también con el botón "ocultar" del panel) |
-| **C** | Plegar / desplegar la barra de controles de abajo (también con su botón) |
 | Clic medio, arrastrar | Mover la cámara |
 
 ## 3. Cómo funciona ahora mismo
@@ -184,15 +183,17 @@ Godot_v4.7.2-stable_win64_console.exe --path .
 ### Estructura del repositorio
 ```
 project.godot        Configuración de Godot (480x270 interno, escalado a 1440x810)
-main.tscn            Escena única: un Node que corre main.gd
-main.gd              Punto de entrada: arma la vista, el HUD, crea/reinicia la Simulation
 ARCHITECTURE.md       Cómo organizar el código de cada fase nueva (léelo antes de empezar una)
+app/                  Punto de entrada real (`run/main_scene`): menú, Opciones, selector de modo
+main.tscn            Escena de la partida en sí: un Node que corre main.gd
+main.gd              Arma la vista, el HUD, crea/reinicia la Simulation; bootable solo (sección 1)
 sim/                  SIMULACIÓN. Sin dibujo, sin UI, sin clases Node (solo RefCounted)
   core/                 Terreno, feromonas, agua, campos de distancia, configuración
-  colony/               Castas, hormigas, cría, cámaras, economía
+  colony/               Castas, hormigas, cría, cámaras, economía (clásica e incremental)
   threats/              Enemigos (hoy, la araña)
   simulation.gd         El orquestador: conoce todos los dominios, fija el orden del tick
-view/                 Render y entrada de mouse
+  save_system.gd        Guardado/carga (Fase 2): convierte la Simulation a/desde JSON
+view/                 Render, HUD y entrada de mouse
 tools/                Scripts de desarrollo y pruebas (ver sección 6)
 ```
 
@@ -210,7 +211,7 @@ tools/                Scripts de desarrollo y pruebas (ver sección 6)
 
 ### Flujo de trabajo
 1. Haz el cambio (los cambios de simulación van en `sim/`).
-2. Corre las tres pruebas de la sección 6. Las tres deben pasar.
+2. Corre las seis suites de la sección 6. Las seis deben pasar.
 3. Si cambiaste algo visual, corre `tools/screenshot.gd` y mira los PNG.
 4. Commit con un mensaje corto en modo imperativo y abre un PR contra `main`.
 
