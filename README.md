@@ -5,9 +5,10 @@ Simulador de supervivencia y gestión de una colonia de hormigas en 2D lateral, 
 colonia de arrieras (inspirada en *Atta*) con **señales de feromonas** y **diseño del nido**, y las
 hormigas hacen el trabajo.
 
-> Estado: **MVP de la Fase 1**, verificado. Reina, 4 castas, cría en 4 etapas, 5 cámaras con efecto
-> real, economía de hongo, las 5 feromonas, drenaje, una araña y progresión por eras. Sigue sin
-> pulido final de arte, tutorial, guardado ni menús (eso es Fase 2).
+> Estado: **Fase 1 completa + guardado/carga de la Fase 2**, verificado. Reina, 4 castas, cría en 4
+> etapas, 5 cámaras con efecto real, economía de hongo, las 5 feromonas, drenaje, una araña,
+> progresión por eras y partida guardable (F6/F7). Sigue sin arte final, tutorial guiado ni
+> controles de interfaz pulidos (el resto de la Fase 2).
 > Repositorio: https://github.com/JuanSPuentes/colony
 
 **Principio de diseño:** el jugador controla la colonia mediante señales ambientales y el diseño del
@@ -27,7 +28,8 @@ convención de una prueba por fase. Existe justo para que el proyecto no se vuel
 6. [Pruebas](#6-pruebas)
 7. [Estado del arte y el sonido](#7-estado-del-arte-y-el-sonido)
 8. [Simplificaciones deliberadas de la Fase 1](#8-simplificaciones-deliberadas-de-la-fase-1)
-9. [Hoja de ruta: qué viene en la Fase 2](#9-hoja-de-ruta-qué-viene-en-la-fase-2)
+9. [Simplificaciones deliberadas del guardado (Fase 2)](#9-simplificaciones-deliberadas-del-guardado-fase-2)
+10. [Hoja de ruta: qué falta de la Fase 2](#10-hoja-de-ruta-qué-falta-de-la-fase-2)
 
 ---
 
@@ -62,6 +64,8 @@ La ventana base es 480x270 escalada por entero a 1440x810. Sin descargas, sin re
 | **F9** | Agregar 400 hormigas (prueba de carga) |
 | **F5** | Reiniciar con la misma semilla |
 | **Shift+F5** | Reiniciar con una semilla nueva |
+| **F6** | Guardar partida |
+| **F7** | Cargar la última partida guardada |
 
 ## 3. Cómo funciona ahora mismo
 
@@ -110,6 +114,10 @@ araña).
 
 **Derrota:** la partida termina cuando muere la reina (ahogada, por la araña o por hambre/sed
 prolongadas); el HUD muestra la causa y F5 reinicia.
+
+**Guardar y cargar** (`sim/save_system.gd`, Fase 2): F6 guarda toda la partida en
+`user://save1.json` (terreno, cámaras, feromonas, agua, economía, cría, la araña y cada hormiga);
+F7 la recupera tal cual, lista para seguir jugando desde donde quedó.
 
 ---
 
@@ -207,6 +215,11 @@ main.gd
       |- Spider                el intruso (Fase 1)
       |- AntSystem             datos de las hormigas y su lógica de decisión por casta
       '- plants: Array[Plant]
+
+sim/save_system.gd  (Fase 2) convierte una Simulation completa a/desde un Dictionary de solo
+                    tipos simples (JSON). Vive junto a simulation.gd, no dentro de core/colony/
+                    threats, porque igual que el orquestador necesita ver todos los dominios a
+                    la vez (ver ARCHITECTURE.md).
 ```
 
 ### Por qué `queen_id` puede ser -1
@@ -232,9 +245,11 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | `Godot --headless --path . --script tools/test_phase0.gd` | Regresión de la Fase 0: determinismo, forrajeo, feromonas, excavación, lluvia/drenaje, huida/muerte, rendimiento. **34 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase1.gd` | Criterios de la Fase 1: reina y puesta de huevos, las 4 etapas de cría, reparto de castas, cámaras (válidas/inválidas), economía del jardín de hongos, Peligro/Evacuar, Drenaje, la araña (caza, la espantan, causa bajas sin soldados), eras, derrota, determinismo con colonia completa, rendimiento. **25 pruebas.** |
 | `Godot --headless --path . --script tools/ui_test.gd` | La escena real con eventos inyectados: arranque con reina+nodrizas, pausa, velocidad, herramientas, cámara, capas, F9, reinicio. **21 pruebas.** |
+| `Godot --headless --path . --script tools/test_phase2.gd` | Guardado y carga: la huella no cambia al guardar y cargar (en memoria y desde un archivo real), la partida sigue igual tras cargar como si nunca se hubiera guardado, un archivo inexistente no revienta, funciona con y sin reina, las cámaras y la lluvia en curso sobreviven. **10 pruebas.** |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
-**Última ejecución verificada (2026-10-16, Godot 4.7.2):** las tres suites en 34/34, 25/25 y 21/21.
+**Última ejecución verificada (2026-10-16, Godot 4.7.2):** las cuatro suites en 34/34, 25/25, 21/21
+y 10/10.
 
 ### Notas para escribir pruebas
 - Si tallas túneles a mano con un helper tipo `_carve()`, llama también a
@@ -284,16 +299,31 @@ verdad:
 - **No hay herramienta de inspección por pasar el mouse** sobre hormigas o cámaras; la capa de
   depuración y los colores cumplen ese papel por ahora.
 
-## 9. Hoja de ruta: qué viene en la Fase 2
+## 9. Simplificaciones deliberadas del guardado (Fase 2)
+
+- **Un solo espacio de guardado** (`user://save1.json`, siempre se sobrescribe). Varias partidas
+  guardadas en paralelo es una extensión mecánica (parametrizar la ruta), no construida todavía.
+- **Formato JSON, no binario.** Pesa más y carga un poco más lento que un formato compacto, pero
+  es legible para depurar y no depende de que las clases de Godot no cambien de forma entre
+  versiones. Si el tamaño del archivo se vuelve un problema real, migrar a `var_to_bytes` es
+  mecánico (ver `sim/save_system.gd`).
+- **No hay versionado de compatibilidad todavía.** `SaveSystem.SAVE_VERSION` existe pero nada lo
+  revisa aún; cargar un guardado de una versión vieja del juego con campos nuevos puede fallar.
+  Construir esa migración es trabajo de cuando de verdad haya versiones distintas en el mundo.
+- **Cargar reconstruye y luego pisa.** `SaveSystem.from_dict` arma una colonia nueva normal y
+  después sobreescribe cada campo con lo guardado, en vez de tener un segundo camino de
+  construcción "en blanco". Es algo de trabajo de más en cada carga, pero evita mantener dos
+  formas de construir una `Simulation` (ver ARCHITECTURE.md, sección 2).
+
+## 10. Hoja de ruta: qué falta de la Fase 2
 
 - Arte final: hormigas y araña dibujadas a mano, animaciones direccionales, variedad de tiles.
 - Interfaz pulida: controles deslizantes para el reparto de castas, tooltips al pasar el mouse,
   tutorial guiado.
-- Guardado y carga de una partida.
 - Playtesting real con una persona (hasta ahora el balance solo se validó con las pruebas
   automatizadas).
 - Mejoras y progresión entre partidas (vuelo nupcial, eras avanzadas): ver el documento de diseño
-  del proyecto para el detalle.
+  del proyecto para el detalle (Fase 4 del plan original).
 
 **Ideas deliberadamente no construidas:** multiplayer, cuentas, monetización, diplomacia, árbol
 tecnológico elaborado, otras especies.

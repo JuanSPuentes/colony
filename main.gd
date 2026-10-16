@@ -14,6 +14,7 @@ extends Node2D
 ## las pruebas), pero la entrada de mouse se convierte a mano al espacio del SubViewport.
 
 const CONFIG_PATH := "res://sim/core/default_config.tres"
+const SAVE_PATH := "user://save1.json"
 const ZOOM_LEVELS: Array[float] = [0.5, 1.0, 2.0, 3.0, 4.0]
 const MAX_TICKS_PER_FRAME := 40
 const OVERLAY_HZ := 5.0
@@ -93,10 +94,14 @@ func _ready() -> void:
 	start(seed_value)
 
 
-func start(new_seed: int) -> void:
+## `loaded_sim`, si se pasa (Fase 2: cargar partida), reemplaza la colonia nueva de siempre.
+func start(new_seed: int, loaded_sim: Simulation = null) -> void:
 	seed_value = new_seed
-	sim = Simulation.new(cfg, seed_value)
-	sim.spawn_colony_court()
+	if loaded_sim != null:
+		sim = loaded_sim
+	else:
+		sim = Simulation.new(cfg, seed_value)
+		sim.spawn_colony_court()
 	terrain_view.setup(sim)
 	plant_view.setup(sim)
 	overlay.setup(sim)
@@ -104,8 +109,33 @@ func start(new_seed: int) -> void:
 	spider_view.setup(sim)
 	_acc = 0.0
 	_painting = false
-	camera.position = Vector2(cfg.nest_x * cfg.cell_px, (cfg.surface_y + 2) * cfg.cell_px)
+	if sim.queen_id >= 0 and sim.ants.alive[sim.queen_id] == 1:
+		camera.position = sim.ants.pos[sim.queen_id]
+	else:
+		camera.position = Vector2(cfg.nest_x * cfg.cell_px, (cfg.surface_y + 2) * cfg.cell_px)
 	_apply_camera()
+
+
+## Fase 2: guardar y cargar partida.
+func save_game() -> void:
+	if sim == null:
+		return
+	var err := SaveSystem.save_file(sim, SAVE_PATH)
+	if err == OK:
+		sim.notify("Partida guardada.")
+	else:
+		sim.notify("No se pudo guardar (error %d)." % err)
+
+
+func load_game() -> void:
+	var loaded := SaveSystem.load_file(SAVE_PATH, cfg)
+	if loaded == null:
+		if sim != null:
+			sim.notify("No hay ninguna partida guardada.")
+		return
+	seed_value = loaded.rng.seed
+	start(seed_value, loaded)
+	sim.notify("Partida cargada.")
 
 
 func _resize_world_container() -> void:
@@ -298,6 +328,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				start(rng.randi() % 1000000)
 			else:
 				start(seed_value)
+		KEY_F6:
+			save_game()
+		KEY_F7:
+			load_game()
 
 
 func _set_zoom(i: int) -> void:

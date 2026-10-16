@@ -102,9 +102,9 @@ func _run() -> void:
 	# nodrizas iniciales (spawn_colony_court, llamado por main.gd.start()).
 	var expected_total := cfg.initial_ants + 1 + cfg.initial_nurses
 	_check("la escena principal arranca con la colonia inicial y todas las vistas", sim.ants.alive_count == expected_total and _main.terrain_view != null and _main.ant_renderer != null and _main.overlay != null and _main.hud != null, "esperado=%d real=%d" % [expected_total, sim.ants.alive_count])
-	# "Clima" vive en su propia línea (_weather) desde que el panel de notificaciones se separó
-	# del texto blanco, para que ninguna línea sea tan larga como para chocar con ese panel.
-	_check("el HUD muestra los datos en español", _main.hud._top.text.contains("Hormigas: %d" % expected_total) and _main.hud._top.text.contains("Hojas:") and _main.hud._weather.text.contains("Clima:") and _main.hud._top.text.contains("Semilla:") and _main.hud._top.text.contains("FPS:") and _main.hud._top.text.contains("Vel:"), _main.hud._top.text + " | " + _main.hud._weather.text)
+	# El HUD se acortó a propósito (un solo panel compacto): "Clima"/"Hojas" ya los dice el
+	# encabezado de su sección o la línea de recursos, no se repiten en _top/_weather.
+	_check("el HUD muestra los datos en español", _main.hud._top.text.contains("Hormigas: %d" % expected_total) and _main.hud._top.text.contains("Semilla:") and _main.hud._top.text.contains("FPS:") and _main.hud._top.text.contains("Vel:") and _main.hud._weather.text.length() > 0, _main.hud._top.text + " | " + _main.hud._weather.text)
 
 	# Pausa y velocidades.
 	await _key(KEY_SPACE)

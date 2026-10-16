@@ -19,6 +19,11 @@ sim/
   simulation.gd   El único archivo que conoce TODOS los dominios: los crea, fija el orden del
               tick y expone los `cmd_*` que llama la UI. No le pongas reglas de juego aquí:
               `tick()` debe seguir leyéndose como una lista de pasos, no como lógica.
+  save_system.gd  (Fase 2) Convierte una Simulation completa a/desde un Dictionary de solo tipos
+              simples. Vive aquí, no en una subcarpeta, por la misma razón que `simulation.gd`:
+              necesita leer y escribir TODOS los dominios a la vez. Si agregas un campo nuevo a
+              cualquier sistema que deba sobrevivir a un guardado, también hay que sumarlo aquí
+              (y a `tools/test_phase2.gd`); si no, se pierde silenciosamente al cargar.
 ```
 
 **Regla al agregar una fase nueva:** antes de escribir una línea, pregúntate en qué carpeta vive
@@ -62,6 +67,8 @@ tools/
   test_phase0.gd   Regresión de la Fase 0. No crece: si algo de la Fase 0 cambia a propósito, se
                    edita aquí con una nota explicando por qué.
   test_phase1.gd   Criterios de aceptación de la Fase 1 únicamente.
+  test_phase2.gd   Criterios de la Fase 2 empezados por guardado/carga; se le suma lo que falte
+                   de la fase (tutorial, interfaz) a medida que se construya.
   test_phaseN.gd   (la que corresponda cuando llegue)
   ui_test.gd       La única que SÍ se actualiza fase a fase: prueba la escena real completa, y la
                    escena real completa cambia en cada fase (nuevas teclas, nuevo HUD, etc.).
