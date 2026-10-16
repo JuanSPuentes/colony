@@ -134,12 +134,10 @@ extends Resource
 @export var evacuate_decay_per_s := 0.02
 @export var danger_flee_threshold := 0.1
 @export var evacuate_threshold := 0.1
-@export var danger_deposit := 0.6
 
 @export_group("Fase 1: nodrizas y soldados")
 ## Qué tan lejos del nido (en celdas de camino) sigue contando una nodriza como "cuidando".
 @export var nurse_range := 7
-@export var soldier_guard_range := 10
 @export var soldier_melee_range_px := 10.0
 @export var soldier_sight_px := 70.0
 

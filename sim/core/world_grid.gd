@@ -41,10 +41,6 @@ func _init(config: SimConfig) -> void:
 	room.resize(w * h)
 
 
-func idx(x: int, y: int) -> int:
-	return y * w + x
-
-
 func in_bounds(x: int, y: int) -> bool:
 	return x >= 0 and y >= 0 and x < w and y < h
 
