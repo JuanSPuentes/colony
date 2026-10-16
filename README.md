@@ -5,12 +5,13 @@ Simulador de supervivencia y gestión de una colonia de hormigas en 2D lateral, 
 colonia de arrieras (inspirada en *Atta*) con **señales de feromonas** y **diseño del nido**, y las
 hormigas hacen el trabajo.
 
-> Estado: **Fase 3 (modo incremental)**, verificado. El juego arranca con una colonia mínima (reina,
-> 3 obreras, 1 soldado y 1 larva), todo se mide en **comida**, el jugador **compra** obreras y
-> soldados (cada una más cara que la anterior) o activa la **auto-compra**, las plantas rebrotan de
-> día, hay **día y noche** (un día de luz + una noche = 1 día) y no hay araña. Debajo sigue todo lo
-> de las Fases 1 y 2 (castas, cría, cámaras, feromonas, drenaje, guardado F6/F7), que el modo
-> clásico conserva intacto para sus pruebas.
+> Estado: **menú principal con dos modos de juego**, verificado. **Juego normal** es la colonia
+> completa de la Fase 1 (reina, 4 castas, cámaras, araña, eras, puede ganarse o perderse).
+> **Modo infinito** es el de la Fase 3: colonia mínima, todo se mide en **comida**, el jugador
+> **compra** obreras y soldados (cada una más cara que la anterior) o activa la **auto-compra**,
+> las plantas rebrotan de día, hay **día y noche**, y no hay araña ni final. **Opciones** (desde el
+> menú o la tuerca ⚙ de la esquina superior derecha durante la partida) tiene volumen, brillo y los
+> controles. Guardado F6/F7 funciona en los dos modos.
 > Repositorio: https://github.com/JuanSPuentes/colony
 
 **Principio de diseño:** el jugador controla la colonia mediante señales ambientales y el diseño del
@@ -39,13 +40,20 @@ convención de una prueba por fase. Existe justo para que el proyecto no se vuel
 
 1. Instala **Godot 4.7.2** (build estándar, no Mono):
    https://godotengine.org/download/windows/
-2. Abre Godot, **Importa** `project.godot`, pulsa **F5**.
+2. Abre Godot, **Importa** `project.godot`, pulsa **F5**. Arranca en el **menú principal**:
+   *Juego normal* (Fase 1), *Modo infinito* (Fase 3), *Opciones* o *Salir*.
    Desde una terminal: `Godot.exe --path .`
-3. Semilla fija opcional: `Godot.exe --path . -- --seed=42` (cada reinicio usa semilla + 1).
+3. Semilla fija opcional: `Godot.exe --path . -- --seed=42` (cada reinicio usa semilla + 1). Solo
+   aplica a la partida, no al menú.
 
-La ventana base es 480x270 escalada por entero a 1440x810. Sin descargas, sin red, sin assets externos.
+La ventana base es 480x270 escalada por entero a 1440x810. Sin descargas, sin red, sin assets
+externos. `main.tscn` abierto directo (sin pasar por el menú) arranca solo en Modo infinito: así lo
+usan las pruebas automatizadas (ver sección 6), no es un atajo pensado para jugar.
 
 ## 2. Controles
+
+Durante la partida, la **tuerca ⚙** en la esquina superior derecha abre Opciones (controles,
+volumen, brillo) o te deja salir, sin perder la partida (vuelve exactamente a donde estabas).
 
 | Tecla | Acción |
 |---|---|
@@ -279,10 +287,11 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | `Godot --headless --path . --script tools/ui_test.gd` | La escena real con eventos inyectados: arranque con reina+nodrizas, pausa, compras 7/8/9 y botones, paneles plegables (I/C), herramientas, cámara, capas, F9, reinicio. **28 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase2.gd` | Guardado y carga: la huella no cambia al guardar y cargar (en memoria y desde un archivo real), la partida sigue igual tras cargar como si nunca se hubiera guardado, un archivo inexistente no revienta, funciona con y sin reina, las cámaras y la lluvia en curso sobreviven. **10 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase3.gd` | Modo incremental: colonia inicial exacta, sin araña ni eras, día y noche, hojas → comida, compras y precios crecientes, el huevo comprado nace de esa casta, auto-compra con reserva, rebrote solo de día, la colonia crece sola 6 min con lluvia sin morir, guardado y carga (también por JSON), determinismo. **28 pruebas.** |
+| `Godot --headless --path . --script tools/test_app_menu.gd` | El menú (`app/`): arranca mostrando el menú, Opciones desde el menú vuelve al menú, Opciones desde la tuerca en partida vuelve a la partida (pausada) y no al menú, Juego normal arranca en modo Historia con la colonia completa, Modo infinito arranca en modo incremental, F5 conserva el modo, volumen/brillo se guardan, Salir pide confirmación en vez de cerrar directo. **11 pruebas.** |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
-**Última ejecución verificada (2026-10-16, Godot 4.7.2):** las cinco suites en 34/34 (Fase 0),
-25/25 (Fase 1), 10/10 (Fase 2), 28/28 (Fase 3) y 28/28 (ui_test).
+**Última ejecución verificada (2026-10-16, Godot 4.7.2):** las seis suites en 34/34 (Fase 0),
+25/25 (Fase 1), 10/10 (Fase 2), 28/28 (Fase 3), 28/28 (ui_test) y 11/11 (menú).
 
 ### Notas para escribir pruebas
 - Si tallas túneles a mano con un helper tipo `_carve()`, llama también a

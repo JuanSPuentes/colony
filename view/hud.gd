@@ -49,6 +49,9 @@ const CONTROLS := [
 var status_open := true
 var controls_open := true
 
+## Fase 3 (menú): `main.gd` la reenvía como `menu_requested` para que `app.gd` abra Opciones.
+signal gear_pressed
+
 var _status_panel: Panel
 var _status_body: Array[Control] = []
 var _status_btn: Button
@@ -139,6 +142,7 @@ func _ready() -> void:
 	_legend = _panel_rich(_ctrl_panel, cy, 8.0, CTRL_CONTENT_W)
 
 	_build_controls_bar(root)
+	_build_gear_button(root)
 	_layout()
 
 	_defeat = Label.new()
@@ -196,6 +200,30 @@ func _fold_button(parent: Panel, panel_w: float, on_press: Callable) -> Button:
 	b.pressed.connect(on_press)
 	parent.add_child(b)
 	return b
+
+
+## Fase 3 (menú): tuerca en la esquina superior derecha de la ventana real (no del panel: usa
+## anclas propias para quedar fija ahí sin importar el tamaño de la ventana), para abrir Opciones
+## o salir en cualquier momento de la partida.
+func _build_gear_button(root: Control) -> void:
+	var b := Button.new()
+	b.text = "⚙"
+	b.focus_mode = Control.FOCUS_NONE
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	b.add_theme_font_size_override("font_size", PANEL_FONT)
+	b.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	b.position = Vector2(-13.0, 2.0) * S
+	b.custom_minimum_size = Vector2(11.0, 8.0) * S
+	b.size = b.custom_minimum_size
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.07, 0.06, 0.08, 0.92)
+	style.border_color = Color("ffd43c")
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(int(3 * S))
+	for s in ["normal", "hover", "pressed"]:
+		b.add_theme_stylebox_override(s, style)
+	b.pressed.connect(func() -> void: gear_pressed.emit())
+	root.add_child(b)
 
 
 ## Botón de compra: recuadro con borde (a diferencia de los de plegar, que son solo texto) para que

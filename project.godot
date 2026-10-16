@@ -11,7 +11,9 @@ config_version=5
 [application]
 
 config/name="colony_under_the_earth"
-run/main_scene="res://main.tscn"
+; El punto de entrada real es el menú (app/app.gd), no la partida directo. main.tscn sigue siendo
+; bootable solo (arranca en modo Infinito): lo abren directo tools/ui_test.gd y screenshot.gd.
+run/main_scene="res://app/app.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [display]

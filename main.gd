@@ -26,6 +26,12 @@ const PHERO_FIELDS := ["food", "home", "danger", "attack", "evacuate"]
 const ROOM_TYPES: Array[int] = [WorldGrid.Room.NURSERY, WorldGrid.Room.STORAGE, WorldGrid.Room.FUNGUS,
 	WorldGrid.Room.DRAIN, WorldGrid.Room.ROYAL]
 
+## Fase 3 (menú): si `app.gd` instancia esta escena, pone esto en `false` antes de añadirla al
+## árbol y arranca la partida él mismo (con el modo que eligió el jugador). Si se abre
+## `main.tscn` directo (como hacen `ui_test.gd`/`screenshot.gd`), arranca solo, como siempre.
+var auto_start := true
+signal menu_requested
+
 var cfg: SimConfig
 var sim: Simulation
 ## En modo `--headless` (usado por las pruebas) la ventana real no existe y `get_tree().root.size`
@@ -43,6 +49,9 @@ var spider_view: SpiderView
 var day_night_view: DayNightView
 var hud: Hud
 var camera: Camera2D
+## Fase 3 (menú): atenúa/aclara solo el mundo (vive en `world_vp`), nunca el HUD, para que el
+## texto siga legible aunque el jugador baje el brillo al mínimo.
+var canvas_modulate: CanvasModulate
 
 var speed := 1
 var paused := false
@@ -91,21 +100,44 @@ func _ready() -> void:
 		world_vp.add_child(n)
 	camera = Camera2D.new()
 	world_vp.add_child(camera)
+	canvas_modulate = CanvasModulate.new()
+	world_vp.add_child(canvas_modulate)
 	hud = Hud.new()
+	hud.gear_pressed.connect(func() -> void: menu_requested.emit())
 	add_child(hud)
-	start(seed_value)
+	if auto_start:
+		start(seed_value)
+
+
+## Fase 3 (menú): brillo del mundo, 0.6 (más oscuro) a 1.4 (más claro); 1.0 es el normal.
+func set_brightness(b: float) -> void:
+	if canvas_modulate != null:
+		canvas_modulate.color = Color(b, b, b)
+
+
+## Qué modo arranca `start()` cuando no se pide uno explícito (F5, por ejemplo, reinicia en el
+## modo en el que ya se estaba jugando, no siempre en el mismo). `main.tscn` abierto directo (las
+## pruebas) arranca en "incremental", igual que antes de que existiera el menú.
+var game_mode := "incremental"
 
 
 ## `loaded_sim`, si se pasa (Fase 2: cargar partida), reemplaza la colonia nueva de siempre.
-func start(new_seed: int, loaded_sim: Simulation = null) -> void:
+## `mode` ("historia" o "incremental"): si se omite, se repite el modo con el que se arrancó la
+## última vez (F5 reinicia en el mismo modo). Lo fija `app.gd` según lo que elige el jugador en el
+## menú; `main.tscn` abierto directo nunca lo pasa, así que conserva el comportamiento de antes.
+func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> void:
 	seed_value = new_seed
+	if mode != "":
+		game_mode = mode
 	if loaded_sim != null:
 		sim = loaded_sim
+		game_mode = "incremental" if loaded_sim.incremental else "historia"
 	else:
 		sim = Simulation.new(cfg, seed_value)
-		# Fase 3: el juego real arranca en modo incremental (colonia mínima, todo en comida, día y
-		# noche, sin araña). `spawn_colony_court()` sigue existiendo para las pruebas de la Fase 1.
-		sim.spawn_incremental_start()
+		if game_mode == "historia":
+			sim.spawn_colony_court()
+		else:
+			sim.spawn_incremental_start()
 	terrain_view.setup(sim)
 	day_night_view.setup(sim)
 	plant_view.setup(sim)
