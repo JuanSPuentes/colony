@@ -98,13 +98,38 @@ func _run() -> void:
 	var sim: Simulation = _main.sim
 	var cfg: SimConfig = _main.cfg
 	var sy := cfg.surface_y
-	# Fase 1: la escena real arranca con las obreras de cfg.initial_ants más la reina y las
-	# nodrizas iniciales (spawn_colony_court, llamado por main.gd.start()).
-	var expected_total := cfg.initial_ants + 1 + cfg.initial_nurses
-	_check("la escena principal arranca con la colonia inicial y todas las vistas", sim.ants.alive_count == expected_total and _main.terrain_view != null and _main.ant_renderer != null and _main.overlay != null and _main.hud != null, "esperado=%d real=%d" % [expected_total, sim.ants.alive_count])
-	# El HUD se acortó a propósito (un solo panel compacto): "Clima"/"Hojas" ya los dice el
-	# encabezado de su sección o la línea de recursos, no se repiten en _top/_weather.
-	_check("el HUD muestra los datos en español", _main.hud._top.text.contains("Hormigas: %d" % expected_total) and _main.hud._top.text.contains("Semilla:") and _main.hud._top.text.contains("FPS:") and _main.hud._top.text.contains("Vel:") and _main.hud._weather.text.length() > 0, _main.hud._top.text + " | " + _main.hud._weather.text)
+	# Fase 3: la escena real arranca en modo incremental (spawn_incremental_start, llamado por
+	# main.gd.start()): reina + obreras + soldados iniciales, ya no las 100 obreras de la Fase 1.
+	var expected_total := 1 + cfg.inc_start_workers + cfg.inc_start_soldiers
+	_check("la escena principal arranca con la colonia inicial y todas las vistas", sim.incremental and sim.ants.alive_count == expected_total and _main.terrain_view != null and _main.ant_renderer != null and _main.overlay != null and _main.hud != null and _main.day_night_view != null, "esperado=%d real=%d" % [expected_total, sim.ants.alive_count])
+	# Fase 3: la semilla ya no se muestra; en su lugar va el día (y si es de día o de noche).
+	_check("el HUD muestra los datos en español", _main.hud._top.text.contains("Hormigas: %d" % expected_total) and _main.hud._top.text.contains("Día 1") and not _main.hud._top.text.contains("Semilla") and _main.hud._top.text.contains("FPS:") and _main.hud._top.text.contains("Vel:") and _main.hud._weather.text.length() > 0, _main.hud._top.text + " | " + _main.hud._weather.text)
+
+	# Fase 3: comprar con 7/8 y la auto-compra con 9 (y con los botones del panel).
+	_main.sim.colony.food = 200.0
+	var eggs0: int = _main.sim.brood.total_alive()
+	await _key(KEY_7)
+	await _key(KEY_8)
+	_check("7 y 8 compran una obrera y un soldado", _main.sim.econ.bought[CasteDefs.Caste.WORKER] == 1 and _main.sim.econ.bought[CasteDefs.Caste.SOLDIER] == 1 and _main.sim.brood.total_alive() == eggs0 + 2)
+	_main.hud._buy_btns[0].pressed.emit()
+	_check("el botón de obrera también compra", _main.sim.econ.bought[CasteDefs.Caste.WORKER] == 2)
+	await _key(KEY_9)
+	_check("9 cambia la auto-compra", _main.sim.econ.auto_mode == IncrementalEconomy.Auto.WORKER and _main.hud._buy_btns[2].text.contains("obreras"))
+	await _key(KEY_9)
+	await _key(KEY_9)
+
+	# Paneles plegables: I pliega el estado (la línea de arriba sigue visible), C la barra de controles.
+	var hud: Hud = _main.hud
+	var status_h: float = hud._status_panel.size.y
+	await _key(KEY_I)
+	_check("I pliega el panel de estado y deja la línea de arriba", not hud.status_open and hud._status_panel.size.y < status_h and hud._top.visible and not hud._weather.visible and hud._ctrl_panel.position.y < status_h)
+	await _key(KEY_I)
+	_check("I lo vuelve a desplegar", hud.status_open and hud._status_panel.size.y == status_h and hud._weather.visible)
+	var bar_h: float = hud._bar.size.y
+	await _key(KEY_C)
+	_check("C pliega la barra de controles", not hud.controls_open and hud._bar.size.y < bar_h)
+	hud._bar_btn.pressed.emit()
+	_check("el botón de la barra la vuelve a desplegar", hud.controls_open and hud._bar.size.y == bar_h)
 
 	# Pausa y velocidades.
 	await _key(KEY_SPACE)
@@ -175,7 +200,7 @@ func _run() -> void:
 	await _key(KEY_F5)
 	_check("F5 reinicia con la misma semilla", _main.sim != sim_before and _main.sim.rng.seed == seed0 and _main.sim.tick_count < 5 and _main.sim.ants.alive_count == expected_total, "semilla %d" % _main.sim.rng.seed)
 	var a: Simulation = Simulation.new(cfg, seed0)
-	a.spawn_colony_court()
+	a.spawn_incremental_start()
 	for i in 100:
 		a.tick()
 	var b: Simulation = _main.sim

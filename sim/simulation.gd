@@ -8,6 +8,11 @@ extends RefCounted
 ## directamente), `queen_id` queda en -1 y la araña, las eras y la puesta de huevos nunca se
 ## activan: el comportamiento es exactamente el de la Fase 0. El juego real (`main.gd`) sí la
 ## llama, así que la escena jugable tiene colonia completa.
+##
+## Fase 3: `spawn_incremental_start()` (lo que llama hoy `main.gd`) activa el modo incremental:
+## colonia diminuta, todo medido en comida, compra de obreras/soldados, plantas que rebrotan, día y
+## noche, y sin araña ni eras. Igual que antes, si nadie lo llama, `incremental` queda en false y
+## las Fases 0-2 corren exactamente como siempre.
 
 enum Weather { CLEAR, WARNING, RAINING }
 enum Era { FOUNDATION, YOUNG, MATURE }
@@ -30,6 +35,9 @@ var rooms: RoomSystem
 var colony: Colony
 var brood: BroodSystem
 var spider: Spider
+## Fase 3: false salvo que se llame a `spawn_incremental_start()`.
+var incremental := false
+var econ: IncrementalEconomy
 
 var leaves_stored := 0
 var delivered := 0
@@ -82,6 +90,7 @@ func _init(config: SimConfig, seed_value: int = -1) -> void:
 	colony = Colony.new(cfg)
 	brood = BroodSystem.new(self)
 	spider = Spider.new(self)
+	econ = IncrementalEconomy.new(self)
 	ants = AntSystem.new(self)
 	ants.add_ants(cfg.initial_ants)
 	if cfg.rain_auto:
@@ -96,6 +105,33 @@ func spawn_colony_court() -> void:
 	for k in cfg.initial_nurses:
 		var c: int = world.nest_cells[rng.randi() % world.nest_cells.size()]
 		ants.add_ant_at(Vector2i(c % world.w, c / world.w), CasteDefs.Caste.NURSE)
+
+
+## Fase 3: arranque del modo incremental. Descarta las obreras de `cfg.initial_ants` que creó el
+## constructor y empieza con una colonia mínima: reina, unas pocas obreras, un soldado y una larva.
+func spawn_incremental_start() -> void:
+	incremental = true
+	ants = AntSystem.new(self)
+	var cell := Vector2i(cfg.nest_x, cfg.surface_y + cfg.shaft_depth + 1)
+	queen_id = ants.add_ant_at(cell, CasteDefs.Caste.QUEEN)
+	for k in cfg.inc_start_workers:
+		ants.add_ant_at(_random_nest_cell(), CasteDefs.Caste.WORKER)
+	for k in cfg.inc_start_soldiers:
+		ants.add_ant_at(_random_nest_cell(), CasteDefs.Caste.SOLDIER)
+	for k in cfg.inc_start_larvae:
+		brood.lay_egg(CasteDefs.Caste.WORKER)
+		brood.stage[brood.stage.size() - 1] = BroodSystem.Stage.LARVA
+		brood.timer[brood.timer.size() - 1] = cfg.larva_time_s
+	colony.food = cfg.inc_start_food
+	colony.water = 0.0
+	if cfg.rain_auto:
+		rain_start_tick = int(cfg.inc_rain_first_s * cfg.tick_rate)
+	ants._recount()
+
+
+func _random_nest_cell() -> Vector2i:
+	var c: int = world.nest_cells[rng.randi() % world.nest_cells.size()]
+	return Vector2i(c % world.w, c / world.w)
 
 
 func _place_plants() -> void:
@@ -147,7 +183,13 @@ func tick() -> void:
 	rooms.maybe_recompute()
 	ants.tick()
 	# Todo lo que sigue solo existe si hay una colonia completa (ver nota en la cabecera).
-	if queen_id >= 0:
+	if incremental:
+		# Fase 3: sin araña ni eras; la economía es solo comida.
+		econ.tick(dt)
+		econ.regrow_plants(dt)
+		brood.tick(dt)
+		_check_game_over()
+	elif queen_id >= 0:
 		colony.tick(self, dt)
 		brood.tick(dt)
 		_update_era()
@@ -296,8 +338,26 @@ func cmd_add_ants(n: int) -> void:
 	ants.add_ants(n)
 
 
+## Fase 3: compra una hormiga de la casta dada (obrera o soldado) con comida.
+func cmd_buy(caste: int) -> bool:
+	return incremental and econ.buy(caste)
+
+
+func cmd_cycle_auto_buy() -> void:
+	if incremental:
+		econ.cycle_auto()
+
+
+func day_number() -> int:
+	return DayNight.day_number(time_s(), cfg)
+
+
+func is_night() -> bool:
+	return DayNight.is_night(time_s(), cfg)
+
+
 func cmd_force_spider() -> void:
-	if queen_id >= 0 and not spider.alive:
+	if queen_id >= 0 and not incremental and not spider.alive:
 		spider.spawn(1.0 + cfg.spider_strength_growth * spiders_spawned)
 		spiders_spawned += 1
 		spider_next_s = cfg.spider_interval_s  # si no, la siguiente se agenda casi de inmediato
@@ -314,4 +374,6 @@ func checksum() -> int:
 	h = (h * 31 + int(water.volume * 1000.0)) & 0x7fffffff
 	if queen_id >= 0:
 		h = (h * 31 + int(colony.food * 10.0) + int(colony.water * 10.0) + brood.hatched * 7 + brood.died * 13) & 0x7fffffff
+	if incremental:
+		h = (h * 31 + econ.bought[CasteDefs.Caste.WORKER] * 7 + econ.bought[CasteDefs.Caste.SOLDIER] * 11 + total_leaves_left) & 0x7fffffff
 	return h

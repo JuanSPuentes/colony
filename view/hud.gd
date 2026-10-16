@@ -24,6 +24,44 @@ const PANEL_W := 230.0
 const MARGIN_X := 5.0
 const MARGIN_Y := 4.0
 const CONTENT_W := PANEL_W - MARGIN_X * 2.0
+## Alto del panel de estado desplegado y plegado (solo la línea de `_top`).
+const STATUS_H := 108.0
+const STATUS_FOLDED_H := 7.0 + MARGIN_Y * 2.0
+## Barra de controles de abajo: ancho casi completo de la pantalla lógica (480).
+const BAR_W := 474.0
+const BAR_H := 53.0
+const BAR_FOLDED_H := 7.0 + MARGIN_Y * 2.0
+const KEY_COLOR := "ffd43c"
+## Columnas de la barra de controles: encabezado y pares [tecla, qué hace]. Si se agrega una tecla
+## nueva en main.gd, se agrega aquí también para que el jugador la vea.
+const CONTROLS := [
+	["HERRAMIENTAS", [["1", "Cavar túneles"], ["2 / 3", "Feromona / Cámara"], ["4", "Borrar todo bajo el pincel"],
+		["Q / E", "Cambiar subtipo"], ["Clic izq / der", "Pintar / quitar"]]],
+	["COLONIA", [["7", "Comprar obrera (comida)"], ["8", "Comprar soldado (comida)"], ["9", "Cambiar auto-compra"],
+		["H", "Ir a la reina"], ["Tab", "Capas de depuración"]]],
+	["CÁMARA Y TIEMPO", [["WASD / clic medio", "Mover la cámara"], ["Rueda", "Zoom"], ["Espacio", "Pausa"],
+		["F1 / F2 / F3", "Velocidad x1 / x2 / x4"], ["I / C", "Plegar estado / controles"]]],
+	["PARTIDA", [["F6 / F7", "Guardar / cargar"], ["F5", "Reiniciar (mismo mapa)"], ["Shift+F5", "Reiniciar con mapa nuevo"],
+		["L", "Forzar lluvia"], ["F9", "+400 obreras (prueba)"]]],
+]
+
+## Estado de plegado de cada panel. `main.gd` los cambia con I / C; los botones, con clic.
+var status_open := true
+var controls_open := true
+
+var _status_panel: Panel
+var _status_body: Array[Control] = []
+var _status_btn: Button
+var _ctrl_panel: Panel
+var _bar: Panel
+var _bar_body: Array[Control] = []
+var _bar_btn: Button
+var _root: Control
+## Fase 3: botones de compra (obrera, soldado, auto-compra) en el panel de herramientas.
+var _buy_row: HBoxContainer
+var _buy_btns: Array[Button] = []
+var _threat_header: Label
+var _m: Node
 
 var _top: Label
 var _weather: Label
@@ -48,9 +86,12 @@ func _ready() -> void:
 
 	# Estado del mundo (arriba) y controles del jugador (debajo) van en dos recuadros iguales:
 	# mismo fondo, mismo borde, mismo margen, para que se lean como una sola familia de paneles.
-	var panel := _make_panel(root, Vector2(3, 1), Vector2(PANEL_W, 108))
+	_root = root
+	var panel := _make_panel(root, Vector2(3, 1), Vector2(PANEL_W, STATUS_H))
+	_status_panel = panel
 	var y := 0.0
-	_top = _panel_label(panel, y)
+	# `_top` queda visible aunque el panel esté plegado; le dejamos sitio al botón a la derecha.
+	_top = _panel_label(panel, y, CONTENT_W - 42.0)
 	y += 8.0
 	_header(panel, y, "COLONIA")
 	y += 7.0
@@ -62,22 +103,43 @@ func _ready() -> void:
 	y += 7.0
 	_weather = _panel_label(panel, y)
 	y += 9.0
-	_header(panel, y, "AMENAZAS")
+	_threat_header = _header(panel, y, "AMENAZAS")
 	y += 7.0
 	_threats = _panel_label(panel, y)
 	y += 10.0
 	_log = _panel_rich(panel, y, 28.0)
+	for c in panel.get_children():
+		if c != _top:
+			_status_body.append(c)
+	_status_btn = _fold_button(panel, PANEL_W, toggle_status)
 
 	# Segundo recuadro, mismo estilo, recortado al ancho del texto (no al ancho del primero).
+	# Su posición vertical la fija `_layout()`: va justo debajo del panel de estado, plegado o no.
 	const CTRL_W := PANEL_W + 14.0
 	const CTRL_CONTENT_W := CTRL_W - MARGIN_X * 2.0
-	var ctrl := _make_panel(root, Vector2(3, 113), Vector2(CTRL_W, 29))
+	_ctrl_panel = _make_panel(root, Vector2(3, 113), Vector2(CTRL_W, 31))
 	var cy := 0.0
-	_tools = _panel_label(ctrl, cy, CTRL_CONTENT_W)
+	_tools = _panel_label(_ctrl_panel, cy, CTRL_CONTENT_W)
 	cy += 7.0
-	_ratio = _panel_label(ctrl, cy, CTRL_CONTENT_W)
-	cy += 9.0
-	_legend = _panel_rich(ctrl, cy, 8.0, CTRL_CONTENT_W)
+	_ratio = _panel_label(_ctrl_panel, cy, CTRL_CONTENT_W)
+	_buy_row = HBoxContainer.new()
+	_buy_row.position = Vector2(MARGIN_X, MARGIN_Y + cy + 1.0) * S
+	_buy_row.size = Vector2(CTRL_CONTENT_W, 8.0) * S
+	_buy_row.add_theme_constant_override("separation", int(3 * S))
+	_buy_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ctrl_panel.add_child(_buy_row)
+	for k in 3:
+		var b := _buy_button()
+		_buy_row.add_child(b)
+		_buy_btns.append(b)
+	_buy_btns[0].pressed.connect(func() -> void: _m.sim.cmd_buy(CasteDefs.Caste.WORKER))
+	_buy_btns[1].pressed.connect(func() -> void: _m.sim.cmd_buy(CasteDefs.Caste.SOLDIER))
+	_buy_btns[2].pressed.connect(func() -> void: _m.sim.cmd_cycle_auto_buy())
+	cy += 11.0
+	_legend = _panel_rich(_ctrl_panel, cy, 8.0, CTRL_CONTENT_W)
+
+	_build_controls_bar(root)
+	_layout()
 
 	_defeat = Label.new()
 	_defeat.add_theme_font_size_override("font_size", FONT * 2.0)
@@ -87,6 +149,112 @@ func _ready() -> void:
 	_defeat.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_defeat.visible = false
 	root.add_child(_defeat)
+
+
+## Barra de abajo con todas las teclas, en columnas por tema. Cada fila es su propio
+## RichTextLabel de 7 unidades (igual que las líneas del panel de estado) para que el espaciado
+## sea idéntico en toda la interfaz.
+func _build_controls_bar(root: Control) -> void:
+	_bar = _make_panel(root, Vector2(3, 270 - BAR_H - 1), Vector2(BAR_W, BAR_H))
+	var col_w := (BAR_W - MARGIN_X * 2.0) / CONTROLS.size()
+	for i in CONTROLS.size():
+		var col: Array = CONTROLS[i]
+		var x := MARGIN_X + col_w * i
+		var h := _panel_label(_bar, 0.0, col_w - 2.0)
+		h.text = col[0]
+		h.add_theme_color_override("font_color", HEADER_COLOR)
+		h.position.x = x * S
+		_bar_body.append(h)
+		var rows: Array = col[1]
+		for r in rows.size():
+			var row := _panel_rich(_bar, 7.0 * (r + 1), 7.0, col_w - 2.0)
+			row.position.x = x * S
+			row.text = "[color=#%s]%s[/color]  %s" % [KEY_COLOR, rows[r][0], rows[r][1]]
+			_bar_body.append(row)
+	# Plegada, la barra se reduce a una sola línea que dice cómo volver a abrirla.
+	var folded := _header(_bar, 0.0, "CONTROLES   (pulsa C para verlos)")
+	folded.visible = false
+	_bar_btn = _fold_button(_bar, BAR_W, toggle_controls)
+	_bar_btn.set_meta("folded_label", folded)
+
+
+## Botón "ocultar / mostrar" en la esquina superior derecha de un panel. Sin foco de teclado: si lo
+## tuviera, Espacio (pausa) lo activaría en vez de pausar.
+func _fold_button(parent: Panel, panel_w: float, on_press: Callable) -> Button:
+	var b := Button.new()
+	b.flat = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	b.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	b.add_theme_font_size_override("font_size", PANEL_FONT)
+	b.add_theme_color_override("font_color", HEADER_COLOR)
+	b.add_theme_color_override("font_hover_color", Color.WHITE)
+	b.add_theme_color_override("font_pressed_color", Color.WHITE)
+	b.position = Vector2(panel_w - MARGIN_X - 40.0, MARGIN_Y - 1.0) * S
+	b.custom_minimum_size = Vector2(40.0, 8.0) * S
+	b.size = b.custom_minimum_size
+	b.pressed.connect(on_press)
+	parent.add_child(b)
+	return b
+
+
+## Botón de compra: recuadro con borde (a diferencia de los de plegar, que son solo texto) para que
+## se lea como algo que se pulsa. Sin foco de teclado, por el mismo motivo que `_fold_button`.
+func _buy_button() -> Button:
+	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.custom_minimum_size = Vector2(0, 8.0) * S
+	b.add_theme_font_size_override("font_size", PANEL_FONT)
+	for s in ["normal", "hover", "pressed", "disabled"]:
+		var st := StyleBoxFlat.new()
+		st.bg_color = {"normal": Color(0.16, 0.14, 0.1), "hover": Color(0.28, 0.24, 0.12),
+			"pressed": Color(0.4, 0.33, 0.12), "disabled": Color(0.1, 0.1, 0.11)}[s]
+		st.border_color = Color("ffd43c") if s != "disabled" else Color(0.35, 0.35, 0.38)
+		st.set_border_width_all(1)
+		st.set_corner_radius_all(int(2 * S))
+		st.content_margin_left = 2.0 * S
+		st.content_margin_right = 2.0 * S
+		b.add_theme_stylebox_override(s, st)
+	b.add_theme_color_override("font_color", Color("f4ecd8"))
+	b.add_theme_color_override("font_disabled_color", Color(0.55, 0.55, 0.58))
+	return b
+
+
+## Alto del panel de estado desplegado: crece con los avisos en vez de dejar siempre un hueco fijo
+## para ellos (`STATUS_H` es el alto con la lista de avisos llena a 4 líneas).
+func _status_open_h() -> float:
+	var lines := _log.text.count("\n") if _log != null else 0
+	return minf(STATUS_H, STATUS_H - 32.0 + 8.0 * lines)
+
+
+func toggle_status() -> void:
+	status_open = not status_open
+	_layout()
+
+
+func toggle_controls() -> void:
+	controls_open = not controls_open
+	_layout()
+
+
+## Aplica el estado de plegado: tamaños, visibilidad y el panel de herramientas pegado debajo del de
+## estado. La barra de controles se pega al borde inferior de la ventana real.
+func _layout() -> void:
+	for c in _status_body:
+		c.visible = status_open
+	_status_btn.text = "ocultar (I)" if status_open else "mostrar (I)"
+	_status_panel.size.y = (_status_open_h() if status_open else STATUS_FOLDED_H) * S
+	_ctrl_panel.position.y = _status_panel.position.y + _status_panel.size.y + 4.0 * S
+
+	for c in _bar_body:
+		c.visible = controls_open
+	(_bar_btn.get_meta("folded_label") as Label).visible = not controls_open
+	_bar_btn.text = "ocultar (C)" if controls_open else "mostrar (C)"
+	_bar.size.y = (BAR_H if controls_open else BAR_FOLDED_H) * S
+	var view_h := _root.size.y if _root.size.y > 0.0 else 270.0 * S
+	_bar.position.y = view_h - _bar.size.y - 1.0 * S
 
 
 ## Un recuadro con el mismo fondo/borde en toda la interfaz, para que se lea como una sola familia
@@ -170,9 +338,70 @@ func _trend_arrow(v: float) -> String:
 	return "→"
 
 
+func _plural(n: int, one: String, many: String) -> String:
+	return "%d %s" % [n, one if n == 1 else many]
+
+
+## Modo incremental (Fase 3): sin semilla, sin agua, sin araña ni eras. Muestra el día, la comida
+## como único recurso, la cría que viene en camino y el precio de cada compra.
+func _update_incremental(m: Node, sim: Simulation) -> void:
+	var cfg := sim.cfg
+	var t := sim.time_s()
+	var night := sim.is_night()
+	_top.text = "Día %d · %s   Hormigas: %d   Vel: %s   FPS: %d" % [
+		sim.day_number(), "Noche" if night else "Día", sim.ants.alive_count,
+		"PAUSA" if m.paused else "x%d" % m.speed, Engine.get_frames_per_second()]
+
+	var c := {CasteDefs.Caste.WORKER: 0, CasteDefs.Caste.SOLDIER: 0}
+	for i in sim.ants.count:
+		if sim.ants.alive[i] == 1 and c.has(sim.ants.caste[i]):
+			c[sim.ants.caste[i]] += 1
+	var queen_alive := sim.ants.alive[sim.queen_id] == 1
+	var queen_hp := sim.ants.hp[sim.queen_id] if queen_alive else 0.0
+	var queen_hp_max := cfg.queen_hp_base * CasteDefs.HP_MULT[CasteDefs.Caste.QUEEN]
+	_colony.text = "[color=#%s]●[/color] %s   [color=#%s]●[/color] %s   [color=#%s]●[/color] Reina %d%%" % [
+		CasteDefs.COLORS[CasteDefs.Caste.WORKER].to_html(false), _plural(c[CasteDefs.Caste.WORKER], "obrera", "obreras"),
+		CasteDefs.COLORS[CasteDefs.Caste.SOLDIER].to_html(false), _plural(c[CasteDefs.Caste.SOLDIER], "soldado", "soldados"),
+		CasteDefs.COLORS[CasteDefs.Caste.QUEEN].to_html(false), int(100.0 * queen_hp / maxf(queen_hp_max, 0.01))]
+	_resources.text = "Comida %.0f / %.0f   +%.0f/min hojas · −%.0f/min consumo%s" % [
+		sim.colony.food, sim.colony.food_cap, sim.econ.income_per_min, sim.econ.upkeep_per_min,
+		"   ¡HAMBRE!" if sim.colony.starving else ""]
+
+	var change := ceili(DayNight.seconds_to_change(t, cfg))
+	var weather := ("De noche: amanece en %d s" if night else "De día: anochece en %d s") % change
+	match sim.weather:
+		Simulation.Weather.WARNING:
+			weather += "   · ¡Lluvia en %d s!" % ceili(sim.rain_eta_s())
+		Simulation.Weather.RAINING:
+			weather += "   · Lloviendo"
+	_weather.text = weather
+
+	# Cría en camino, por casta (lo que el jugador compró y aún no nació).
+	var coming := {CasteDefs.Caste.WORKER: 0, CasteDefs.Caste.SOLDIER: 0}
+	for i in sim.brood.stage.size():
+		if sim.brood.alive[i] and coming.has(sim.brood.caste[i]):
+			coming[sim.brood.caste[i]] += 1
+	var st := sim.brood.counts_by_stage
+	if coming[CasteDefs.Caste.WORKER] + coming[CasteDefs.Caste.SOLDIER] == 0:
+		_threats.text = "Nada en camino: compra obreras o soldados abajo"
+	else:
+		_threats.text = "En camino: %s y %s   (huevo %d · larva %d · pupa %d)" % [
+			_plural(coming[CasteDefs.Caste.WORKER], "obrera", "obreras"),
+			_plural(coming[CasteDefs.Caste.SOLDIER], "soldado", "soldados"),
+			st[BroodSystem.Stage.EGG], st[BroodSystem.Stage.LARVA], st[BroodSystem.Stage.PUPA]]
+
+	var econ := sim.econ
+	_buy_btns[0].text = "[7] Obrera: %.0f" % econ.cost(CasteDefs.Caste.WORKER)
+	_buy_btns[0].disabled = not econ.can_buy(CasteDefs.Caste.WORKER)
+	_buy_btns[1].text = "[8] Soldado: %.0f" % econ.cost(CasteDefs.Caste.SOLDIER)
+	_buy_btns[1].disabled = not econ.can_buy(CasteDefs.Caste.SOLDIER)
+	_buy_btns[2].text = "[9] Auto: %s" % IncrementalEconomy.AUTO_NAMES[econ.auto_mode]
+
+
 ## `m` es el nodo main.gd: lee todo lo que necesita de él y de `m.sim`.
 func update_info(m: Node) -> void:
 	var sim: Simulation = m.sim
+	_layout()  # barato; sigue el alto real de la ventana si cambia de tamaño
 	_top.text = "Hormigas: %d   Vel: %s   Semilla: %d   FPS: %d" % [
 		sim.ants.alive_count, "PAUSA" if m.paused else "x%d" % m.speed, sim.rng.seed, Engine.get_frames_per_second()]
 
@@ -227,6 +456,14 @@ func update_info(m: Node) -> void:
 		_resources.text = ""
 		_ratio.text = ""
 		_log.text = ""
+
+	# Fase 3: en el modo incremental el mismo panel cuenta otra cosa (pisa los textos de arriba).
+	_m = m
+	_buy_row.visible = sim.incremental
+	_ratio.visible = not sim.incremental
+	_threat_header.text = "CRÍA" if sim.incremental else "AMENAZAS"
+	if sim.incremental:
+		_update_incremental(m, sim)
 
 	var tool_names := ["", "Cavar [1]", "Feromona [2]", "Cámara [3]", "Borrar [4]"]
 	var sub := ""

@@ -69,6 +69,8 @@ tools/
   test_phase1.gd   Criterios de aceptación de la Fase 1 únicamente.
   test_phase2.gd   Criterios de la Fase 2 empezados por guardado/carga; se le suma lo que falte
                    de la fase (tutorial, interfaz) a medida que se construya.
+  test_phase3.gd   Modo incremental (`spawn_incremental_start`): economía de comida, compras,
+                   auto-compra, día y noche, sin araña.
   test_phaseN.gd   (la que corresponda cuando llegue)
   ui_test.gd       La única que SÍ se actualiza fase a fase: prueba la escena real completa, y la
                    escena real completa cambia en cada fase (nuevas teclas, nuevo HUD, etc.).

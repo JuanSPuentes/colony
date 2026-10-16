@@ -162,7 +162,9 @@ func tick() -> void:
 		var cy := clampi(floori(p.y / cpx), 0, sim.world.h - 1)
 		var ci := cy * w + cx
 		var lv := lvl[ci]
-		if lv > cfg.deep_level:
+		# Fase 3: en el modo incremental la reina no se ahoga (la colonia es demasiado chica al
+		# principio para defenderse de una inundación); el resto de castas, sí.
+		if lv > cfg.deep_level and not (sim.incremental and caste[i] == CasteDefs.Caste.QUEEN):
 			hp[i] -= cfg.drown_damage_per_s * dt
 			if hp[i] <= 0.0:
 				_kill(i, true)
@@ -388,6 +390,8 @@ func _plant_logic(i: int, cx: int, cy: int, ci: int) -> bool:
 	if pos[i].distance_to(pc) <= cfg.pickup_cells * cfg.cell_px:
 		pl.leaves -= 1
 		sim.total_leaves_left -= 1
+		if sim.incremental:
+			sim.econ.known_plants[sim.plants.find(pl)] = 1
 		carry[i] = 1
 		trip_steps[i] = 0
 		state[i] = State.CARRY_HOME
@@ -395,6 +399,32 @@ func _plant_logic(i: int, cx: int, cy: int, ci: int) -> bool:
 		return true
 	state[i] = State.GO_TO_FOOD
 	_step(i, cx, cy, ci, Mode.PLANT, pc)
+	return true
+
+
+## Fase 3 (solo modo incremental): la colonia recuerda las plantas de las que ya sacó hojas y las
+## obreras que están en la superficie van directo a la conocida más cercana que tenga hojas. Con
+## 3-10 obreras los rastros de feromona no se refrescan lo bastante y se desgastan por la punta de
+## la planta (las obreras quedaban dando vueltas junto al nido); con 100 hormigas, como en las
+## Fases 0-2, no hacía falta. Si ninguna conocida tiene hojas, se explora como siempre.
+func _remembered_plant(i: int, cx: int, cy: int, ci: int) -> bool:
+	if not sim.incremental or cy >= sim.cfg.surface_y:
+		return false
+	var known := sim.econ.known_plants
+	var best: Plant = null
+	var best_d := INF
+	for k in sim.plants.size():
+		var pl := sim.plants[k]
+		if known[k] == 0 or pl.leaves <= 0:
+			continue
+		var d := absf(pos[i].x - _center(pl.cell.x, pl.cell.y).x)
+		if d < best_d:
+			best_d = d
+			best = pl
+	if best == null:
+		return false
+	state[i] = State.GO_TO_FOOD
+	_step(i, cx, cy, ci, Mode.PLANT, _center(best.cell.x, best.cell.y))
 	return true
 
 
@@ -407,7 +437,7 @@ func _food_here_max(cx: int, cy: int, ci: int) -> float:
 
 func _think_explore(i: int, cx: int, cy: int, ci: int) -> void:
 	var cfg := sim.cfg
-	if _plant_logic(i, cx, cy, ci):
+	if _plant_logic(i, cx, cy, ci) or _remembered_plant(i, cx, cy, ci):
 		return
 	if sim.total_leaves_left <= 0 and sim.world.marked_count == 0:
 		state[i] = State.IDLE
@@ -422,7 +452,7 @@ func _think_explore(i: int, cx: int, cy: int, ci: int) -> void:
 
 func _think_food(i: int, cx: int, cy: int, ci: int) -> void:
 	var cfg := sim.cfg
-	if _plant_logic(i, cx, cy, ci):
+	if _plant_logic(i, cx, cy, ci) or _remembered_plant(i, cx, cy, ci):
 		return
 	var here := sim.food.data[ci]
 	var best := 0.0

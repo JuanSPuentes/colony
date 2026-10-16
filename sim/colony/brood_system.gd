@@ -53,6 +53,12 @@ func tick(dt: float) -> void:
 		dev_mult = 0.4
 	elif not nursery_ok:
 		dev_mult = 0.65
+	# Fase 3: en el modo incremental no se compran nodrizas, así que la cría no depende de ellas;
+	# toda la cría (no solo la larva) avanza `inc_brood_speed` veces más rápido.
+	var speed := 1.0
+	if sim.incremental:
+		dev_mult = 1.0
+		speed = cfg.inc_brood_speed
 	var flooded := sim.rooms.counts[WorldGrid.Room.NURSERY] == 0 and _nest_is_deep_flooded()
 	var starved := sim.colony.food <= 0.0
 	for k in 3:
@@ -67,7 +73,7 @@ func tick(dt: float) -> void:
 		counts_by_stage[stage[i]] += 1
 		if starved and stage[i] == Stage.LARVA:
 			continue  # sin comida la larva no avanza (se estanca, no muere, en este MVP)
-		timer[i] -= dt * (dev_mult if stage[i] == Stage.LARVA else 1.0) * maxf(CasteDefs.DEV_SPEED_MULT[caste[i]], 0.01)
+		timer[i] -= dt * speed * (dev_mult if stage[i] == Stage.LARVA else 1.0) * maxf(CasteDefs.DEV_SPEED_MULT[caste[i]], 0.01)
 		if timer[i] <= 0.0:
 			_advance(i)
 

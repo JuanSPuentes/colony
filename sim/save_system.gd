@@ -19,7 +19,9 @@ static func to_dict(sim: Simulation) -> Dictionary:
 	var d := {}
 	d["version"] = SAVE_VERSION
 	d["seed"] = sim.rng.seed
-	d["rng_state"] = sim.rng.state
+	# Como texto: JSON guarda los números como double y redondearía este entero de 64 bits, así
+	# que la partida cargada desde un archivo divergía a los pocos ticks.
+	d["rng_state"] = str(sim.rng.state)
 	d["tick_count"] = sim.tick_count
 	d["leaves_stored"] = sim.leaves_stored
 	d["delivered"] = sim.delivered
@@ -39,6 +41,14 @@ static func to_dict(sim: Simulation) -> Dictionary:
 	d["spiders_spawned"] = sim.spiders_spawned
 	d["spider_next_s"] = sim.spider_next_s
 	d["notifications"] = sim.notifications.duplicate()
+	# Fase 3: modo incremental.
+	d["incremental"] = sim.incremental
+	d["econ"] = {
+		"bought": _int_keys_to_str(sim.econ.bought),
+		"auto_mode": sim.econ.auto_mode,
+		"food_earned": sim.econ.food_earned,
+		"known_plants": Array(sim.econ.known_plants),
+	}
 
 	d["world"] = {
 		"w": sim.world.w, "h": sim.world.h,
@@ -103,7 +113,7 @@ static func to_dict(sim: Simulation) -> Dictionary:
 
 	var plants := []
 	for p in sim.plants:
-		plants.append({"cell": [p.cell.x, p.cell.y], "leaves": p.leaves, "max_leaves": p.max_leaves})
+		plants.append({"cell": [p.cell.x, p.cell.y], "leaves": p.leaves, "max_leaves": p.max_leaves, "regrow_acc": p.regrow_acc})
 	d["plants"] = plants
 	return d
 
@@ -127,7 +137,7 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	# Es algo de trabajo de más, pero evita tener un segundo camino de construcción sin colonia
 	# que mantener aparte (ver ARCHITECTURE.md: menos caminos de construcción, menos espagueti).
 	var sim := Simulation.new(cfg, int(d["seed"]))
-	sim.rng.state = int(d["rng_state"])
+	sim.rng.state = String(d["rng_state"]).to_int() if d["rng_state"] is String else int(d["rng_state"])
 	sim.tick_count = int(d["tick_count"])
 	sim.leaves_stored = int(d["leaves_stored"])
 	sim.delivered = int(d["delivered"])
@@ -149,6 +159,16 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	sim.notifications.clear()
 	for n in d["notifications"]:
 		sim.notifications.append(String(n))
+	# Fase 3. Un guardado de antes de la Fase 3 no trae estas llaves: queda en modo clásico.
+	sim.incremental = bool(d.get("incremental", false))
+	if d.has("econ"):
+		var ed: Dictionary = d["econ"]
+		var bought: Dictionary = ed["bought"]
+		for k in bought:
+			sim.econ.bought[int(k)] = int(bought[k])
+		sim.econ.auto_mode = int(ed["auto_mode"]) as IncrementalEconomy.Auto
+		sim.econ.food_earned = float(ed["food_earned"])
+		sim.econ.known_plants = PackedByteArray(ed["known_plants"])
 
 	var wd: Dictionary = d["world"]
 	sim.world.cells = PackedByteArray(wd["cells"])
@@ -237,6 +257,7 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 		var cell: Array = pd["cell"]
 		var p := Plant.new(Vector2i(int(cell[0]), int(cell[1])), int(pd["max_leaves"]))
 		p.leaves = int(pd["leaves"])
+		p.regrow_acc = float(pd.get("regrow_acc", 0.0))
 		sim.plants.append(p)
 
 	# Los campos de distancia y las cámaras son derivados: se recalculan en vez de guardarse.

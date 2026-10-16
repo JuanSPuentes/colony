@@ -40,6 +40,7 @@ var plant_view: PlantView
 var overlay: OverlayView
 var ant_renderer: AntRenderer
 var spider_view: SpiderView
+var day_night_view: DayNightView
 var hud: Hud
 var camera: Camera2D
 
@@ -85,7 +86,8 @@ func _ready() -> void:
 	overlay = OverlayView.new()
 	ant_renderer = AntRenderer.new()
 	spider_view = SpiderView.new()
-	for n in [terrain_view, plant_view, overlay, ant_renderer, spider_view]:
+	day_night_view = DayNightView.new()
+	for n in [terrain_view, plant_view, overlay, ant_renderer, spider_view, day_night_view]:
 		world_vp.add_child(n)
 	camera = Camera2D.new()
 	world_vp.add_child(camera)
@@ -101,8 +103,11 @@ func start(new_seed: int, loaded_sim: Simulation = null) -> void:
 		sim = loaded_sim
 	else:
 		sim = Simulation.new(cfg, seed_value)
-		sim.spawn_colony_court()
+		# Fase 3: el juego real arranca en modo incremental (colonia mínima, todo en comida, día y
+		# noche, sin araña). `spawn_colony_court()` sigue existiendo para las pruebas de la Fase 1.
+		sim.spawn_incremental_start()
 	terrain_view.setup(sim)
+	day_night_view.setup(sim)
 	plant_view.setup(sim)
 	overlay.setup(sim)
 	ant_renderer.setup(sim)
@@ -183,6 +188,7 @@ func _process(delta: float) -> void:
 		if ran >= MAX_TICKS_PER_FRAME:
 			_acc = 0.0
 	terrain_view.refresh()
+	day_night_view.refresh()
 	_overlay_acc += delta
 	if _overlay_acc >= 1.0 / OVERLAY_HZ:
 		_overlay_acc = 0.0
@@ -295,12 +301,23 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				phero_index = (phero_index + 1) % PHERO_FIELDS.size()
 			elif tool == 3:
 				room_index = (room_index + 1) % ROOM_TYPES.size()
+		# Fase 3 (modo incremental): 7/8 compran obrera/soldado y 9 cambia la auto-compra. En una
+		# partida clásica (cargada de un guardado viejo) siguen ajustando el reparto de castas.
 		KEY_7:
-			sim.cmd_nudge_caste(CasteDefs.Caste.WORKER, 0.08)
+			if sim.incremental:
+				sim.cmd_buy(CasteDefs.Caste.WORKER)
+			else:
+				sim.cmd_nudge_caste(CasteDefs.Caste.WORKER, 0.08)
 		KEY_8:
-			sim.cmd_nudge_caste(CasteDefs.Caste.NURSE, 0.08)
+			if sim.incremental:
+				sim.cmd_buy(CasteDefs.Caste.SOLDIER)
+			else:
+				sim.cmd_nudge_caste(CasteDefs.Caste.NURSE, 0.08)
 		KEY_9:
-			sim.cmd_nudge_caste(CasteDefs.Caste.SOLDIER, 0.08)
+			if sim.incremental:
+				sim.cmd_cycle_auto_buy()
+			else:
+				sim.cmd_nudge_caste(CasteDefs.Caste.SOLDIER, 0.08)
 		KEY_SPACE:
 			paused = not paused
 		KEY_F1:
@@ -328,6 +345,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				start(rng.randi() % 1000000)
 			else:
 				start(seed_value)
+		KEY_I:
+			hud.toggle_status()
+		KEY_C:
+			hud.toggle_controls()
 		KEY_F6:
 			save_game()
 		KEY_F7:

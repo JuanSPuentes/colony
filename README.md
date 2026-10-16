@@ -5,10 +5,12 @@ Simulador de supervivencia y gestión de una colonia de hormigas en 2D lateral, 
 colonia de arrieras (inspirada en *Atta*) con **señales de feromonas** y **diseño del nido**, y las
 hormigas hacen el trabajo.
 
-> Estado: **Fase 1 completa + guardado/carga de la Fase 2**, verificado. Reina, 4 castas, cría en 4
-> etapas, 5 cámaras con efecto real, economía de hongo, las 5 feromonas, drenaje, una araña,
-> progresión por eras y partida guardable (F6/F7). Sigue sin arte final, tutorial guiado ni
-> controles de interfaz pulidos (el resto de la Fase 2).
+> Estado: **Fase 3 (modo incremental)**, verificado. El juego arranca con una colonia mínima (reina,
+> 3 obreras, 1 soldado y 1 larva), todo se mide en **comida**, el jugador **compra** obreras y
+> soldados (cada una más cara que la anterior) o activa la **auto-compra**, las plantas rebrotan de
+> día, hay **día y noche** (un día de luz + una noche = 1 día) y no hay araña. Debajo sigue todo lo
+> de las Fases 1 y 2 (castas, cría, cámaras, feromonas, drenaje, guardado F6/F7), que el modo
+> clásico conserva intacto para sus pruebas.
 > Repositorio: https://github.com/JuanSPuentes/colony
 
 **Principio de diseño:** el jugador controla la colonia mediante señales ambientales y el diseño del
@@ -52,7 +54,9 @@ La ventana base es 480x270 escalada por entero a 1440x810. Sin descargas, sin re
 | **3** | Cámara (Q/E cambia el tipo: Guardería, Almacén, Jardín de hongos, Drenaje, Real) |
 | **4** | Borrar (quita marca de excavar, cámara y las 5 feromonas bajo el pincel) |
 | Clic izquierdo / derecho, arrastrar | Pintar / borrar con la herramienta activa |
-| **7 / 8 / 9** | Sube el objetivo de reparto de Obreras / Nodrizas / Soldados |
+| **7** | Comprar una obrera con comida (también con el botón del panel) |
+| **8** | Comprar un soldado con comida (también con el botón del panel) |
+| **9** | Auto-compra: apagada → obreras → soldados (compra sola en cuanto alcanza, dejando una reserva) |
 | **Espacio** | Pausa / reanudar |
 | **F1 / F2 / F3** | Velocidad x1 / x2 / x4 |
 | **Tab** | Recorre las capas de depuración (feromonas, agua, estados, castas) |
@@ -60,14 +64,42 @@ La ventana base es 480x270 escalada por entero a 1440x810. Sin descargas, sin re
 | Rueda del mouse | Zoom en pasos fijos |
 | **H** | Saltar a la reina |
 | **L** | Forzar la lluvia |
-| **F10** | Forzar que aparezca una araña |
 | **F9** | Agregar 400 hormigas (prueba de carga) |
-| **F5** | Reiniciar con la misma semilla |
-| **Shift+F5** | Reiniciar con una semilla nueva |
+| **F5** | Reiniciar con el mismo mapa |
+| **Shift+F5** | Reiniciar con un mapa nuevo |
 | **F6** | Guardar partida |
 | **F7** | Cargar la última partida guardada |
+| **I** | Plegar / desplegar el panel de estado (también con el botón "ocultar" del panel) |
+| **C** | Plegar / desplegar la barra de controles de abajo (también con su botón) |
+| Clic medio, arrastrar | Mover la cámara |
 
 ## 3. Cómo funciona ahora mismo
+
+### Modo incremental (Fase 3, el que arranca `main.gd`)
+
+`Simulation.spawn_incremental_start()` (`sim/simulation.gd`), economía en
+`sim/colony/incremental_economy.gd`, día y noche en `sim/core/day_night.gd`.
+
+- **Colonia inicial:** 1 reina, 3 obreras, 1 soldado y 1 larva (que nace obrera). Sin nodrizas.
+- **Todo es comida.** Cada hoja que una obrera trae al nido vale `inc_food_per_leaf` de comida al
+  llegar. No hay agua ni hongo como recursos aparte. Todas las adultas comen; si la comida llega
+  a 0, la reina y los soldados se debilitan (las obreras no).
+- **Comprar hormigas:** 7 (obrera) u 8 (soldado), o los botones del panel. Se paga la comida, la
+  reina pone un huevo de esa casta y la cría hace el resto (huevo → larva → pupa, `inc_brood_speed`
+  veces más rápido que en la Fase 1 y sin depender de nodrizas). Cada compra multiplica el precio
+  de la siguiente de esa casta (`inc_*_cost_growth`).
+- **Auto-compra (9):** apagada → obreras → soldados. Compra sola en cuanto alcanza, dejando
+  `inc_auto_reserve` de comida para no matar de hambre a la reina.
+- **Día y noche:** el ciclo dura `day_length_s` (60 % de luz, 40 % de noche) y arranca al amanecer.
+  Un día de luz + una noche = 1 día; el HUD muestra "Día N". De noche el mundo se oscurece y las
+  plantas no rebrotan.
+- **Plantas:** rebrotan de día (`inc_plant_regrow_per_s`) hasta su máximo, así el juego no se queda
+  sin hojas. La colonia recuerda las plantas de las que ya sacó hojas y las obreras en la superficie
+  van directo a la conocida más cercana (ver simplificaciones, sección 9b).
+- **Sin araña ni eras.** La primera lluvia llega al inicio del día 3 (`inc_rain_first_s`) y la reina
+  no se ahoga; el resto de la colonia sí sufre las inundaciones.
+
+### Modo clásico (Fases 1-2; lo usan las pruebas de esas fases)
 
 **Castas** (`sim/colony/caste_defs.gd`): Reina (una sola, vive en la cámara Real, pone huevos si hay comida
 suficiente; su muerte termina la partida), Obrera (explora, corta hojas, carga, cava), Nodriza (acelera
@@ -244,12 +276,13 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 |---|---|
 | `Godot --headless --path . --script tools/test_phase0.gd` | Regresión de la Fase 0: determinismo, forrajeo, feromonas, excavación, lluvia/drenaje, huida/muerte, rendimiento. **34 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase1.gd` | Criterios de la Fase 1: reina y puesta de huevos, las 4 etapas de cría, reparto de castas, cámaras (válidas/inválidas), economía del jardín de hongos, Peligro/Evacuar, Drenaje, la araña (caza, la espantan, causa bajas sin soldados), eras, derrota, determinismo con colonia completa, rendimiento. **25 pruebas.** |
-| `Godot --headless --path . --script tools/ui_test.gd` | La escena real con eventos inyectados: arranque con reina+nodrizas, pausa, velocidad, herramientas, cámara, capas, F9, reinicio. **21 pruebas.** |
+| `Godot --headless --path . --script tools/ui_test.gd` | La escena real con eventos inyectados: arranque con reina+nodrizas, pausa, compras 7/8/9 y botones, paneles plegables (I/C), herramientas, cámara, capas, F9, reinicio. **28 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase2.gd` | Guardado y carga: la huella no cambia al guardar y cargar (en memoria y desde un archivo real), la partida sigue igual tras cargar como si nunca se hubiera guardado, un archivo inexistente no revienta, funciona con y sin reina, las cámaras y la lluvia en curso sobreviven. **10 pruebas.** |
+| `Godot --headless --path . --script tools/test_phase3.gd` | Modo incremental: colonia inicial exacta, sin araña ni eras, día y noche, hojas → comida, compras y precios crecientes, el huevo comprado nace de esa casta, auto-compra con reserva, rebrote solo de día, la colonia crece sola 6 min con lluvia sin morir, guardado y carga (también por JSON), determinismo. **28 pruebas.** |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
-**Última ejecución verificada (2026-10-16, Godot 4.7.2):** las cuatro suites en 34/34, 25/25, 21/21
-y 10/10.
+**Última ejecución verificada (2026-10-16, Godot 4.7.2):** las cinco suites en 34/34 (Fase 0),
+25/25 (Fase 1), 10/10 (Fase 2), 28/28 (Fase 3) y 28/28 (ui_test).
 
 ### Notas para escribir pruebas
 - Si tallas túneles a mano con un helper tipo `_carve()`, llama también a
@@ -314,6 +347,19 @@ verdad:
   después sobreescribe cada campo con lo guardado, en vez de tener un segundo camino de
   construcción "en blanco". Es algo de trabajo de más en cada carga, pero evita mantener dos
   formas de construir una `Simulation` (ver ARCHITECTURE.md, sección 2).
+
+## 9b. Simplificaciones deliberadas del modo incremental (Fase 3)
+
+- **La colonia recuerda las plantas visitadas** (`IncrementalEconomy.known_plants`) y las obreras
+  en la superficie van directo a la más cercana con hojas. Con 3-10 obreras los rastros de
+  feromona no se refrescan lo bastante: se desgastaban por la punta de la planta y terminaban
+  justo fuera del alcance de vista, así que las obreras daban vueltas junto al nido hasta que la
+  reina moría de hambre. Solo pasa en este modo; las Fases 0-2 siguen usando solo los rastros.
+- **La reina no se ahoga en este modo**, y la primera lluvia llega el día 3: una colonia de 5
+  hormigas no alcanza a cavar un drenaje antes de la lluvia de los 150 s de la Fase 1.
+- **No se compran nodrizas** y la cría no depende de ellas en este modo.
+- **Las cámaras siguen existiendo** pero solo el Almacén importa para la economía (sube el tope de
+  comida). El Jardín de hongos no hace nada: las hojas ya son comida al llegar.
 
 ## 10. Hoja de ruta: qué falta de la Fase 2
 

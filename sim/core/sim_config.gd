@@ -162,3 +162,33 @@ extends Resource
 @export_group("Fase 1: eras")
 @export var era2_population := 20
 @export var era3_population := 60
+
+@export_group("Fase 3: día y noche")
+## Duración de un día completo (luz + noche) en segundos de simulación. Un día + una noche = 1 día.
+@export var day_length_s := 180.0
+## Fracción del ciclo que es de noche (el resto es de día). El ciclo arranca al amanecer.
+@export var night_fraction := 0.4
+
+@export_group("Fase 3: modo incremental")
+## Colonia inicial del modo incremental: reina + estas obreras + estos soldados + larvas de obrera.
+@export var inc_start_workers := 3
+@export var inc_start_soldiers := 1
+@export var inc_start_larvae := 1
+@export var inc_start_food := 40.0
+## Comida que vale cada hoja que una obrera trae al nido. Todo se mide en comida: no hay agua ni
+## hongo como recursos aparte en este modo.
+@export var inc_food_per_leaf := 4.0
+## Precio base de cada casta comprable; cada compra multiplica el siguiente precio por `growth`.
+@export var inc_worker_cost := 15.0
+@export var inc_worker_cost_growth := 1.12
+@export var inc_soldier_cost := 40.0
+@export var inc_soldier_cost_growth := 1.2
+## La auto-compra deja siempre esta comida de reserva para no matar de hambre a la reina.
+@export var inc_auto_reserve := 10.0
+## Multiplica la velocidad de la cría (huevo, larva y pupa) para que una compra no tarde minutos.
+@export var inc_brood_speed := 2.0
+## Primera lluvia del modo incremental (la de la Fase 1 llega a los 150 s, demasiado pronto para
+## una colonia de 5 hormigas que todavía no puede cavar un drenaje). Por defecto: inicio del día 3.
+@export var inc_rain_first_s := 360.0
+## Hojas que rebrota cada planta por segundo, solo de día y hasta su máximo.
+@export var inc_plant_regrow_per_s := 0.06
