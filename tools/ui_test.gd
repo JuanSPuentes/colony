@@ -1,20 +1,19 @@
 extends SceneTree
-## Drives the real scene with real input events (keyboard + mouse) and checks the UI wiring.
-## Usage: Godot --headless --path . --script tools/ui_test.gd
+## Prueba la escena real con eventos de teclado y mouse inyectados: herramientas, cámara, pausa,
+## velocidades, lluvia, capas, prueba de carga, reinicio y semilla.
+## Uso: godot --headless --path . --script tools/ui_test.gd
 
 var _pass := 0
 var _fail := 0
 var _main: Node
-var _view: WorldView
-var _hud: Hud
 
 
 func _initialize() -> void:
-	# Headless windows are tiny; give the test a real-sized, unscaled viewport so injected
-	# mouse positions mean the same thing as on screen.
+	# Las ventanas headless son diminutas: damos un tamaño real y sin escalado para que las
+	# posiciones del mouse inyectadas signifiquen lo mismo que en pantalla.
 	root.content_scale_mode = Window.CONTENT_SCALE_MODE_DISABLED
-	root.size = Vector2i(1680, 900)
-	_main = load("res://scenes/main.tscn").instantiate()
+	root.size = Vector2i(480, 270)
+	_main = load("res://main.tscn").instantiate()
 	root.add_child(_main)
 	_run()
 
@@ -24,7 +23,7 @@ func _check(label: String, ok: bool, detail := "") -> void:
 		_pass += 1
 	else:
 		_fail += 1
-	print("[%s] %s %s" % ["PASS" if ok else "FAIL", label, detail])
+	print("[%s] %s %s" % ["OK " if ok else "FALLA", label, detail])
 
 
 func _frames(n: int) -> void:
@@ -32,131 +31,146 @@ func _frames(n: int) -> void:
 		await process_frame
 
 
-func _key(code: int, ctrl := false) -> void:
-	for pressed in [true, false]:
-		var ev := InputEventKey.new()
-		ev.keycode = code
-		ev.physical_keycode = code
-		ev.pressed = pressed
-		ev.ctrl_pressed = ctrl
-		root.push_input(ev)
+func _key(code: int, shift := false, hold_frames := 1) -> void:
+	var ev := InputEventKey.new()
+	ev.keycode = code
+	ev.physical_keycode = code
+	ev.shift_pressed = shift
+	ev.pressed = true
+	root.push_input(ev)
+	await _frames(hold_frames)
+	var up := InputEventKey.new()
+	up.keycode = code
+	up.physical_keycode = code
+	up.pressed = false
+	root.push_input(up)
 	await process_frame
 
 
-func _mouse_at(cell: Vector2i) -> Vector2:
-	return _view.get_global_transform() * Vector2((cell.x + 0.5) * Cfg.CELL, (cell.y + 0.5) * Cfg.CELL)
+func _screen(cell: Vector2i) -> Vector2:
+	return _main.get_global_transform_with_canvas() * ((Vector2(cell) + Vector2(0.5, 0.5)) * 8.0)
 
 
 func _drag(from: Vector2i, to: Vector2i, button := MOUSE_BUTTON_LEFT) -> void:
-	var mm := InputEventMouseMotion.new()
-	mm.position = _mouse_at(from)
-	root.push_input(mm)
-	await process_frame
 	var down := InputEventMouseButton.new()
 	down.button_index = button
 	down.pressed = true
-	down.position = _mouse_at(from)
+	down.position = _screen(from)
 	root.push_input(down)
 	await process_frame
-	var steps := 6
-	for i in range(1, steps + 1):
+	for i in range(1, 7):
 		var m := InputEventMouseMotion.new()
-		var c := Vector2i(roundi(lerpf(from.x, to.x, float(i) / steps)), roundi(lerpf(from.y, to.y, float(i) / steps)))
-		m.position = _mouse_at(c)
+		m.position = _screen(Vector2i(roundi(lerpf(from.x, to.x, i / 6.0)), roundi(lerpf(from.y, to.y, i / 6.0))))
 		root.push_input(m)
 		await process_frame
 	var up := InputEventMouseButton.new()
 	up.button_index = button
 	up.pressed = false
-	up.position = _mouse_at(to)
+	up.position = _screen(to)
 	root.push_input(up)
 	await process_frame
 
 
+func _wheel(up: bool) -> void:
+	var e := InputEventMouseButton.new()
+	e.button_index = MOUSE_BUTTON_WHEEL_UP if up else MOUSE_BUTTON_WHEEL_DOWN
+	e.pressed = true
+	e.position = Vector2(240, 135)
+	root.push_input(e)
+	await process_frame
+
+
+func _ticks_per_second(frames: int) -> float:
+	var t0 := Time.get_ticks_msec()
+	var k0: int = _main.sim.tick_count
+	await _frames(frames)
+	return float(_main.sim.tick_count - k0) / ((Time.get_ticks_msec() - t0) / 1000.0)
+
+
 func _run() -> void:
 	await _frames(5)
-	_view = _main.view
-	_hud = _main.hud
-	var sim: Simulation = _view.sim
-	_check("scene builds view, HUD and simulation", _view != null and _hud != null and sim != null)
-	_check("top bar and tool buttons exist", _hud._buttons.size() >= 20 and _hud._top_labels.has("food"))
+	var sim: Simulation = _main.sim
+	var cfg: SimConfig = _main.cfg
+	var sy := cfg.surface_y
+	_check("la escena principal arranca con 100 hormigas y todas las vistas", sim.ants.alive_count == 100 and _main.terrain_view != null and _main.ant_renderer != null and _main.overlay != null and _main.hud != null)
+	_check("el HUD muestra los datos en español", _main.hud._top.text.contains("Hormigas: 100") and _main.hud._top.text.contains("Hojas:") and _main.hud._top.text.contains("Clima:") and _main.hud._top.text.contains("Semilla:") and _main.hud._top.text.contains("FPS:") and _main.hud._top.text.contains("Vel:"), _main.hud._top.text)
 
-	# Pause / speed.
+	# Pausa y velocidades.
 	await _key(KEY_SPACE)
-	_check("Space pauses", _view.paused)
-	var t_paused := sim.t
-	await _frames(30)
-	_check("simulation time stops while paused", is_equal_approx(sim.t, t_paused))
-	await _key(KEY_SPACE)
-	await _frames(30)
-	_check("Space resumes", not _view.paused and sim.t > t_paused)
-	await _key(KEY_TAB)
-	_check("Tab raises the speed to 2x", _view.speed == 2.0)
-	await _key(KEY_TAB)
-	await _key(KEY_TAB)
-	_check("Tab cycles back to 1x", _view.speed == 1.0)
-
-	# Dig with the mouse.
-	await _key(KEY_D)
-	_check("D selects the dig tool", _view.tool == WorldView.Tool.DIG)
-	var s := Cfg.SURFACE
-	await _drag(Vector2i(41, s + 4), Vector2i(44, s + 4))
-	_check("dragging with the dig tool creates connected dig orders", sim.terrain.dig_jobs.size() >= 3, "orders=%d" % sim.terrain.dig_jobs.size())
-	await _drag(Vector2i(70, s + 30), Vector2i(72, s + 30))
-	_check("disconnected dig orders are refused", not sim.terrain.dig_jobs.has(Vector2i(70, s + 30)))
-
-	# Zoom and pan keep the world under the HUD frame and keep clicks accurate.
-	var wheel := InputEventMouseButton.new()
-	wheel.button_index = MOUSE_BUTTON_WHEEL_UP
-	wheel.pressed = true
-	wheel.position = _mouse_at(Vector2i(40, s + 5))
-	root.push_input(wheel)
-	await _frames(2)
-	_check("mouse wheel zooms in", _view.zoom > 1.1, "zoom=%.2f" % _view.zoom)
-	_check("zoom keeps the world covering the view", _view.position.x <= 0.0 and _view.position.y <= 0.0 and _view.position.x >= _view.visible_rect.size.x - _view.world_size.x * _view.zoom - 0.01)
-	await _drag(Vector2i(41, s + 6), Vector2i(43, s + 6))
-	_check("digging still lands on the right cell when zoomed", sim.terrain.dig_jobs.has(Vector2i(42, s + 6)), "orders=%d" % sim.terrain.dig_jobs.size())
-	await _key(KEY_HOME)
-	_check("Home resets the view", is_equal_approx(_view.zoom, 1.0) and _view.position == Vector2.ZERO)
-
-	# Pheromone painting.
-	await _key(KEY_Q)
-	_check("Q selects food pheromone", _view.tool == WorldView.Tool.PHERO and _view.tool_phero == Cfg.Phero.FOOD)
-	await _drag(Vector2i(40, Cfg.SURFACE_ROW), Vector2i(30, Cfg.SURFACE_ROW))
-	_check("dragging paints a rising food trail", sim.pher.count(Cfg.Phero.FOOD) >= 8 and sim.pher.get_v(Cfg.Phero.FOOD, Vector2i(31, Cfg.SURFACE_ROW)) > sim.pher.get_v(Cfg.Phero.FOOD, Vector2i(39, Cfg.SURFACE_ROW)), "cells=%d" % sim.pher.count(Cfg.Phero.FOOD))
-	await _key(KEY_E)
-	await _drag(Vector2i(60, Cfg.SURFACE_ROW), Vector2i(60, Cfg.SURFACE_ROW))
-	_check("danger pheromone paints a patch", sim.pher.get_v(Cfg.Phero.DANGER, Vector2i(61, Cfg.SURFACE_ROW)) > 0.9)
-	await _drag(Vector2i(59, Cfg.SURFACE_ROW), Vector2i(61, Cfg.SURFACE_ROW), MOUSE_BUTTON_RIGHT)
-	_check("right-click erases pheromones", sim.pher.get_v(Cfg.Phero.DANGER, Vector2i(60, Cfg.SURFACE_ROW)) < 0.01)
-
-	# Rooms.
-	await _key(KEY_4)
-	await _drag(Vector2i(34, s + 8), Vector2i(35, s + 8))
-	_check("room tool turns tunnel cells into drainage", sim.terrain.room_at(Vector2i(34, s + 8)) == Cfg.Room.DRAIN)
-
-	# Inspect.
-	await _key(KEY_I)
-	var ant: Ant = sim.ants[3]
-	await _drag(ant.cell, ant.cell)
-	_check("Inspect selects what is clicked", _view.selected != null, str(_view.selected))
-	_check("selection text describes it", _view.describe_selection().length() > 5)
-	_hud._set_caste(Cfg.Caste.SOLDIER)
-	_check("caste button sets the next eggs", sim.colony.next_caste == Cfg.Caste.SOLDIER)
-
-	# Outcome screen and restart.
-	sim.kill_ant(sim.queen, "spider")
-	await _frames(10)
-	_check("defeat is detected and explained", sim.outcome == 2 and sim.outcome_reason.length() > 10)
-	_check("defeat screen is shown", _hud._over_panel.visible and _hud._over_text.text.contains("spider"))
-	var old := sim
-	_hud.restart_requested.emit()
-	await _frames(5)
-	_check("restart creates a fresh simulation", _view.sim != old and _view.sim.t < 1.0 and _view.sim.outcome == 0 and not _hud._over_panel.visible)
-	# Victory screen.
-	_view.sim.t = Cfg.WIN_DAYS * Cfg.DAY_LENGTH - 0.02
-	_view.speed = 1.0
+	_check("Espacio pausa", _main.paused)
+	var k0: int = _main.sim.tick_count
 	await _frames(20)
-	_check("surviving the final day wins", _view.sim.outcome == 1 and _hud._over_title.text == "VICTORY", "outcome=%d" % _view.sim.outcome)
-	print("RESULT: %d passed, %d failed" % [_pass, _fail])
+	_check("en pausa no avanzan los ticks", _main.sim.tick_count == k0)
+	await _key(KEY_SPACE)
+	_check("Espacio reanuda", not _main.paused)
+	await _key(KEY_F1)
+	var r1 := await _ticks_per_second(40)
+	await _key(KEY_F3)
+	var r4 := await _ticks_per_second(40)
+	await _key(KEY_F2)
+	var r2 := await _ticks_per_second(40)
+	_check("F1/F2/F3 dan velocidad x1/x2/x4 (más ticks por segundo, mismo tick fijo)", _main.speed == 2 and r4 > r2 * 1.5 and r2 > r1 * 1.4, "ticks/s: x1=%.0f x2=%.0f x4=%.0f" % [r1, r2, r4])
+	await _key(KEY_F1)
+
+	# Herramientas del mouse.
+	await _key(KEY_1)
+	var cells: Array[Vector2i] = [Vector2i(cfg.nest_x + 1, sy + 2), Vector2i(cfg.nest_x + 2, sy + 2), Vector2i(cfg.nest_x + 3, sy + 2)]
+	await _drag(cells[0], cells[2])
+	_check("clic izquierdo y arrastrar con Cavar marca celdas", _main.sim.world.marked_count == 3, "marcadas=%d" % _main.sim.world.marked_count)
+	await _drag(Vector2i(30, sy + 10), Vector2i(32, sy + 10))
+	_check("no se marcan celdas sin espacio abierto al lado", _main.sim.world.type_at(31, sy + 10) == WorldGrid.Cell.DIRT)
+	await _drag(cells[1], cells[2], MOUSE_BUTTON_RIGHT)
+	_check("clic derecho desmarca", _main.sim.world.marked_count == 1)
+	await _key(KEY_2)
+	await _drag(Vector2i(cfg.nest_x, sy - 1), Vector2i(cfg.nest_x - 20, sy - 1))
+	var near: float = _main.sim.food.get_v(cfg.nest_x - 3, sy - 1)
+	var far: float = _main.sim.food.get_v(cfg.nest_x - 18, sy - 1)
+	_check("la herramienta Feromona pinta un rastro con dirección (más fuerte al final)", far > near and near > 0.0, "cerca=%.2f lejos=%.2f" % [near, far])
+	await _drag(Vector2i(cfg.nest_x - 12, sy - 1), Vector2i(cfg.nest_x - 12, sy - 1), MOUSE_BUTTON_RIGHT)
+	_check("clic derecho con Feromona borra", _main.sim.food.get_v(cfg.nest_x - 12, sy - 1) == 0.0)
+
+	# Cámara.
+	var cam: Camera2D = _main.camera
+	var x0 := cam.position.x
+	await _key(KEY_D, false, 20)
+	_check("WASD mueve la cámara", cam.position.x > x0 + 2.0, "x %.0f -> %.0f" % [x0, cam.position.x])
+	var z0: float = cam.zoom.x
+	await _wheel(true)
+	_check("la rueda hace zoom en pasos fijos", cam.zoom.x > z0 and [0.5, 1.0, 2.0, 3.0, 4.0].has(cam.zoom.x), "zoom %.1f -> %.1f" % [z0, cam.zoom.x])
+	for i in 8:
+		await _wheel(false)
+	_check("el zoom tiene un mínimo", cam.zoom.x == 0.5)
+	await _wheel(true)
+
+	# Lluvia, capas y prueba de carga.
+	await _key(KEY_L)
+	_check("L fuerza la lluvia", _main.sim.weather == Simulation.Weather.RAINING)
+	var layer0: int = _main.overlay.layer
+	await _key(KEY_TAB)
+	_check("Tab cambia de capa de depuración", _main.overlay.layer != layer0, OverlayView.LAYER_NAMES[_main.overlay.layer])
+	var seen := {}
+	for i in 5:
+		seen[_main.overlay.layer] = true
+		await _key(KEY_TAB)
+	_check("Tab recorre las 5 capas (ninguna, comida, hogar, agua, estados)", seen.size() == 5)
+	var before: int = _main.sim.ants.alive_count
+	await _key(KEY_F9)
+	_check("F9 agrega 400 hormigas", _main.sim.ants.alive_count == before + 400, "%d -> %d" % [before, _main.sim.ants.alive_count])
+
+	# Reinicio y semilla.
+	var seed0: int = _main.seed_value
+	var sim_before: Simulation = _main.sim
+	await _frames(30)
+	await _key(KEY_F5)
+	_check("F5 reinicia con la misma semilla", _main.sim != sim_before and _main.sim.rng.seed == seed0 and _main.sim.tick_count < 5 and _main.sim.ants.alive_count == 100, "semilla %d" % _main.sim.rng.seed)
+	var a: Simulation = Simulation.new(cfg, seed0)
+	for i in 100:
+		a.tick()
+	var b: Simulation = _main.sim
+	while b.tick_count < 100:
+		b.tick()
+	_check("tras reiniciar, la misma semilla reproduce exactamente la partida", a.checksum() == b.checksum(), "huellas %d / %d" % [a.checksum(), b.checksum()])
+	await _key(KEY_F5, true)
+	_check("Shift+F5 reinicia con una semilla nueva", _main.seed_value != seed0 and _main.sim.rng.seed == _main.seed_value, "semilla %d" % _main.seed_value)
+	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)

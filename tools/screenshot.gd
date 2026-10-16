@@ -1,15 +1,13 @@
 extends SceneTree
-## Dev tool: renders the real game in a window and saves PNGs.
-## Usage: Godot --path . --resolution 1600x900 --script tools/screenshot.gd -- <out_dir> <sim_seconds> [sim_seconds ...]
-## Fast-forwards the simulation to each given time (in sim seconds) and captures a frame.
+## Herramienta de desarrollo: ejecuta el juego real en una ventana y guarda PNG.
+## Uso: Godot --path . --script tools/screenshot.gd -- <carpeta> <seg_sim> [seg_sim ...] [zoomN] [capaN]
+## Avanza la simulación hasta cada tiempo y captura. "zoomN" fija el nivel de zoom, "capaN" la capa.
 
-const V := preload("res://tools/validate.gd")
-const DEMO := true  # let the scripted player act so the shots show trails, rooms and fights
 var _main: Node
 
 
 func _initialize() -> void:
-	_main = load("res://scenes/main.tscn").instantiate()
+	_main = load("res://main.tscn").instantiate()
 	root.add_child(_main)
 	_run(OS.get_cmdline_user_args())
 
@@ -17,35 +15,29 @@ func _initialize() -> void:
 func _run(args: PackedStringArray) -> void:
 	var out := args[0] if args.size() > 0 else "user://shots"
 	DirAccess.make_dir_recursive_absolute(out)
-	await _frames(20)
-	var view: WorldView = _main.view
-	_shot(out, "t0")
-	var bot := V.new()
-	var ticks := 0
-	for i in range(1, args.size()):
-		var target := float(args[i])
-		view.speed = 1.0
-		while view.sim.t < target and view.sim.outcome == 0:
-			for k in 20:
-				view.sim.step(Cfg.TICK)
-				ticks += 1
-				if ticks % 30 == 0 and DEMO:
-					bot._bot_actions(view.sim, 0 if ticks == 30 * 4 else 1)
-		await _frames(6)
-		_shot(out, "t%d" % int(target))
-		view.zoom_at(Vector2(660, 330), 2.4)
-		await _frames(4)
-		_shot(out, "t%d_zoom" % int(target))
-		view.reset_view()
-	quit()
-
-
-func _frames(n: int) -> void:
-	for i in n:
+	for _i in 10:
 		await process_frame
-
-
-func _shot(dir: String, shot_name: String) -> void:
-	var img := root.get_texture().get_image()
-	img.save_png("%s/%s.png" % [dir, shot_name])
-	print("saved ", shot_name, " ", img.get_size())
+	var suffix := ""
+	for i in range(1, args.size()):
+		var a := args[i]
+		if a.begins_with("zoom"):
+			_main.zoom_index = int(a.substr(4))
+			_main._apply_camera()
+			suffix = "_z" + a.substr(4)
+			continue
+		if a.begins_with("capa"):
+			_main.overlay.layer = int(a.substr(4))
+			suffix += "_c" + a.substr(4)
+			continue
+		var target := float(a)
+		while _main.sim.time_s() < target:
+			for _k in 40:
+				_main.sim.tick()
+		for _j in 8:
+			await process_frame
+		_main.overlay.refresh()
+		await process_frame
+		var img := root.get_texture().get_image()
+		img.save_png("%s/t%d%s.png" % [out, int(target), suffix])
+		print("saved t", int(target), suffix, " ", img.get_size())
+	quit()
