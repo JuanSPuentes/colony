@@ -57,12 +57,11 @@ func _run() -> void:
 	await _frames(1)
 	_check("la flecha desde el menú vuelve al menú", _app.menu.visible and not _app.options.visible)
 
-	# Modo Historia.
+	# Papeles invertidos a propósito (ver main_menu.gd): "Juego normal" es la economía de
+	# comida/compra (incremental) y "Modo infinito" es la colonia con reina/castas/araña (Historia).
 	_app.menu.play_normal.emit()
 	await _frames(3)
-	_check("Juego normal arranca en modo Historia (con reina y nodrizas)", _app.game != null and not _app.game.sim.incremental and _app.game.sim.queen_id >= 0, "" if _app.game == null else "incremental=%s" % _app.game.sim.incremental)
-	var expected_historia: int = _app.game.cfg.initial_ants + 1 + _app.game.cfg.initial_nurses
-	_check("la colonia de Historia arranca con obreras+reina+nodrizas", _app.game.sim.ants.alive_count == expected_historia, "esperado=%d real=%d" % [expected_historia, _app.game.sim.ants.alive_count])
+	_check("Juego normal arranca en modo incremental (comida/compra)", _app.game != null and _app.game.sim.incremental, "" if _app.game == null else "incremental=%s" % _app.game.sim.incremental)
 
 	# La tuerca durante la partida: abre Opciones y pausa; la flecha debe volver al juego, no al menú.
 	_app.game.menu_requested.emit()
@@ -72,12 +71,12 @@ func _run() -> void:
 	await _frames(1)
 	_check("la flecha desde la tuerca vuelve al juego (no al menú) y lo despausa", not _app.options.visible and not _app.menu.visible and not _app.game.paused)
 
-	# Reiniciar (F5-equivalente) en modo Historia debe conservar el modo, no volver a Infinito.
+	# Reiniciar (F5-equivalente) en modo incremental debe conservar el modo, no volver a Historia.
 	var seed0: int = _app.game.seed_value
 	_app.game.start(seed0)
-	_check("reiniciar conserva el modo de juego (Historia)", not _app.game.sim.incremental)
+	_check("reiniciar conserva el modo de juego (incremental)", _app.game.sim.incremental)
 
-	# Modo Infinito: se descarta la partida de Historia y se arranca una nueva.
+	# Modo Infinito (Historia): se descarta la partida de comida/compra y se arranca una nueva.
 	_app.game.queue_free()
 	await _frames(1)
 	_app = load("res://app/app.tscn").instantiate()
@@ -85,7 +84,9 @@ func _run() -> void:
 	await _frames(2)
 	_app.menu.play_infinite.emit()
 	await _frames(3)
-	_check("Modo infinito arranca en modo incremental", _app.game.sim.incremental)
+	_check("Modo infinito arranca en modo Historia (con reina y nodrizas)", not _app.game.sim.incremental and _app.game.sim.queen_id >= 0)
+	var expected_historia: int = _app.game.cfg.initial_ants + 1 + _app.game.cfg.initial_nurses
+	_check("la colonia de Historia arranca con obreras+reina+nodrizas", _app.game.sim.ants.alive_count == expected_historia, "esperado=%d real=%d" % [expected_historia, _app.game.sim.ants.alive_count])
 
 	# Salir: el botón debe pedir confirmación, no cerrar directo.
 	var closed := false

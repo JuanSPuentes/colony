@@ -33,7 +33,9 @@ app/
   app.gd / app.tscn    Punto de entrada real del juego (`project.godot` -> `run/main_scene`).
                        Decide si se ve el menú, Opciones o la partida; no sabe nada de reglas de
                        juego (eso es `sim/`) ni de cómo se dibuja el mundo (eso es `view/`).
-  main_menu.gd         Juego normal / Modo infinito / Opciones / Salir.
+  main_menu.gd         Juego normal / Modo infinito / Opciones / Salir. Papeles invertidos a
+                       propósito: "Juego normal" lanza la economía de comida/compra (Fase 3) y
+                       "Modo infinito" lanza la colonia con reina/castas/araña (Fase 1).
   options_screen.gd    Controles (reusa `Hud.CONTROLS`, no mantiene su propia lista), volumen,
                        brillo y un botón de "Salir del juego".
   app_settings.gd       Volumen/brillo persistidos en user://app_settings.json. No es parte de una
@@ -41,8 +43,9 @@ app/
                        aplicación, sobrevive a reiniciar y a cargar partidas distintas.
 ```
 
-`main.tscn` (con `main.gd`) sigue siendo bootable solo y arranca en modo Infinito sin pasar por el
-menú: así lo abren `tools/ui_test.gd` y `tools/screenshot.gd`, sin que el menú les importe. `app.gd`
+`main.tscn` (con `main.gd`) sigue siendo bootable solo y arranca en el modo `incremental` (comida/
+compra, hoy "Juego normal" en el menú) sin pasar por el menú: así lo abren `tools/ui_test.gd` y
+`tools/screenshot.gd`, sin que el menú les importe. `app.gd`
 lo instancia con `auto_start = false` y lo arranca él mismo en el modo que eligió el jugador
 (`main.gd.start(seed, loaded_sim, mode)`). La tuerca del HUD (`Hud.gear_pressed`) viaja hacia
 arriba por las capas (`Hud` -> `main.gd.menu_requested` -> `app.gd`), nunca al revés: `main.gd`

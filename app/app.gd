@@ -22,8 +22,11 @@ func _ready() -> void:
 
 	menu = MainMenu.new()
 	add_child(menu)
-	menu.play_normal.connect(func() -> void: _start_game(false))
-	menu.play_infinite.connect(func() -> void: _start_game(true))
+	# Papeles invertidos a propósito (ver nota en main_menu.gd): "Juego normal" es ahora la
+	# economía de comida/compra (antes "Modo infinito") y "Modo infinito" es la colonia con reina,
+	# castas y araña (antes "Juego normal"). `_start_game(incremental)` no cambió de significado.
+	menu.play_normal.connect(func() -> void: _start_game(true))
+	menu.play_infinite.connect(func() -> void: _start_game(false))
 	menu.open_options.connect(func() -> void: _open_options("menu"))
 	menu.quit_requested.connect(_ask_quit)
 

@@ -1,8 +1,14 @@
 class_name MainMenu
 extends CanvasLayer
-## Menú principal: Juego normal (modo Historia, Fase 1), Modo infinito (el de Juan, Fase 3),
-## Opciones y Salir. Dibuja directo a la resolución real, con el mismo estilo de paneles que el
-## resto de la interfaz (`Hud._make_panel`), para que se sienta parte del mismo juego.
+## Menú principal: Juego normal, Modo infinito, Opciones y Salir. Dibuja directo a la resolución
+## real, con el mismo estilo de paneles que el resto de la interfaz (`Hud._make_panel`), para que
+## se sienta parte del mismo juego.
+##
+## Papeles invertidos a propósito: "Juego normal" lanza la economía de comida/compra (la Fase 3,
+## sin reina ni final) y "Modo infinito" lanza la colonia con reina/castas/araña (la Fase 1, que
+## sí puede ganarse o perderse). `play_normal`/`play_infinite` conservan sus nombres de señal
+## porque son la posición en el menú, no el modo; `app.gd._ready()` decide a qué modo de
+## `_start_game()` apunta cada una.
 
 signal play_normal
 signal play_infinite
@@ -53,8 +59,8 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 16)
 	root.add_child(box)
 
-	_option(box, "Juego normal", "Reina, cámaras, araña: la colonia completa de la Fase 1.", play_normal.emit)
-	_option(box, "Modo infinito", "Crece sin límite: compra obreras y soldados con comida.", play_infinite.emit)
+	_option(box, "Juego normal", "Crece sin límite: compra obreras y soldados con comida.", play_normal.emit)
+	_option(box, "Modo infinito", "Reina, cámaras, araña: la colonia completa de la Fase 1.", play_infinite.emit)
 	_option(box, "Opciones", "Controles, volumen y brillo.", open_options.emit)
 	_option(box, "Salir", "Cierra el juego.", quit_requested.emit)
 
