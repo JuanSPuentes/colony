@@ -1,279 +1,299 @@
 # Colony: Under the Earth
 
-A 2D side-view ant-colony survival and management simulator made with **Godot 4.7** (GDScript,
-Compatibility renderer) for Windows. You do not command individual ants. You guide a leafcutter
-colony (*Atta*-inspired) with **pheromone signals** and **nest design**, and the ants do the work.
+Simulador de supervivencia y gestión de una colonia de hormigas en 2D lateral, hecho con **Godot 4.7**
+(GDScript, renderer de Compatibilidad) para Windows. No controlas hormigas individuales: guías una
+colonia de arrieras (inspirada en *Atta*) con **señales de feromonas** y **diseño del nido**, y las
+hormigas hacen el trabajo.
 
-> Status: playable prototype / MVP. One species, one scenario (survive 10 days), one enemy (spider).
-> Repository: https://github.com/JuanSPuentes/colony
+> Estado: **MVP de la Fase 1**, verificado. Reina, 4 castas, cría en 4 etapas, 5 cámaras con efecto
+> real, economía de hongo, las 5 feromonas, drenaje, una araña y progresión por eras. Sigue sin
+> pulido final de arte, tutorial, guardado ni menús (eso es Fase 2).
+> Repositorio: https://github.com/JuanSPuentes/colony
 
-**Design principle:** the player controls the colony through environmental signals and nest design;
-the ants do the work themselves. Every new feature should respect this.
+**Principio de diseño:** el jugador controla la colonia mediante señales ambientales y el diseño del
+nido; las hormigas hacen el trabajo. Toda función nueva debe respetar esto.
 
-## Contents
+**Antes de empezar una fase nueva, lee [`ARCHITECTURE.md`](ARCHITECTURE.md):** cómo está organizado
+`sim/` por dominio (no por fase), cómo aislar el código nuevo para no romper fases anteriores, y la
+convención de una prueba por fase. Existe justo para que el proyecto no se vuelva espagueti.
 
-1. [Play it](#1-play-it)
-2. [Controls](#2-controls)
-3. [How the game works](#3-how-the-game-works)
-4. [Development guide](#4-development-guide) (start here to contribute)
-5. [Architecture](#5-architecture)
-6. [How to extend it](#6-how-to-extend-it)
-7. [Testing](#7-testing)
-8. [Art and sound status](#8-art-and-sound-status)
-9. [Known limitations and roadmap](#9-known-limitations-and-roadmap)
+## Contenido
+
+1. [Jugarlo](#1-jugarlo)
+2. [Controles](#2-controles)
+3. [Cómo funciona ahora mismo](#3-cómo-funciona-ahora-mismo)
+4. [Guía de desarrollo](#4-guía-de-desarrollo)
+5. [Arquitectura](#5-arquitectura)
+6. [Pruebas](#6-pruebas)
+7. [Estado del arte y el sonido](#7-estado-del-arte-y-el-sonido)
+8. [Simplificaciones deliberadas de la Fase 1](#8-simplificaciones-deliberadas-de-la-fase-1)
+9. [Hoja de ruta: qué viene en la Fase 2](#9-hoja-de-ruta-qué-viene-en-la-fase-2)
 
 ---
 
-## 1. Play it
+## 1. Jugarlo
 
-1. Install **Godot 4.x**. Developed and tested with **4.7.2 stable** (standard build, not Mono):
+1. Instala **Godot 4.7.2** (build estándar, no Mono):
    https://godotengine.org/download/windows/
-2. Open Godot, **Import** `project.godot`, press **F5**.
-   From a terminal: `Godot.exe --path .`
-3. Optional fixed seed: `Godot.exe --path . -- --seed=42` (each restart uses seed + 1).
+2. Abre Godot, **Importa** `project.godot`, pulsa **F5**.
+   Desde una terminal: `Godot.exe --path .`
+3. Semilla fija opcional: `Godot.exe --path . -- --seed=42` (cada reinicio usa semilla + 1).
 
-The window is 1680x900 and scales to fit. No downloads, no network, no external assets.
+La ventana base es 480x270 escalada por entero a 1440x810. Sin descargas, sin red, sin assets externos.
 
-## 2. Controls
+## 2. Controles
 
-| Input | Action |
+| Tecla | Acción |
 |---|---|
-| **I** | Inspect: click an ant, brood, plant, spider or cell |
-| **D** | Dig: drag from an existing tunnel into soil (workers carry the orders out) |
-| **1 2 3 4 5** | Paint rooms over tunnels: Royal, Nursery, Storage, Drain, plain Tunnel |
-| **Q W E R T** | Pheromones: Food, Home, Danger, Attack, Evacuate |
-| **X** or right-click | Erase pheromones and cancel dig orders under the brush |
-| **7 8 9** | Next eggs become Worker / Nurse / Soldier (also retargets a selected egg or larva) |
-| **Space** | Pause / resume |
-| **Tab** | Speed 1x / 2x / 4x |
-| Mouse wheel, middle-drag, arrows, **Home** | Zoom, pan, reset the view |
-| **Ctrl+R** or *Restart* button | Restart with a new seed |
+| **1** | Cavar: arrastra desde un túnel existente hacia tierra |
+| **2** | Feromona (Q/E cambia el tipo: Comida, Hogar, Peligro, Ataque, Evacuar) |
+| **3** | Cámara (Q/E cambia el tipo: Guardería, Almacén, Jardín de hongos, Drenaje, Real) |
+| **4** | Borrar (quita marca de excavar, cámara y las 5 feromonas bajo el pincel) |
+| Clic izquierdo / derecho, arrastrar | Pintar / borrar con la herramienta activa |
+| **7 / 8 / 9** | Sube el objetivo de reparto de Obreras / Nodrizas / Soldados |
+| **Espacio** | Pausa / reanudar |
+| **F1 / F2 / F3** | Velocidad x1 / x2 / x4 |
+| **Tab** | Recorre las capas de depuración (feromonas, agua, estados, castas) |
+| **WASD** | Mover la cámara |
+| Rueda del mouse | Zoom en pasos fijos |
+| **H** | Saltar a la reina |
+| **L** | Forzar la lluvia |
+| **F10** | Forzar que aparezca una araña |
+| **F9** | Agregar 400 hormigas (prueba de carga) |
+| **F5** | Reiniciar con la misma semilla |
+| **Shift+F5** | Reiniciar con una semilla nueva |
 
-Everything is also in the right-hand panel (hover for tooltips). A hint box teaches the first steps.
+## 3. Cómo funciona ahora mismo
 
-## 3. How the game works
+**Castas** (`sim/colony/caste_defs.gd`): Reina (una sola, vive en la cámara Real, pone huevos si hay comida
+suficiente; su muerte termina la partida), Obrera (explora, corta hojas, carga, cava), Nodriza (acelera
+el desarrollo de la cría cerca del nido), Soldado (patrulla, responde a la feromona de Ataque y pelea
+cuerpo a cuerpo contra la araña).
 
-**Goal.** Survive until the end of day 10 with the queen alive and at least 10 other ants. You lose if
-the queen dies (spider, drowning, starvation), if there is no food or water for two minutes, or if
-every worker, nurse and soldier dies. The defeat screen explains why.
+**Cría** (`sim/colony/brood_system.gd`): huevo → larva → pupa → adulta. Al poner un huevo, la reina le asigna
+la casta que más lejos esté del reparto objetivo del jugador (ajustable con 7/8/9). Sin nodrizas cerca
+la larva se desarrolla mucho más despacio; sin Guardería válida, algo más despacio y puede morir si el
+nido se inunda a fondo.
 
-**Castes** (data in `scripts/sim/species_defs.gd`)
-- *Queen*: stays in the royal chamber, lays eggs when fed, flees rising water. Her death ends the game.
-- *Workers*: forage food and water, carry it home, dig tunnels.
-- *Nurses*: move eggs and larvae to the nursery and tend them.
-- *Soldiers*: guard the entrance, fight spiders, answer Attack signals.
+**Cámaras** (`sim/colony/room_system.gd`): el jugador las designa pintando sobre túneles ya excavados. Cada
+tipo necesita un tamaño mínimo y estar conectado al nido para activarse:
 
-**Brood.** Egg, larva, pupa, adult (18 s / 40 s / 26 s at normal care). Larvae eat food; a soldier costs
-10 food, a nurse 6, a worker 5. Nurseries and nurse care speed development; flooded or starving brood
-dies. The population cap grows with the size of the nest.
-
-**Economy.** Food and water are carried physically to storage. Storage cells raise capacity. Everyone
-consumes food; without it the queen stops laying and ants weaken at different rates. The top bar shows
-stocks and their change per minute.
-
-**Pheromones (the main control).** Five fields with intensity, decay and caste-dependent effects. Rain
-washes surface scent away about 10x faster.
-
-| Type | What ants do |
+| Cámara | Efecto |
 |---|---|
-| Food | Workers climb its gradient toward food; returning loaded ants lay their own trail, so good routes reinforce themselves. Drag **from the nest toward the plant**: the stroke ramps up so the trail has a direction. |
-| Home | Lost ants (rain makes surface ants lose their way, shown as `?`) follow it back. Drag **from far away toward the nest**. |
-| Danger | Workers and nurses retreat underground; soldiers ignore it. |
-| Attack | Soldiers in range run to the strongest Attack cells. |
-| Evacuate | Ants in marked cells move to the nearest unmarked, dry cell. |
+| Real | La reina solo pone huevos aquí (la cámara inicial ya viene designada) |
+| Guardería | La cría se desarrolla a velocidad completa |
+| Almacén | Sube el tope de comida y agua |
+| Jardín de hongos | Convierte hojas almacenadas en comida, con el tiempo |
+| Drenaje | Absorbe agua de inundación, celda por celda |
 
-Ants weigh signals against their task, load, path cost (flooded cells are expensive), colony needs and
-immediate threats, so a food trail never makes an ant ignore rising water or a spider. Icons above
-ants show reactions: `+` following a trail, `!` fleeing danger, `~` fleeing water, `>` evacuating,
-`x` attacking, `?` lost.
+**Economía** (`sim/colony/colony.gd`): las obreras cortan hojas y las traen al nido (igual que en la Fase 0);
+el Jardín de hongos las convierte en comida. El agua entra despacio mientras hay charcos tras la
+lluvia (ver simplificaciones). Todas las adultas consumen comida y agua; sin jardín de hongos, la
+colonia no repone comida sola. La falta de comida o agua no afecta a la obrera (compatibilidad con la
+Fase 0), pero sí debilita a la reina, las nodrizas y los soldados hasta matarlos.
 
-**Nest building.** A dig order must touch an existing tunnel or order, so new areas are always
-connected. Rock cannot be dug. Digging costs worker time plus a little food. Digging up to the surface
-opens a new entrance, and a new way for rain. Rooms: Royal (queen lays here), Nursery (faster, tended
-brood), Storage (capacity), Drain (soaks floodwater).
+**Feromonas.** A las dos de la Fase 0 (Comida, Hogar) se suman:
 
-**Weather.** Storms are announced 15 s ahead. Rain enters every surface opening; water falls, spreads
-sideways and pushes upward when cells are full. It slows and drowns ants, damages brood and can kill the
-queen. The default nest funnels water into the royal chamber, so layout matters.
+| Tipo | Qué hacen las hormigas |
+|---|---|
+| Peligro | Todas menos el soldado huyen de la zona (el soldado la ignora) |
+| Ataque | Los soldados en rango van hacia la señal más fuerte |
+| Evacuar | Las hormigas en la zona marcada se alejan hacia donde la señal sea más débil |
 
-**Spider.** Comes from a map edge, hunts exposed ants, lingers at the entrance, and invades toward the
-queen if no soldier guards the entrance for about 22 s. It retreats when badly hurt. Four spiders are
-scheduled (days 3, 6, 8, 10) with growing strength.
+**Araña** (`sim/threats/spider.gd`): aparece en la superficie cuando la población llega a cierto umbral, caza
+obreras sueltas y, si nadie la detiene en la entrada por un tiempo, hiere a la reina. Huye si queda
+débil o si varios soldados la rodean; vuelve otra más fuerte pasado un intervalo.
+
+**Eras:** la población desbloquea contenido — Fundación (excavar, Comida, Hogar), Colonia joven
+(Jardín de hongos, soldados, primera lluvia) y Colonia madura (Drenaje, Peligro, Ataque, Evacuar, la
+araña).
+
+**Derrota:** la partida termina cuando muere la reina (ahogada, por la araña o por hambre/sed
+prolongadas); el HUD muestra la causa y F5 reinicia.
 
 ---
 
-## 4. Development guide
+## 4. Guía de desarrollo
 
-### Requirements
-- Godot **4.7.2** (other 4.x versions are untested; GDScript uses typed code, `static var`, lambdas).
-- Windows is the target platform. Nothing in the code is Windows-specific.
-- Python is **not** needed. All tools are GDScript.
+### Requisitos
+- Godot **4.7.2** (otras versiones 4.x no están probadas).
+- Windows es la plataforma objetivo. Nada en el código es específico de Windows.
+- No se necesita Python. Todas las herramientas son GDScript.
 
-### First steps
+### Primeros pasos
 ```
 git clone https://github.com/JuanSPuentes/colony.git
 cd colony
-Godot.exe --headless --path . --import      # first import, creates .godot/ (ignored by git)
-Godot.exe --path .                          # play
+Godot_v4.7.2-stable_win64_console.exe --headless --path . --import
+Godot_v4.7.2-stable_win64_console.exe --path .
 ```
-`.godot/` is generated and ignored by git. Never commit it.
+`.godot/` se genera solo y está ignorado por git. Nunca lo subas.
 
-### Repository layout
+**Importante:** cada vez que agregues un script nuevo con `class_name`, corre `--import` antes de
+`--script` o de abrir el editor; si no, los scripts que lo referencian fallan con
+"Could not find type X in the current scope" aunque el código esté bien.
+
+### Estructura del repositorio
 ```
-project.godot            Godot config (1680x900, Compatibility renderer, main scene)
-scenes/main.tscn         Single scene: one Node running scripts/main.gd
-scripts/main.gd          Entry point: builds view, HUD, sound; creates/restarts the Simulation
-scripts/sim/             SIMULATION. No drawing, no UI, no Node classes (RefCounted only)
-scripts/view/            Rendering and mouse input (world_view.gd), procedural sprites (sprites.gd)
-scripts/ui/hud.gd        All UI, built in code
-scripts/audio/sfx.gd     Synthesized sound effects
-tools/                   Dev and test scripts (see Testing)
+project.godot        Configuración de Godot (480x270 interno, escalado a 1440x810)
+main.tscn            Escena única: un Node que corre main.gd
+main.gd              Punto de entrada: arma la vista, el HUD, crea/reinicia la Simulation
+ARCHITECTURE.md       Cómo organizar el código de cada fase nueva (léelo antes de empezar una)
+sim/                  SIMULACIÓN. Sin dibujo, sin UI, sin clases Node (solo RefCounted)
+  core/                 Terreno, feromonas, agua, campos de distancia, configuración
+  colony/               Castas, hormigas, cría, cámaras, economía
+  threats/              Enemigos (hoy, la araña)
+  simulation.gd         El orquestador: conoce todos los dominios, fija el orden del tick
+view/                 Render y entrada de mouse
+tools/                Scripts de desarrollo y pruebas (ver sección 6)
 ```
 
-### Conventions
-- **Simulation is separate from presentation.** `scripts/sim/` must never reference `Node`, drawing,
-  `Input` or UI. The view reads simulation state; the UI and mouse call `Simulation.cmd_*` methods.
-  This keeps the sim testable headless.
-- **Fixed tick.** `Cfg.TICK = 1/30 s`. `WorldView` accumulates real time x speed and calls
-  `sim.step(Cfg.TICK)`. Never use `delta` of the render frame inside the simulation.
-- **Determinism.** All randomness goes through `sim.rng` (seeded). Same seed gives the same game.
-  Avoid `randf()` in `scripts/sim/` (it is fine for cosmetic particles in the view).
-- **Data over code.** Caste stats, brood times and costs live in `species_defs.gd`; tunable numbers
-  such as flood rates and decay rates are named constants at the top of their files.
-- **Typed GDScript.** The project treats untyped inferred `:=` from Variant as an error. When `sim` is
-  an untyped parameter (as in `AntBrain`), declare types explicitly: `var p: Array[Vector2i] = ...`.
-- **Grid coordinates.** x grows right, y grows **down**. Row `Cfg.SURFACE` (14) is the first soil row;
-  ants walk on row `Cfg.SURFACE_ROW` (13) above ground and on `TUNNEL` cells below. Convert with
-  `Cfg.cell_center()` and `Cfg.world_to_cell()`. One cell is 16 px.
-- Keep comments short and explain *why*, not what. Match the surrounding style (tabs, snake_case).
+### Convenciones
+- **La simulación va separada de la presentación.** `sim/` nunca debe referenciar `Node`, dibujo,
+  `Input` ni UI.
+- **Tick fijo.** `SimConfig.tick_rate` (20/s). Nunca uses el `delta` del frame de render dentro de la
+  simulación.
+- **Determinismo.** Toda la aleatoriedad pasa por `sim.rng` (con semilla).
+- **Datos en vez de código.** Los números ajustables viven en `SimConfig`, agrupados por
+  `@export_group`; los datos de cada casta, en `CasteDefs` (arrays paralelos, no Resources: ver
+  sección 8).
+- **GDScript tipado.** El proyecto trata la inferencia no tipada de `Variant` como un problema.
+- Comentarios cortos que expliquen el *porqué*, no el *qué*.
 
-### Workflow
-1. Make the change (simulation changes go in `scripts/sim/`).
-2. Run the three test scripts below. All must pass.
-3. If you changed visuals, run `tools/screenshot.gd` and look at the PNGs.
-4. Commit with a short imperative message and open a PR against `main`.
+### Flujo de trabajo
+1. Haz el cambio (los cambios de simulación van en `sim/`).
+2. Corre las tres pruebas de la sección 6. Las tres deben pasar.
+3. Si cambiaste algo visual, corre `tools/screenshot.gd` y mira los PNG.
+4. Commit con un mensaje corto en modo imperativo y abre un PR contra `main`.
 
-## 5. Architecture
+## 5. Arquitectura
+
+**Cómo está organizado `sim/` en carpetas (`core/`, `colony/`, `threats/`) y las reglas para no
+romper fases anteriores al agregar una nueva: ver [`ARCHITECTURE.md`](ARCHITECTURE.md).** Lo de
+aquí abajo es sobre el render y el orden del tick, no sobre dónde vive cada archivo.
+
+### Render: mundo en pixel art + HUD nítido
+
+El mundo (480x270, pixel art) vive dentro de un `SubViewport` propio que `main.gd` escala con
+`SubViewportContainer.stretch_shrink` y sin filtro (`TEXTURE_FILTER_NEAREST`), para que se vea
+grande y nítido en vez de borroso. El `Hud` (`CanvasLayer`) es hermano de ese `SubViewport`, fuera
+de él, así que dibuja su texto directo a la resolución real de la ventana (nítido de verdad, no
+una imagen de baja resolución ampliada).
+
+`Main` sigue siendo el nodo raíz (para que `sim`, `cfg`, `tool`, `camera`, etc. se lean igual que
+antes desde `Hud` y desde las pruebas), pero como ya no vive en el mismo viewport que la cámara del
+mundo, la entrada de mouse se convierte a mano: `main.gd._to_world()` pasa la posición del evento
+por el tamaño real del contenedor y por `world_vp.get_canvas_transform()` (que sí conoce la cámara).
+
+**Nota para quien escriba pruebas:** en `--headless`, `get_tree().root.size` queda fijo en un
+tamaño ficticio sin importar lo que el script le asigne (`root.size = ...` no tiene efecto real).
+Por eso existe `main.world_size_override`: una prueba que necesite clics de mouse predecibles debe
+fijarlo (ver `tools/ui_test.gd`) en vez de confiar en `root.size`.
 
 ```
 main.gd
- |- Sfx                      synthesized audio
- |- WorldView (Node2D)       draws everything, mouse tools, owns the simulation clock
- |    '- reads Simulation, calls sim.cmd_*()
- |- Hud (CanvasLayer)        top bar, tool panel, hints, log, outcome screen
- '- Simulation (RefCounted)  the whole game state and rules
-      |- Terrain             cell types, rooms, water array, dig orders, AStarGrid2D, BFS helper
-      |- Pheromones          5 sparse-active float fields, decay, gradient helpers
-      |- Flood               water cellular automaton (fall, spread, overflow, drain, seep)
-      |- Weather             storm schedule, rain intensity, puddle
-      |- Colony              food/water stocks, consumption, egg laying, population cap
-      |- ants: Array[Ant]    data only; behaviour is in AntBrain
-      |- brood: Array[Brood], sources: Array[FoodSource], spider: Spider
-      '- AntBrain (static)   per-caste state machines
+ |- SubViewportContainer (sin filtro, stretch_shrink dinámico)
+ |    '- SubViewport (480x270)
+ |         '- TerrainView / AntRenderer / PlantView / SpiderView / OverlayView / Camera2D
+ |- Hud (CanvasLayer, fuera del SubViewport: dibuja a resolución real)
+ '- Simulation (RefCounted)   todo el estado y las reglas del juego
+      |- WorldGrid             terreno, excavación, cámaras designadas (Fase 1)
+      |- PheromoneField x5     Comida, Hogar, Peligro, Ataque, Evacuar
+      |- WaterSim              agua: caída, esparcido, evaporación, drenaje
+      |- NestDistanceField     campo de distancias al nido (BFS)
+      |- RoomSystem            cuenta cámaras válidas y su capacidad (Fase 1)
+      |- Colony                comida, agua, consumo, puesta de huevos (Fase 1)
+      |- BroodSystem           huevo/larva/pupa (Fase 1)
+      |- Spider                el intruso (Fase 1)
+      |- AntSystem             datos de las hormigas y su lógica de decisión por casta
+      '- plants: Array[Plant]
 ```
 
-### Tick order (`Simulation.step`)
-weather -> puddle -> flood -> pheromone decay -> food regrowth -> spider schedule -> spatial buckets
--> slow stats (every 0.25 s) -> every ant `AntBrain.update` -> spider -> brood -> colony economy ->
-remove dead -> win/lose check. Dead ants are only flagged during the loop and removed afterwards.
+### Por qué `queen_id` puede ser -1
+`Simulation.new(cfg, seed)` por sí sola crea una colonia **sin reina**, exactamente como en la Fase 0.
+Solo `spawn_colony_court()` (llamado por `main.gd.start()`) añade la reina y las nodrizas iniciales.
+Esto fue deliberado: así las pruebas de la Fase 0 (`tools/test_phase0.gd`, que nunca llaman a
+`spawn_colony_court()`) siguen comprobando exactamente el mismo comportamiento de obrera que antes,
+sin que la economía, la cría o la araña interfieran. El código revisa `queen_id >= 0` antes de correr
+cualquier sistema de la Fase 1.
 
-### Ant behaviour (`scripts/sim/ant_brain.gd`)
-`AntBrain.update(ant, sim, dt)` runs once per ant per tick:
-1. Environment damage (drowning, starvation), then a hazard check every ~0.3 s (flood, Evacuate,
-   Danger). A hazard interrupts the current task and starts `FLEE` toward a safe cell found by BFS.
-2. Movement along a precomputed A* path (`_move`). Blocked paths are dropped and the state logic re-plans.
-3. The state machine of the caste: `_queen`, `_worker`, `_nurse`, `_soldier`.
+### Orden del tick (`Simulation.tick`)
+clima → agua + drenaje → decaimiento de las 5 feromonas → recálculo de campos si cambió el terreno →
+cámaras (`rooms.maybe_recompute`) → `AntSystem.tick()` → si hay reina: economía → cría → era →
+araña (cada 3 ticks) → revisión de derrota.
 
-Important states (`Cfg.State`): IDLE, EXPLORE, FOLLOW_TRAIL, TO_RESOURCE, COLLECT, CARRY_HOME, TO_DIG,
-DIGGING, NURSING, MOVE_BROOD, GUARD, ATTACK, FLEE, REST.
+## 6. Pruebas
 
-Ground-line pheromone following is `_gradient_dir()`: climb the gradient, keep heading on plateaus, turn
-when walking downhill, report `ended` when the trail runs out. Both Food and Home use it.
+Todas las pruebas son GDScript corrido a través de Godot. Usa el build de consola
+(`Godot_v4.7.2-stable_win64_console.exe`) para ver la salida. Terminan con código 1 si algo falla.
 
-### Why some things are the way they are
-- **No scent next to openings** (`Simulation.near_opening`): without this, returning ants pile pheromone at
-  the entrance and trap followers in a local maximum.
-- **Paint ramp** (`WorldView._paint_phero`): Food/Home strokes rise 0.012 per cell so a trail has a
-  direction and does not saturate quickly.
-- **Hunger is staggered** (`Ant.hardiness`): ants weaken at different speeds so a famine is gradual.
-- **Surface is one-dimensional**: ants only walk on the ground line. This keeps pathing and pheromones
-  simple and is a deliberate MVP simplification.
-
-## 6. How to extend it
-
-**A new species.** Add a dictionary like `SpeciesDefs.LEAFCUTTER` and pass it to `Colony.new()`
-in `Simulation`. Castes are looked up with `SpeciesDefs.caste(species, caste_id)`. New caste ids go in
-`Cfg.Caste` plus a sprite in `Sprites._make_ant` and a branch in `AntBrain.update`.
-
-**A new room type.** Add it to `Cfg.Room` and `Cfg.ROOM_NAMES`, a colour in `Sprites.ROOM_BASE` and
-`ROOM_SPECK`, a button in `Hud._build`, a key in `WorldView._unhandled_key_input`, and implement its
-effect where it matters (`Colony`, `Flood`, `AntBrain`). A room without a gameplay effect should not be
-added.
-
-**A new pheromone.** Add to `Cfg.Phero`, `PHERO_NAMES`, `Pheromones.DECAY`, `WorldView.PHERO_COLORS` and
-`PHERO_HINTS`, then read it in `AntBrain` (see `_hazards` and `_soldier_think` for examples). Add an A/B
-test in `tools/validate.gd` proving it changes behaviour.
-
-**A new enemy.** Copy the structure of `scripts/sim/spider.gd` (a `RefCounted` with `step(sim, dt)`,
-`take_damage`, an alarm emitter), schedule it in `Simulation._spider_plan`/`_spider_events`, draw it in
-`WorldView`, and let soldiers target it in `AntBrain._soldier`.
-
-**New events/weather.** Storms are a list in `Weather._init`. Add fields and handle them in
-`Weather.step`.
-
-**Balance.** Main knobs: `species_defs.gd` (costs, speeds), `Colony` (consumption, laying rules),
-`FoodSource.regrow` and amounts in `Simulation._make_sources`, `Flood` constants, `Weather.storms`,
-`Simulation._spider_plan`, `Spider.damage_per_hit`. After changing any, rerun `tools/validate.gd`: the
-scripted-player test is an early warning that the game became too hard or too easy.
-
-## 7. Testing
-
-All tests are GDScript run through Godot. Use the console build on Windows
-(`Godot_v4.7.2-stable_win64_console.exe`) to see output. They exit with code 1 on failure.
-
-| Command | What it checks |
+| Comando | Qué comprueba |
 |---|---|
-| `Godot --headless --path . --script tools/validate.gd` | Simulation behaviour: determinism, foraging, A/B tests for each pheromone, digging and room rules, eggs and castes, flooding with and without drains, spider fights and invasion, lost ants, performance, and a scripted player that must win 2 of 3 seeds. **36 checks.** |
-| `Godot --headless --path . --script tools/ui_test.gd` | The real scene driven with injected keyboard and mouse events: pause, speed, tools, dragging, erase, inspect, zoom, caste buttons, defeat, restart, victory. **26 checks.** |
-| `Godot --path . --script tools/perf.gd` | (Needs a window.) Frame rate with 140 ants at 4x speed. Expected 60 FPS. |
-| `Godot --headless --path . --script tools/sim_test.gd -- 7` | Prints a report every 30 simulated seconds for a full game without player input. Useful for balance. |
-| `Godot --path . --resolution 1680x900 --script tools/screenshot.gd -- <out_dir> 45 150 250` | (Needs a window.) Fast-forwards to the given sim seconds with a scripted player and saves PNGs, plus zoomed shots. |
+| `Godot --headless --path . --script tools/test_phase0.gd` | Regresión de la Fase 0: determinismo, forrajeo, feromonas, excavación, lluvia/drenaje, huida/muerte, rendimiento. **34 pruebas.** |
+| `Godot --headless --path . --script tools/test_phase1.gd` | Criterios de la Fase 1: reina y puesta de huevos, las 4 etapas de cría, reparto de castas, cámaras (válidas/inválidas), economía del jardín de hongos, Peligro/Evacuar, Drenaje, la araña (caza, la espantan, causa bajas sin soldados), eras, derrota, determinismo con colonia completa, rendimiento. **25 pruebas.** |
+| `Godot --headless --path . --script tools/ui_test.gd` | La escena real con eventos inyectados: arranque con reina+nodrizas, pausa, velocidad, herramientas, cámara, capas, F9, reinicio. **21 pruebas.** |
+| `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
-Notes for writing tests
-- Disable random events with `_no_storms(sim)` when you test something else; force one with
-  `sim._spider_plan = [...]` or `sim.weather.storms = [...]`.
-- Prefer A/B tests (same seed with and without the player action) to prove a mechanic matters.
-- Headless windows are tiny; `ui_test.gd` sets the root window size and disables content scaling so
-  injected mouse positions match the screen. Do the same for new UI tests.
-- Harmless warnings at exit ("resources still in use") appear in headless runs.
+**Última ejecución verificada (2026-10-16, Godot 4.7.2):** las tres suites en 34/34, 25/25 y 21/21.
 
-## 8. Art and sound status
+### Notas para escribir pruebas
+- Si tallas túneles a mano con un helper tipo `_carve()`, llama también a
+  `sim.fields.recompute_terrain()` (o `sim.tick()`) antes de comprobar cámaras: si no, `nest_dist`
+  queda desactualizado y toda cámara nueva se ve "desconectada".
+- Una cámara de prueba debe tocar el nido existente (o un túnel ya conectado a él); un bolsillo de
+  túnel aislado en mitad de la tierra nunca cuenta como válido, a propósito.
+- Prefiere pruebas A/B (misma semilla con y sin la acción del jugador).
+- Advertencias inofensivas al salir ("resources still in use", "ObjectDB instances leaked") no
+  indican un fallo del juego.
+- El presupuesto de rendimiento con 500 hormigas se mide con wall-clock; si hay otro proceso de Godot
+  corriendo en paralelo en la misma máquina, el número sale inflado por pura contención de CPU. Mide
+  con un solo proceso a la vez si el resultado parece alto.
 
-| Item | Status |
+## 7. Estado del arte y el sonido
+
+| Elemento | Estado |
 |---|---|
-| Ants (4 castes x 4 walk frames), spider, brood, leaves, plants | Procedural pixel art generated at start-up in `sprites.gd`. Coherent but **provisional**. |
-| Soil, rock, tunnel and room tiles | Procedural, variants per depth band and room type. |
-| Sky, sun/moon, hills, clouds, grass, rain | Procedural, drawn in `world_view.gd`. |
-| UI | Godot theme styled in code, default font. |
-| Sound | Synthesized placeholders (`sfx.gd`). |
+| Hormigas (color por casta o por estado en las capas de depuración), araña, plantas | Pixel art / formas procedurales. Coherente pero **provisional**. |
+| Cámaras designadas | Tinte de color por tipo sobre el túnel, más intenso si la cámara es válida. |
+| Suelo, roca, túnel | Procedural, variantes por profundidad. |
+| UI | Tema de Godot en código, fuente por defecto. |
+| Sonido | No implementado todavía. |
 
-There are no third-party assets and no licences to track. Replacing a procedural sprite with a PNG only
-requires returning a `Texture2D` from the matching function in `sprites.gd`.
+## 8. Simplificaciones deliberadas de la Fase 1
 
-## 9. Known limitations and roadmap
+Documentadas a propósito, para que quien siga el proyecto sepa qué es a propósito y qué falta de
+verdad:
 
-**Known limitations**
-- Never played by a human: difficulty is tuned against a scripted player (wins 3/3 seeds; doing nothing
-  loses around day 7-9).
-- Ants only mirror/rotate (no proper wall-climbing orientation); one spider design.
-- Surface movement is one-dimensional; pheromones do not diffuse; water is a grid approximation.
-- Caste handling is a gameplay simplification (choose what the next eggs become).
-- One species, one enemy, one scenario; no save/load; the world does not scroll beyond zoom/pan.
+- **Datos de casta como arrays paralelos (`CasteDefs`), no `Resource`/`.tres`.** Más rápido de
+  escribir y de leer para 4 castas fijas; el prompt original pedía Resources para facilitar especies
+  nuevas más adelante. Migrar es mecánico cuando llegue una segunda especie.
+- **Las cámaras son un recuento global por tipo, no una forma contigua validada.** Una cámara es
+  "todas las celdas de túnel con esa etiqueta que están conectadas al nido"; importa el tamaño total
+  y la conexión, no la forma. Se simplificó así para no tener que detectar componentes conexos por
+  separado.
+- **El agua como recurso no tiene una tarea dedicada de "traer agua".** Entra sola, despacio,
+  mientras haya charcos tras la lluvia. No hay una obrera que cargue una gota físicamente.
+- **El hambre y la sed no dañan a la obrera**, solo a reina, nodrizas y soldados. Así el
+  comportamiento de obrera de la Fase 0 queda intacto byte a byte, sin importar la economía.
+- **La cría no tiene posición física ni la cargan las nodrizas.** Vive conceptualmente en el nido;
+  lo que sí importa (nodrizas presentes, Guardería válida, inundación) tiene efecto real.
+- **La araña no encuentra camino real por los túneles.** Si nadie la detiene en la entrada por un
+  tiempo, se modela como un golpe directo a la reina ("asedio"), no como una invasión celda por celda.
+- **El reparto de castas se ajusta con tres teclas (7/8/9)**, no con controles deslizantes en
+  pantalla.
+- **No hay herramienta de inspección por pasar el mouse** sobre hormigas o cámaras; la capa de
+  depuración y los colores cumplen ese papel por ahora.
 
-**Suggested next steps (highest value first)**
-1. Art and animation pass: hand-drawn directional ant sheets, tile variety, a second enemy design.
-2. Real playtesting: tune difficulty, add difficulty levels, turn hints into a guided first storm and spider.
-3. Content using the existing data model: more species/castes, seasons, rival colonies, scent diffusion.
-4. Save/load of a colony (all state is plain data in `Simulation`, so serialising it is feasible).
+## 9. Hoja de ruta: qué viene en la Fase 2
 
-**Ideas deliberately not built yet:** multiplayer, accounts, monetisation, diplomacy, tech tree.
+- Arte final: hormigas y araña dibujadas a mano, animaciones direccionales, variedad de tiles.
+- Interfaz pulida: controles deslizantes para el reparto de castas, tooltips al pasar el mouse,
+  tutorial guiado.
+- Guardado y carga de una partida.
+- Playtesting real con una persona (hasta ahora el balance solo se validó con las pruebas
+  automatizadas).
+- Mejoras y progresión entre partidas (vuelo nupcial, eras avanzadas): ver el documento de diseño
+  del proyecto para el detalle.
+
+**Ideas deliberadamente no construidas:** multiplayer, cuentas, monetización, diplomacia, árbol
+tecnológico elaborado, otras especies.

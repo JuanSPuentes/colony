@@ -4,6 +4,11 @@ extends RefCounted
 ## "pasable": túnel, o aire dentro de la franja baja sobre el suelo.
 
 enum Cell { AIR, DIRT, ROCK, TUNNEL, MARKED }
+## Cámaras que el jugador designa sobre túneles ya excavados (Fase 1). Simplificación del MVP:
+## una cámara es "todas las celdas de túnel con esa etiqueta conectadas al nido", no exige una
+## forma contigua concreta; lo que importa para el efecto es el tamaño total y la conexión.
+enum Room { NONE, ROYAL, NURSERY, STORAGE, FUNGUS, DRAIN }
+const ROOM_NAMES: Array[String] = ["(ninguna)", "Real", "Guardería", "Almacén", "Jardín de hongos", "Drenaje"]
 
 var cfg: SimConfig
 var w := 0
@@ -20,6 +25,10 @@ var marked_count := 0
 var jobs_version := 0
 var nest_cells: Array[int] = []
 
+## Etiqueta de cámara por celda (Fase 1). Solo tiene sentido sobre Cell.TUNNEL.
+var room := PackedByteArray()
+var rooms_version := 0
+
 
 func _init(config: SimConfig) -> void:
 	cfg = config
@@ -29,6 +38,7 @@ func _init(config: SimConfig) -> void:
 	job_claim.resize(w * h)
 	job_claim.fill(-1)
 	job_progress.resize(w * h)
+	room.resize(w * h)
 
 
 func idx(x: int, y: int) -> int:
@@ -96,6 +106,10 @@ func generate(rng: RandomNumberGenerator) -> void:
 		for x in range(cfg.nest_x - half, cfg.nest_x - half + cfg.chamber_w):
 			cells[y * w + x] = Cell.TUNNEL
 			nest_cells.append(y * w + x)
+	# La cámara inicial ya es la Real: la colonia arranca con la reina alojada (Fase 1).
+	for c in nest_cells:
+		room[c] = Room.ROYAL
+	rooms_version += 1
 	changed.clear()
 	passable_version += 1
 
@@ -153,3 +167,31 @@ func take_changed() -> PackedInt32Array:
 	var out := changed
 	changed = PackedInt32Array()
 	return out
+
+
+# --- Cámaras (Fase 1) ---------------------------------------------------------------------------
+
+func can_assign_room(x: int, y: int) -> bool:
+	return in_bounds(x, y) and cells[y * w + x] == Cell.TUNNEL
+
+
+func assign_room(x: int, y: int, room_type: int) -> bool:
+	if not can_assign_room(x, y):
+		return false
+	var i := y * w + x
+	if room[i] == room_type:
+		return false
+	room[i] = room_type
+	rooms_version += 1
+	changed.append(i)
+	return true
+
+
+func clear_room(x: int, y: int) -> bool:
+	if not in_bounds(x, y) or room[y * w + x] == Room.NONE:
+		return false
+	var i := y * w + x
+	room[i] = Room.NONE
+	rooms_version += 1
+	changed.append(i)
+	return true

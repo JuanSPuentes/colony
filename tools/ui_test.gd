@@ -14,6 +14,9 @@ func _initialize() -> void:
 	root.content_scale_mode = Window.CONTENT_SCALE_MODE_DISABLED
 	root.size = Vector2i(480, 270)
 	_main = load("res://main.tscn").instantiate()
+	# En --headless, root.size de arriba no tiene efecto real (la ventana no existe): main.gd
+	# necesita que se lo forcemos así para que sus clics de mouse simulados caigan donde deben.
+	_main.world_size_override = Vector2(480, 270)
 	root.add_child(_main)
 	_run()
 
@@ -47,8 +50,11 @@ func _key(code: int, shift := false, hold_frames := 1) -> void:
 	await process_frame
 
 
+## La cámara vive dentro del SubViewport del mundo (`main.gd`), no en el de `_main`: hay que pasar
+## por la transformación de ESE viewport (world -> píxel de pantalla), no por la de `_main`.
 func _screen(cell: Vector2i) -> Vector2:
-	return _main.get_global_transform_with_canvas() * ((Vector2(cell) + Vector2(0.5, 0.5)) * 8.0)
+	var world_point := (Vector2(cell) + Vector2(0.5, 0.5)) * 8.0
+	return _main.world_vp.get_canvas_transform() * world_point
 
 
 func _drag(from: Vector2i, to: Vector2i, button := MOUSE_BUTTON_LEFT) -> void:
@@ -92,8 +98,13 @@ func _run() -> void:
 	var sim: Simulation = _main.sim
 	var cfg: SimConfig = _main.cfg
 	var sy := cfg.surface_y
-	_check("la escena principal arranca con 100 hormigas y todas las vistas", sim.ants.alive_count == 100 and _main.terrain_view != null and _main.ant_renderer != null and _main.overlay != null and _main.hud != null)
-	_check("el HUD muestra los datos en español", _main.hud._top.text.contains("Hormigas: 100") and _main.hud._top.text.contains("Hojas:") and _main.hud._top.text.contains("Clima:") and _main.hud._top.text.contains("Semilla:") and _main.hud._top.text.contains("FPS:") and _main.hud._top.text.contains("Vel:"), _main.hud._top.text)
+	# Fase 1: la escena real arranca con las obreras de cfg.initial_ants más la reina y las
+	# nodrizas iniciales (spawn_colony_court, llamado por main.gd.start()).
+	var expected_total := cfg.initial_ants + 1 + cfg.initial_nurses
+	_check("la escena principal arranca con la colonia inicial y todas las vistas", sim.ants.alive_count == expected_total and _main.terrain_view != null and _main.ant_renderer != null and _main.overlay != null and _main.hud != null, "esperado=%d real=%d" % [expected_total, sim.ants.alive_count])
+	# "Clima" vive en su propia línea (_weather) desde que el panel de notificaciones se separó
+	# del texto blanco, para que ninguna línea sea tan larga como para chocar con ese panel.
+	_check("el HUD muestra los datos en español", _main.hud._top.text.contains("Hormigas: %d" % expected_total) and _main.hud._top.text.contains("Hojas:") and _main.hud._weather.text.contains("Clima:") and _main.hud._top.text.contains("Semilla:") and _main.hud._top.text.contains("FPS:") and _main.hud._top.text.contains("Vel:"), _main.hud._top.text + " | " + _main.hud._weather.text)
 
 	# Pausa y velocidades.
 	await _key(KEY_SPACE)
@@ -162,8 +173,9 @@ func _run() -> void:
 	var sim_before: Simulation = _main.sim
 	await _frames(30)
 	await _key(KEY_F5)
-	_check("F5 reinicia con la misma semilla", _main.sim != sim_before and _main.sim.rng.seed == seed0 and _main.sim.tick_count < 5 and _main.sim.ants.alive_count == 100, "semilla %d" % _main.sim.rng.seed)
+	_check("F5 reinicia con la misma semilla", _main.sim != sim_before and _main.sim.rng.seed == seed0 and _main.sim.tick_count < 5 and _main.sim.ants.alive_count == expected_total, "semilla %d" % _main.sim.rng.seed)
 	var a: Simulation = Simulation.new(cfg, seed0)
+	a.spawn_colony_court()
 	for i in 100:
 		a.tick()
 	var b: Simulation = _main.sim

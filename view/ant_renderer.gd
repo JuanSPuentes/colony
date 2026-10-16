@@ -8,6 +8,7 @@ const LEAF_COLOR := Color("5fe05f")
 
 var sim: Simulation
 var color_by_state := false
+var color_by_caste := false
 var _ants_mm: MultiMesh
 var _leaf_mm: MultiMesh
 var _capacity := 0
@@ -57,7 +58,12 @@ func update(alpha: float) -> void:
 			continue
 		var p := ants.prev[i].lerp(ants.pos[i], alpha)
 		_ants_mm.set_instance_transform_2d(n, Transform2D(0.0, p))
-		_ants_mm.set_instance_color(n, AntSystem.STATE_COLORS[ants.state[i]] if color_by_state else ANT_COLOR)
+		var c := ANT_COLOR
+		if color_by_state:
+			c = AntSystem.STATE_COLORS[ants.state[i]]
+		elif color_by_caste:
+			c = CasteDefs.COLORS[ants.caste[i]]
+		_ants_mm.set_instance_color(n, c)
 		n += 1
 		if ants.carry[i] == 1:
 			_leaf_mm.set_instance_transform_2d(leaves, Transform2D(0.0, p + Vector2(0, -2.0)))

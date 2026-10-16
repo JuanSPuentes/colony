@@ -16,12 +16,12 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [display]
 
-window/size/viewport_width=480
-window/size/viewport_height=270
-window/size/window_width_override=1440
-window/size/window_height_override=810
-window/stretch/mode="viewport"
-window/stretch/scale_mode="integer"
+; La ventana raíz ya no se estira a baja resolución: el mundo pixel art vive en un SubViewport
+; propio (480x270, visto en main.gd) escalado sin filtro; el HUD dibuja directo aquí, a esta
+; resolución real, para que el texto se vea nítido en vez de borroso/bloqueado.
+window/size/viewport_width=1440
+window/size/viewport_height=810
+window/stretch/mode="disabled"
 
 [rendering]
 

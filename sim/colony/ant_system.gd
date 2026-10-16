@@ -2,10 +2,15 @@ class_name AntSystem
 extends RefCounted
 ## Todas las hormigas como arrays de datos (ningún nodo por hormiga). Cada hormiga decide cada
 ## 3-5 ticks (desfasadas entre sí); el movimiento se aplica en cada tick y el render lo interpola.
-## Estados: EXPLORE, GO_TO_FOOD, CARRY_HOME, DIG, FLEE_WATER, IDLE.
+##
+## Fase 1: se añadió `caste` (Reina, Obrera, Nodriza, Soldado). La Obrera se comporta exactamente
+## igual que en la Fase 0 (sus multiplicadores en `CasteDefs` son 1.0) para no romper esa
+## regresión. La Reina no decide ni se mueve (vive en la cámara Real); Nodriza y Soldado tienen
+## su propio `_think_*`. Los estados nuevos (FLEE_DANGER, EVACUATE, NURSE, GUARD, ATTACK) son
+## aditivos: si nada pinta esas feromonas (como en la Fase 0) nunca se activan.
 
-enum State { EXPLORE, GO_TO_FOOD, CARRY_HOME, DIG, FLEE_WATER, IDLE }
-enum Mode { EXPLORE, FOOD, NEST, DIG, FLEE, PLANT }
+enum State { EXPLORE, GO_TO_FOOD, CARRY_HOME, DIG, FLEE_WATER, IDLE, FLEE_DANGER, EVACUATE, NURSE, GUARD, ATTACK }
+enum Mode { EXPLORE, FOOD, NEST, DIG, FLEE, PLANT, TOWARD, AWAY }
 
 const STATE_COLORS: Array[Color] = [
 	Color("e6d84a"),  # EXPLORE
@@ -14,8 +19,14 @@ const STATE_COLORS: Array[Color] = [
 	Color("c06bff"),  # DIG
 	Color("ff4a4a"),  # FLEE_WATER
 	Color("7fb6ff"),  # IDLE
+	Color("ff2fb0"),  # FLEE_DANGER
+	Color("ffffff"),  # EVACUATE
+	Color("4fd4e0"),  # NURSE
+	Color("ff8040"),  # GUARD
+	Color("ff0000"),  # ATTACK
 ]
-const STATE_NAMES: Array[String] = ["EXPLORAR", "IR A COMIDA", "LLEVAR A CASA", "CAVAR", "HUIR DEL AGUA", "DESCANSO"]
+const STATE_NAMES: Array[String] = ["EXPLORAR", "IR A COMIDA", "LLEVAR A CASA", "CAVAR", "HUIR DEL AGUA", "DESCANSO",
+	"HUIR DEL PELIGRO", "EVACUAR", "CUIDAR CRÍA", "GUARDIA", "ATACAR"]
 const DX: Array[int] = [1, 1, 0, -1, -1, -1, 0, 1]
 const DY: Array[int] = [0, 1, 1, 1, 0, -1, -1, -1]
 const FAR := NestDistanceField.FAR
@@ -23,7 +34,7 @@ const FAR := NestDistanceField.FAR
 var sim: Simulation
 var count := 0
 var alive_count := 0
-var state_counts: Array[int] = [0, 0, 0, 0, 0, 0]
+var state_counts: Array[int] = []
 
 var pos := PackedVector2Array()
 var prev := PackedVector2Array()
@@ -31,6 +42,7 @@ var heading := PackedVector2Array()
 var target := PackedVector2Array()
 var last_check := PackedVector2Array()
 var state := PackedInt32Array()
+var caste := PackedInt32Array()
 var next_think := PackedInt32Array()
 var last_think := PackedInt32Array()
 var trip_steps := PackedInt32Array()
@@ -56,6 +68,7 @@ func _init(s: Simulation) -> void:
 	sim = s
 	for k in 8:
 		_dirs.append(Vector2(DX[k], DY[k]).normalized())
+	state_counts.resize(State.size())
 
 
 func _grow(n: int) -> void:
@@ -66,6 +79,7 @@ func _grow(n: int) -> void:
 	target.resize(total)
 	last_check.resize(total)
 	state.resize(total)
+	caste.resize(total)
 	next_think.resize(total)
 	last_think.resize(total)
 	trip_steps.resize(total)
@@ -88,7 +102,7 @@ func add_ants(n: int) -> void:
 
 
 ## Crea una hormiga en el centro de la celda dada (con un pequeño desfase aleatorio).
-func add_ant_at(cell: Vector2i) -> int:
+func add_ant_at(cell: Vector2i, ant_caste: int = CasteDefs.Caste.WORKER) -> int:
 	_grow(1)
 	var cfg := sim.cfg
 	var i := count
@@ -100,6 +114,7 @@ func add_ant_at(cell: Vector2i) -> int:
 	var a := sim.rng.randf() * TAU
 	heading[i] = Vector2(cos(a), sin(a))
 	state[i] = State.IDLE
+	caste[i] = ant_caste
 	next_think[i] = sim.tick_count + sim.rng.randi_range(0, cfg.think_ticks_max)
 	last_think[i] = sim.tick_count
 	trip_steps[i] = 0
@@ -108,7 +123,7 @@ func add_ant_at(cell: Vector2i) -> int:
 	ignore_until[i] = 0
 	alive[i] = 1
 	carry[i] = 0
-	hp[i] = cfg.ant_hp
+	hp[i] = (cfg.queen_hp_base if ant_caste == CasteDefs.Caste.QUEEN else cfg.ant_hp) * CasteDefs.HP_MULT[ant_caste]
 	timer[i] = sim.rng.randf_range(0.0, cfg.rest_seconds_max)
 	stuck_t[i] = 0.0
 	check_acc[i] = sim.rng.randf() * 0.5
@@ -152,6 +167,8 @@ func tick() -> void:
 			if hp[i] <= 0.0:
 				_kill(i, true)
 				continue
+		if caste[i] == CasteDefs.Caste.QUEEN:
+			continue  # la reina no se mueve ni decide: vive en la cámara Real
 		if state[i] == State.DIG and job[i] >= 0:
 			_dig_progress(i, dt)
 		if now >= next_think[i]:
@@ -165,7 +182,7 @@ func tick() -> void:
 
 
 func _recount() -> void:
-	for k in 6:
+	for k in state_counts.size():
 		state_counts[k] = 0
 	for i in count:
 		if alive[i] == 1:
@@ -218,7 +235,7 @@ func _move(i: int, dt: float, lv: float) -> void:
 	if d < 0.01:
 		return
 	var cfg := sim.cfg
-	var mult := 1.0
+	var mult := CasteDefs.SPEED_MULT[caste[i]]
 	if carry[i] == 1:
 		mult *= cfg.carry_speed_mult
 	if lv > 0.0:
@@ -270,6 +287,21 @@ func _think(i: int, cx: int, cy: int, ci: int) -> void:
 	if lv > cfg.flee_level and state[i] != State.FLEE_WATER:
 		_release_job(i)
 		state[i] = State.FLEE_WATER
+	# Peligro y evacuación (Fase 1): el soldado no les teme. Estas condiciones nunca se cumplen
+	# si nada pintó esas feromonas (como en toda la Fase 0), así que no cambian ese comportamiento.
+	if caste[i] != CasteDefs.Caste.SOLDIER and state[i] != State.FLEE_WATER:
+		if sim.danger.get_v(cx, cy) > cfg.danger_flee_threshold and state[i] != State.FLEE_DANGER:
+			_release_job(i)
+			state[i] = State.FLEE_DANGER
+		elif sim.evacuate.get_v(cx, cy) > cfg.evacuate_threshold and state[i] != State.EVACUATE:
+			_release_job(i)
+			state[i] = State.EVACUATE
+	if caste[i] == CasteDefs.Caste.NURSE and state[i] != State.FLEE_WATER:
+		_think_nurse(i, cx, cy, ci)
+		return
+	if caste[i] == CasteDefs.Caste.SOLDIER and state[i] != State.FLEE_WATER:
+		_think_soldier(i, cx, cy, ci, think_dt)
+		return
 	match state[i]:
 		State.FLEE_WATER:
 			if lv < cfg.safe_level:
@@ -278,6 +310,20 @@ func _think(i: int, cx: int, cy: int, ci: int) -> void:
 				target[i] = pos[i]
 			elif not _flee_bfs(cx, cy, ci, i):
 				_step(i, cx, cy, ci, Mode.FLEE, null)
+		State.FLEE_DANGER:
+			if sim.danger.get_v(cx, cy) <= cfg.danger_flee_threshold * 0.4:
+				state[i] = State.IDLE
+				timer[i] = 0.5
+				target[i] = pos[i]
+			else:
+				_step(i, cx, cy, ci, Mode.AWAY, sim.danger)
+		State.EVACUATE:
+			if sim.evacuate.get_v(cx, cy) <= 0.02:
+				state[i] = State.IDLE
+				timer[i] = 0.5
+				target[i] = pos[i]
+			else:
+				_step(i, cx, cy, ci, Mode.AWAY, sim.evacuate)
 		State.IDLE:
 			_think_idle(i, cx, cy, ci, think_dt)
 		State.EXPLORE:
@@ -424,6 +470,49 @@ func _think_dig(i: int, cx: int, cy: int, ci: int) -> void:
 	_step(i, cx, cy, ci, Mode.DIG, null)
 
 
+# --- Nodrizas y soldados (Fase 1) --------------------------------------------------------------
+
+func _think_nurse(i: int, cx: int, cy: int, ci: int) -> void:
+	var cfg := sim.cfg
+	var nd := sim.fields.nest_dist[ci]
+	if nd > cfg.nurse_range and nd < FAR:
+		state[i] = State.NURSE
+		_step(i, cx, cy, ci, Mode.NEST, null)
+	else:
+		state[i] = State.NURSE
+		target[i] = pos[i]  # se queda cuidando la cría cerca del nido
+
+
+func _think_soldier(i: int, cx: int, cy: int, ci: int, think_dt: float) -> void:
+	var cfg := sim.cfg
+	var sim_spider := sim.spider
+	if sim_spider != null and sim_spider.alive:
+		var d := pos[i].distance_to(sim_spider.pos)
+		if d <= cfg.soldier_melee_range_px:
+			state[i] = State.ATTACK
+			target[i] = pos[i]
+			sim_spider.take_damage(CasteDefs.DAMAGE_PER_S[CasteDefs.Caste.SOLDIER] * think_dt)
+			return
+		if d <= cfg.soldier_sight_px:
+			state[i] = State.ATTACK
+			_step(i, cx, cy, ci, Mode.PLANT, sim_spider.pos)
+			return
+	var here := sim.attack.data[ci]
+	var best := here
+	for k in 8:
+		best = maxf(best, sim.attack.get_v(cx + DX[k], cy + DY[k]))
+	if best > 0.02:
+		state[i] = State.ATTACK
+		_step(i, cx, cy, ci, Mode.TOWARD, sim.attack)
+		return
+	state[i] = State.GUARD
+	var nd := sim.fields.nest_dist[ci]
+	if nd > 2 and nd < FAR:
+		_step(i, cx, cy, ci, Mode.NEST, null)
+	else:
+		target[i] = pos[i]
+
+
 ## Elige la mejor celda vecina según el modo y fija el objetivo de movimiento.
 func _step(i: int, cx: int, cy: int, ci: int, mode: int, extra: Variant) -> void:
 	var cfg := sim.cfg
@@ -436,8 +525,11 @@ func _step(i: int, cx: int, cy: int, ci: int, mode: int, extra: Variant) -> void
 	var head := heading[i]
 	var on_surface := cy < cfg.surface_y
 	var plant_pos := Vector2.ZERO
+	var field: PheromoneField = null
 	if mode == Mode.PLANT:
 		plant_pos = extra
+	elif mode == Mode.TOWARD or mode == Mode.AWAY:
+		field = extra
 	for k in 8:
 		var nx := cx + DX[k]
 		var ny := cy + DY[k]
@@ -483,6 +575,15 @@ func _step(i: int, cx: int, cy: int, ci: int, mode: int, extra: Variant) -> void
 				s = -_center(nx, ny).distance_to(plant_pos) / cfg.cell_px + 0.1 * rng.randf()
 				if on_surface and ny >= cfg.surface_y:
 					s -= 2.0
+			Mode.TOWARD:
+				s = (field.get_v(nx, ny) - field.get_v(cx, cy)) * 10.0
+				s += cfg.w_persist * 0.3 * head.dot(_dirs[k]) + 0.2 * rng.randf()
+				s -= 3.0 * lw
+			Mode.AWAY:
+				s = -field.get_v(nx, ny) * 10.0 + 0.2 * rng.randf()
+				if not on_surface:
+					s += 0.5 * float(f.surface_dist[ci] - f.surface_dist[ni])
+				s -= 3.0 * lw
 		if s > best_s:
 			best_s = s
 			best_k = k
@@ -555,6 +656,8 @@ func _stuck_check(i: int, ci: int) -> void:
 		exempt = true  # cavando
 	elif state[i] == State.IDLE and sim.fields.nest_dist[ci] <= 2:
 		exempt = true  # descansando en el nido
+	elif state[i] == State.NURSE or state[i] == State.GUARD or state[i] == State.ATTACK:
+		exempt = true  # quietas cuidando, de guardia o peleando cuerpo a cuerpo
 	elif sim.water.max_level > 0.0 and sim.water.level[ci] < sim.cfg.safe_level:
 		exempt = true  # esperando en seco a que baje el agua
 	if moved >= cfg.stuck_min_move_px or exempt:

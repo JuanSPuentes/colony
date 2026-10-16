@@ -361,6 +361,9 @@ func _t_movement_validity() -> void:
 
 
 func _t_performance() -> void:
+	# El presupuesto de 500 hormigas se relajó de 12 a 16 ms al llegar la Fase 1: hay que decaer
+	# 3 feromonas más y comprobar cámaras/peligro por hormiga, incluso sin reina. Sigue muy por
+	# debajo de los 33 ms (30 FPS) que exige el criterio de rendimiento de la Fase 1.
 	for n in [100, 500]:
 		var sim := Simulation.new(_cfg(n), 3)
 		_run(sim, 5.0)
@@ -369,4 +372,5 @@ func _t_performance() -> void:
 		for i in ticks:
 			sim.tick()
 		var ms := float(Time.get_ticks_usec() - t0) / 1000.0 / ticks
-		_check("coste de simulación con %d hormigas dentro del presupuesto (50 ms por tick)" % n, ms < 12.0, "%.2f ms por tick" % ms)
+		var budget := 12.0 if n == 100 else 16.0
+		_check("coste de simulación con %d hormigas dentro del presupuesto (50 ms por tick)" % n, ms < budget, "%.2f ms por tick" % ms)
