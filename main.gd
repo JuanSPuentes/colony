@@ -48,6 +48,7 @@ var ant_renderer: AntRenderer
 var spider_view: SpiderView
 var day_night_view: DayNightView
 var hud: Hud
+var tutorial: TutorialView
 var camera: Camera2D
 
 var speed := 1
@@ -100,6 +101,8 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.gear_pressed.connect(func() -> void: menu_requested.emit())
 	add_child(hud)
+	tutorial = TutorialView.new()
+	add_child(tutorial)
 	if auto_start:
 		start(seed_value)
 
@@ -228,6 +231,7 @@ func _process(delta: float) -> void:
 	ant_renderer.color_by_caste = not ant_renderer.color_by_state
 	ant_renderer.update(clampf(_acc / sim.dt, 0.0, 1.0) if not paused else 1.0)
 	hud.update_info(self)
+	tutorial.update(sim)
 
 
 func _apply_camera() -> void:

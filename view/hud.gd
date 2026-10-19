@@ -35,14 +35,15 @@ const STATUS_FOLDED_H := 7.0 + MARGIN_Y * 2.0
 const KEY_COLOR := "ffd43c"
 ## Columnas de la barra de controles: encabezado y pares [tecla, qué hace]. Si se agrega una tecla
 ## nueva en main.gd, se agrega aquí también para que el jugador la vea.
+## Fase 5: COLONIA (comprar/ir a la reina) y PARTIDA (guardar/reiniciar) se quitaron de esta lista
+## a propósito: son acciones de juego, no "opciones" — la pantalla de Opciones (que reusa esta
+## lista) terminó mostrando más de lo que su nombre promete. Las teclas 7/8/9/H/F5/F6/F7/Shift+F5
+## siguen funcionando igual en `main.gd`; solo se dejaron de documentar aquí.
 const CONTROLS := [
 	["HERRAMIENTAS", [["1", "Cavar túneles"], ["2 / 3", "Feromona / Cámara"], ["4", "Borrar todo bajo el pincel"],
 		["Q / E", "Cambiar subtipo"], ["Clic izq / der", "Pintar / quitar"]]],
-	["COLONIA", [["7", "Comprar obrera (comida)"], ["8", "Comprar soldado (comida)"], ["9", "Cambiar auto-compra"],
-		["H", "Ir a la reina"]]],
 	["CÁMARA Y TIEMPO", [["WASD / clic medio", "Mover la cámara"], ["Rueda", "Zoom"], ["Espacio", "Pausa"],
 		["F1 / F2 / F3", "Velocidad x1 / x2 / x4"], ["I", "Plegar / desplegar estado"]]],
-	["PARTIDA", [["F6 / F7", "Guardar / cargar"], ["F5", "Reiniciar (mismo mapa)"], ["Shift+F5", "Reiniciar con mapa nuevo"]]],
 ]
 
 ## Estado de plegado del panel de estado. `main.gd` lo cambia con I; el botón, con clic.
@@ -58,6 +59,11 @@ var _ctrl_panel: Panel
 ## Fase 3: botones de compra (obrera, soldado, auto-compra) en el panel de herramientas.
 var _buy_row: HBoxContainer
 var _buy_btns: Array[Button] = []
+## Fase 5: sliders de reparto de castas (reemplazan 7/8/9 como forma principal, las teclas se
+## quedan como atajo — ver README sección 12). Mismo lugar que `_buy_row`: nunca se muestran a la
+## vez (uno es del modo incremental, el otro de la colonia con reina).
+var _caste_row: HBoxContainer
+var _caste_sliders: Array[HSlider] = []
 var _threat_header: Label
 var _m: Node
 
@@ -71,6 +77,11 @@ var _threats: Label
 var _ratio: Label
 var _log: RichTextLabel
 var _defeat: Label
+## Fase 5: tooltip al pasar el mouse sobre una hormiga (casta, vida) o una cámara (tipo, válida).
+var _tooltip: Label
+## Fase 5: panel visible mientras el juego está en pausa (Espacio), para que una persona nueva
+## pueda reiniciar o salir sin saber que Shift+F5/la tuerca existen.
+var _pause_panel: PanelContainer
 
 
 func _ready() -> void:
@@ -114,7 +125,7 @@ func _ready() -> void:
 	# Su posición vertical la fija `_layout()`: va justo debajo del panel de estado, plegado o no.
 	const CTRL_W := PANEL_W + 14.0
 	const CTRL_CONTENT_W := CTRL_W - MARGIN_X * 2.0
-	_ctrl_panel = _make_panel(root, Vector2(3, 113), Vector2(CTRL_W, 31))
+	_ctrl_panel = _make_panel(root, Vector2(3, 113), Vector2(CTRL_W, 40))
 	var cy := 0.0
 	_tools = _panel_label(_ctrl_panel, cy, CTRL_CONTENT_W)
 	cy += 7.0
@@ -132,7 +143,28 @@ func _ready() -> void:
 	_buy_btns[0].pressed.connect(func() -> void: _m.sim.cmd_buy(CasteDefs.Caste.WORKER))
 	_buy_btns[1].pressed.connect(func() -> void: _m.sim.cmd_buy(CasteDefs.Caste.SOLDIER))
 	_buy_btns[2].pressed.connect(func() -> void: _m.sim.cmd_cycle_auto_buy())
-	cy += 11.0
+
+	# Fase 5: debajo de la línea de `_ratio` (a diferencia de `_buy_row`, que sí se superpone con
+	# `_ratio` a propósito porque nunca se muestran juntos — `_caste_row` sí se ve a la vez que
+	# `_ratio`, que le sirve de etiqueta con los porcentajes). Orden Obreras/Nodrizas/Soldados.
+	_caste_row = HBoxContainer.new()
+	_caste_row.position = Vector2(MARGIN_X, MARGIN_Y + cy + 8.0) * S
+	_caste_row.size = Vector2(CTRL_CONTENT_W, 8.0) * S
+	_caste_row.add_theme_constant_override("separation", int(3 * S))
+	_ctrl_panel.add_child(_caste_row)
+	var castes := [CasteDefs.Caste.WORKER, CasteDefs.Caste.NURSE, CasteDefs.Caste.SOLDIER]
+	for c in castes:
+		var s := HSlider.new()
+		s.min_value = 0.05
+		s.max_value = 0.9
+		s.step = 0.01
+		s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		s.custom_minimum_size = Vector2(0, 8.0) * S
+		s.modulate = CasteDefs.COLORS[c]
+		_caste_row.add_child(s)
+		_caste_sliders.append(s)
+		s.value_changed.connect(func(v: float) -> void: _m.sim.cmd_set_caste_target(c, v))
+	cy += 18.0  # dejar sitio bajo el más alto de los dos (`_caste_row`, que termina en cy+16).
 	_legend = _panel_rich(_ctrl_panel, cy, 8.0, CTRL_CONTENT_W)
 
 	_build_gear_button(root)
@@ -145,6 +177,17 @@ func _ready() -> void:
 	_defeat.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_defeat.visible = false
 	root.add_child(_defeat)
+
+	_build_pause_panel(root)
+
+	_tooltip = Label.new()
+	_tooltip.add_theme_font_size_override("font_size", PANEL_FONT)
+	_tooltip.add_theme_color_override("font_color", Color("f4ecd8"))
+	_tooltip.add_theme_color_override("font_outline_color", Color.BLACK)
+	_tooltip.add_theme_constant_override("outline_size", OUTLINE)
+	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tooltip.visible = false
+	root.add_child(_tooltip)
 
 
 ## Botón "ocultar / mostrar" en la esquina superior derecha de un panel. Sin foco de teclado: si lo
@@ -189,6 +232,48 @@ func _build_gear_button(root: Control) -> void:
 		b.add_theme_stylebox_override(s, style)
 	b.pressed.connect(func() -> void: gear_pressed.emit())
 	root.add_child(b)
+
+
+## Fase 5: panel centrado con Reiniciar/Salir, visible solo en pausa manual (Espacio), para que una
+## persona nueva no dependa de saber que Shift+F5 o la tuerca existen (prompt_fase3_godot.md 4.4).
+func _build_pause_panel(root: Control) -> void:
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.07, 0.06, 0.08, 0.95)
+	style.border_color = Color("ffd43c")
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(int(3 * S))
+	style.content_margin_left = 16.0 * S
+	style.content_margin_right = 16.0 * S
+	style.content_margin_top = 10.0 * S
+	style.content_margin_bottom = 10.0 * S
+	panel.add_theme_stylebox_override("panel", style)
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.visible = false
+	root.add_child(panel)
+	_pause_panel = panel
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", int(4 * S))
+	panel.add_child(box)
+
+	var title := Label.new()
+	title.text = "Pausa"
+	title.add_theme_font_size_override("font_size", PANEL_FONT)
+	title.add_theme_color_override("font_color", HEADER_COLOR)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+
+	var restart := _buy_button()
+	restart.text = "Reiniciar"
+	restart.pressed.connect(func() -> void: _m.start(_m.seed_value))
+	box.add_child(restart)
+
+	var quit := _buy_button()
+	quit.text = "Salir"
+	quit.pressed.connect(func() -> void: gear_pressed.emit())
+	box.add_child(quit)
 
 
 ## Botón de compra: recuadro con borde (a diferencia de los de plegar, que son solo texto) para que
@@ -363,6 +448,43 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 	_buy_btns[2].text = "[9] Auto: %s" % IncrementalEconomy.AUTO_NAMES[econ.auto_mode]
 
 
+## Fase 5: tooltip al pasar el mouse. Se recalcula cada frame (barato: una hormiga cercana y una
+## celda), no cada tick de simulación, así que vive en `_process`, no en `update_info`.
+func _process(_delta: float) -> void:
+	if _m == null or _m.sim == null or _defeat.visible:
+		_tooltip.visible = false
+		return
+	var screen_pos := get_viewport().get_mouse_position()
+	var world_pos: Vector2 = _m._to_world(screen_pos)
+	var cell: Vector2i = _m._world_cell(world_pos)
+	var sim: Simulation = _m.sim
+	var text := ""
+	if sim.queen_id >= 0:
+		var nearest := -1
+		var nearest_d := 6.0  # px: el radio de "estás señalando esta hormiga".
+		for i in sim.ants.count:
+			if sim.ants.alive[i] == 0:
+				continue
+			var d: float = sim.ants.pos[i].distance_to(world_pos)
+			if d < nearest_d:
+				nearest_d = d
+				nearest = i
+		if nearest >= 0:
+			var nc: int = sim.ants.caste[nearest]
+			var base_hp: float = sim.cfg.queen_hp_base if nc == CasteDefs.Caste.QUEEN else sim.cfg.ant_hp
+			text = "%s   %d%% vida" % [CasteDefs.NAMES[nc],
+				int(100.0 * sim.ants.hp[nearest] / maxf(base_hp * CasteDefs.HP_MULT[nc], 0.01))]
+	if text == "" and sim.world.in_bounds(cell.x, cell.y):
+		var room_type: int = sim.world.room[cell.y * sim.world.w + cell.x]
+		if room_type != WorldGrid.Room.NONE:
+			var valid: bool = sim.rooms.valid[room_type]
+			text = "%s — %s" % [WorldGrid.ROOM_NAMES[room_type], "válida" if valid else "inválida (falta espacio)"]
+	_tooltip.text = text
+	_tooltip.visible = text != ""
+	if text != "":
+		_tooltip.position = screen_pos + Vector2(14, 14)
+
+
 ## `m` es el nodo main.gd: lee todo lo que necesita de él y de `m.sim`.
 func update_info(m: Node) -> void:
 	var sim: Simulation = m.sim
@@ -410,8 +532,11 @@ func update_info(m: Node) -> void:
 			sim.brood.counts_by_stage[BroodSystem.Stage.EGG], sim.brood.counts_by_stage[BroodSystem.Stage.LARVA], sim.brood.counts_by_stage[BroodSystem.Stage.PUPA],
 			sim.colony.food, _trend_arrow(sim.colony.food_trend), sim.colony.water, _trend_arrow(sim.colony.water_trend)]
 		var t := sim.colony.target_pct
-		_ratio.text = "Reparto → Obreras %d%%  Nodrizas %d%%  Soldados %d%%  (7/8/9)" % [
+		_ratio.text = "Reparto → Obreras %d%%  Nodrizas %d%%  Soldados %d%%" % [
 			int(t[CasteDefs.Caste.WORKER] * 100), int(t[CasteDefs.Caste.NURSE] * 100), int(t[CasteDefs.Caste.SOLDIER] * 100)]
+		var castes := [CasteDefs.Caste.WORKER, CasteDefs.Caste.NURSE, CasteDefs.Caste.SOLDIER]
+		for i in castes.size():
+			_caste_sliders[i].set_value_no_signal(t[castes[i]])
 		var lines := ""
 		for n in sim.notifications:
 			lines += "[color=#ffd43c]• %s[/color]\n" % n
@@ -426,6 +551,11 @@ func update_info(m: Node) -> void:
 	_m = m
 	_buy_row.visible = sim.incremental
 	_ratio.visible = not sim.incremental
+	_caste_row.visible = not sim.incremental
+
+	_pause_panel.visible = m.paused and not sim.game_over
+	if _pause_panel.visible:
+		_pause_panel.position = (get_viewport().get_visible_rect().size - _pause_panel.size) * 0.5
 	_threat_header.text = "CRÍA" if sim.incremental else "AMENAZAS"
 	if sim.incremental:
 		_update_incremental(m, sim)

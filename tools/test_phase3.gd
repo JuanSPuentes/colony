@@ -162,7 +162,8 @@ func _t_plants_regrow_only_by_day() -> void:
 
 
 func _t_colony_grows_on_its_own() -> void:
-	# Con lluvia, como en el juego real: 6 minutos (2 días) con la auto-compra de obreras.
+	# Con lluvia, como en el juego real: 6 minutos de auto-compra de obreras (poco más de un día
+	# con `day_length_s` por defecto); no depende de cuántos días exactos caben en esa ventana.
 	var cfg := _cfg(true)
 	var sim := _inc(cfg, 12345)
 	sim.cmd_cycle_auto_buy()

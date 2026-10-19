@@ -16,7 +16,6 @@ const BG := Color(0.05, 0.04, 0.04, 1.0)
 const GOLD := Color("ffd43c")
 const CREAM := Color("f4ecd8")
 const PANEL_BG := Color(0.07, 0.06, 0.08, 0.92)
-const CONTENT_W := 760.0
 
 var _volume_slider: HSlider
 var _volume_value: Label
@@ -62,7 +61,6 @@ func _ready() -> void:
 	scroll.add_child(center)
 
 	var content := VBoxContainer.new()
-	content.custom_minimum_size = Vector2(CONTENT_W, 0)
 	content.add_theme_constant_override("separation", 20)
 	center.add_child(content)
 
@@ -112,6 +110,10 @@ func _ready() -> void:
 ## porque GDScript no deja devolver dos nodos a la vez sin una clase aparte solo para eso.
 func _card(header_text: String) -> PanelContainer:
 	var card := PanelContainer.new()
+	# Cada tarjeta se ajusta a su propio contenido en vez de estirarse al ancho de la más ancha
+	# (antes las dos compartían un ancho fijo, y la de Controles quedaba con un borde enorme y
+	# medio vacío cuando tiene menos columnas que la de Ajustes, o al revés).
+	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var style := StyleBoxFlat.new()
 	style.bg_color = PANEL_BG
 	style.border_color = GOLD

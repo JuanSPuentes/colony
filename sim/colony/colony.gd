@@ -49,6 +49,31 @@ func nudge_target(caste: int, amount: float) -> void:
 		target_pct[k] /= total
 
 
+## Fase 5: fija el objetivo de una casta a un valor absoluto (los sliders de Opciones/HUD usan
+## esto, a diferencia de `nudge_target` que suma/resta, que siguen usando las teclas 7/8/9). Las
+## otras dos castas se reparten lo que queda, en proporción a lo que ya tenían entre ellas.
+func set_target(caste: int, value: float) -> void:
+	if not target_pct.has(caste):
+		return
+	value = clampf(value, 0.05, 0.9)
+	var others_total := 0.0
+	for k in target_pct:
+		if k != caste:
+			others_total += target_pct[k]
+	var remaining := 1.0 - value
+	target_pct[caste] = value
+	var others: Array = []
+	for k in target_pct:
+		if k != caste:
+			others.append(k)
+	if others_total <= 0.0001:
+		for k in others:
+			target_pct[k] = remaining / others.size()
+	else:
+		for k in others:
+			target_pct[k] = target_pct[k] / others_total * remaining
+
+
 ## Casta (obrera/nodriza/soldado) cuyo porcentaje actual está más por debajo de su objetivo.
 func furthest_from_target(sim: Simulation) -> int:
 	var counts := {CasteDefs.Caste.WORKER: 0, CasteDefs.Caste.NURSE: 0, CasteDefs.Caste.SOLDIER: 0}

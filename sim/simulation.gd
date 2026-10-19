@@ -43,6 +43,9 @@ var leaves_stored := 0
 var delivered := 0
 var deaths := 0
 var dug := 0
+## Fase 5: true desde la primera vez que `cmd_paint_food` pinta una celda con éxito. Solo lo usa
+## el tutorial guiado (ver `view/tutorial_view.gd`) para saber si ya se cumplió el primer paso.
+var food_painted := false
 var dig_violations := 0
 var stuck_recoveries := 0
 var total_leaves_left := 0
@@ -326,6 +329,7 @@ func cmd_paint_food(x: int, y: int, value: float) -> bool:
 	if not world.is_passable(x, y):
 		return false
 	food.set_max(y * world.w + x, value)
+	food_painted = true
 	return true
 
 
@@ -352,6 +356,11 @@ func cmd_clear_room(x: int, y: int) -> bool:
 
 func cmd_nudge_caste(caste: int, amount: float) -> void:
 	colony.nudge_target(caste, amount)
+
+
+## Fase 5: lo usan los sliders de reparto de castas (valor absoluto, no relativo como la de arriba).
+func cmd_set_caste_target(caste: int, value: float) -> void:
+	colony.set_target(caste, value)
 
 
 func cmd_force_rain() -> void:

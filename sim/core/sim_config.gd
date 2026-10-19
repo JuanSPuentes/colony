@@ -163,7 +163,7 @@ extends Resource
 
 @export_group("Fase 3: día y noche")
 ## Duración de un día completo (luz + noche) en segundos de simulación. Un día + una noche = 1 día.
-@export var day_length_s := 180.0
+@export var day_length_s := 300.0
 ## Fracción del ciclo que es de noche (el resto es de día). El ciclo arranca al amanecer.
 @export var night_fraction := 0.4
 
@@ -186,8 +186,9 @@ extends Resource
 ## Multiplica la velocidad de la cría (huevo, larva y pupa) para que una compra no tarde minutos.
 @export var inc_brood_speed := 2.0
 ## Primera lluvia del modo incremental (la de la Fase 1 llega a los 150 s, demasiado pronto para
-## una colonia de 5 hormigas que todavía no puede cavar un drenaje). Por defecto: inicio del día 3.
-@export var inc_rain_first_s := 360.0
+## una colonia de 5 hormigas que todavía no puede cavar un drenaje). Por defecto: inicio del día 3
+## (`day_length_s * 2`; si `day_length_s` cambia, esto hay que recalcularlo a mano).
+@export var inc_rain_first_s := 600.0
 ## Hojas que rebrota cada planta por segundo, solo de día y hasta su máximo.
 @export var inc_plant_regrow_per_s := 0.06
 
