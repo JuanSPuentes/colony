@@ -84,6 +84,11 @@ func _wheel(up: bool) -> void:
 	e.position = Vector2(240, 135)
 	root.push_input(e)
 	await process_frame
+	# La rueda ahora anima el zoom en vez de aplicarlo de golpe (fluidez, ver main.gd _set_zoom).
+	# Para que la prueba sea determinista sin depender de cuántos frames reales tarda la
+	# transición, forzamos que termine antes de comprobar el resultado.
+	_main._zoom_t = 0.999999  # bajo 1.0 a propósito: _process solo corre el lerp final si `< 1.0`
+	await process_frame
 
 
 func _ticks_per_second(frames: int) -> float:

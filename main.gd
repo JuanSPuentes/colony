@@ -72,6 +72,14 @@ var _pan := Vector2.ZERO
 ## ticks, así que interpolar desde ahí perdía todo el movimiento anterior y las hormigas se veían
 ## saltar. Esto guarda el punto de partida real del frame para interpolar el tramo completo.
 var _frame_start_pos := PackedVector2Array()
+## Transición suave de zoom (punto 3 de fluidez): en vez de aplicar el nivel de `ZOOM_LEVELS` de
+## golpe, se anima zoom y posición de cámara desde el valor actual al destino en `ZOOM_DURATION`.
+const ZOOM_DURATION := 0.12
+var _zoom_t := 1.0
+var _zoom_from_z := 1.0
+var _zoom_from_pos := Vector2.ZERO
+var _zoom_to_z := 1.0
+var _zoom_to_pos := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -210,6 +218,13 @@ func _process(delta: float) -> void:
 	if sim == null:
 		return
 	_resize_world_container()  # barato; `root.size` puede tardar un frame en reflejar el cambio
+	if _zoom_t < 1.0:
+		_zoom_t = minf(1.0, _zoom_t + delta / ZOOM_DURATION)
+		var e := smoothstep(0.0, 1.0, _zoom_t)
+		var z := lerpf(_zoom_from_z, _zoom_to_z, e)
+		camera.zoom = Vector2(z, z)
+		camera.position = _zoom_from_pos.lerp(_zoom_to_pos, e)
+		_clamp_camera(z)
 	if _pan != Vector2.ZERO:
 		camera.position += _pan * (160.0 / ZOOM_LEVELS[zoom_index]) * delta
 		_apply_camera()
@@ -242,8 +257,14 @@ func _process(delta: float) -> void:
 
 
 func _apply_camera() -> void:
-	var z := ZOOM_LEVELS[zoom_index]
-	camera.zoom = Vector2(z, z)
+	camera.zoom = Vector2(ZOOM_LEVELS[zoom_index], ZOOM_LEVELS[zoom_index])
+	_clamp_camera(ZOOM_LEVELS[zoom_index])
+
+
+## Separado de `_apply_camera` para que la animación de zoom (`_zoom_t` en `_process`) pueda
+## clamplear la cámara con el zoom intermedio de cada frame sin pisar `camera.zoom` con el valor
+## final todavía no alcanzado.
+func _clamp_camera(z: float) -> void:
 	var half := Vector2(480.0, 270.0) / (2.0 * z)
 	var world := Vector2(sim.world.w, sim.world.h) * cfg.cell_px
 	camera.position.x = clampf(camera.position.x, minf(half.x, world.x * 0.5), maxf(world.x - half.x, world.x * 0.5))
@@ -389,18 +410,26 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 ## `anchor_screen_pos`, si se pasa, es el punto de pantalla (mouse) que debe quedar fijo en el
 ## mundo tras el cambio de zoom (en vez de que todo se corra alrededor del centro de cámara).
+## El cambio no se aplica de golpe: arranca una transición corta (`_zoom_t` en `_process`) desde
+## el zoom/posición actuales (que pueden venir a mitad de una transición anterior) al destino.
 func _set_zoom(i: int, anchor_screen_pos: Vector2 = Vector2.INF) -> void:
 	var new_index := clampi(i, 0, ZOOM_LEVELS.size() - 1)
 	if new_index == zoom_index:
 		return
 	var has_anchor := is_finite(anchor_screen_pos.x) and sim != null
 	var before := _to_world(anchor_screen_pos) if has_anchor else Vector2.ZERO
+	_zoom_from_z = camera.zoom.x
+	_zoom_from_pos = camera.position
 	zoom_index = new_index
+	_zoom_to_z = ZOOM_LEVELS[zoom_index]
 	if has_anchor:
-		camera.zoom = Vector2(ZOOM_LEVELS[zoom_index], ZOOM_LEVELS[zoom_index])
+		camera.zoom = Vector2(_zoom_to_z, _zoom_to_z)
 		var after := _to_world(anchor_screen_pos)
-		camera.position += before - after
-	_apply_camera()
+		_zoom_to_pos = _zoom_from_pos + (before - after)
+		camera.zoom = Vector2(_zoom_from_z, _zoom_from_z)  # restaurar: el frame animará desde acá
+	else:
+		_zoom_to_pos = _zoom_from_pos
+	_zoom_t = 0.0
 
 
 func _apply_line(from: Vector2i, to: Vector2i) -> void:
