@@ -9,8 +9,11 @@ extends Resource
 @export var cell_px := 8
 ## Primera fila de tierra. Todo lo de arriba es aire.
 @export var surface_y := 22
-## Filas de aire sobre el suelo por las que pueden caminar las hormigas.
-@export var walk_band := 3
+## Filas de aire sobre el suelo por las que pueden caminar las hormigas. 1 alcanza para llegar a
+## una planta (`Plant.cell.y = surface_y - 1`, y `pickup_cells` ya cubre tomar la hoja desde el
+## suelo sin subir). Con 3 se veían "flotando" varias filas por encima de la tierra al perseguir
+## una hoja lejos de cualquier parte sólida visible.
+@export var walk_band := 1
 @export var rock_clusters := 16
 @export var nest_x := 60
 @export var shaft_depth := 7

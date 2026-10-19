@@ -163,8 +163,16 @@ func _t_danger_and_evacuate() -> void:
 	var i := sim.ants.add_ant_at(Vector2i(sim.cfg.nest_x, sy - 1))
 	for x in range(sim.cfg.nest_x - 6, sim.cfg.nest_x + 6):
 		sim.danger.data[(sy - 1) * sim.world.w + x] = 1.0
-	_run(sim, 4.0)
-	_check("la feromona de peligro hace que una no-soldado huya", sim.ants.state[i] == AntSystem.State.FLEE_DANGER or sim.ants.state[i] == AntSystem.State.IDLE, "estado=%d" % sim.ants.state[i])
+	# No se fija en el estado exacto a los 4 s: con `walk_band` más chico (ver sim_config.gd) la
+	# hormiga escapa más directo hacia el nido y para entonces ya puede haber vuelto a EXPLORE
+	# normal, que es el comportamiento correcto después de huir, no una falla. Lo que de verdad
+	# importa es que la feromona sí dispare la huida en algún momento.
+	var fled := false
+	for t in int(4.0 * sim.cfg.tick_rate):
+		sim.tick()
+		if sim.ants.state[i] == AntSystem.State.FLEE_DANGER:
+			fled = true
+	_check("la feromona de peligro hace que una no-soldado huya", fled, "estado final=%d" % sim.ants.state[i])
 	# Un soldado no debe asustarse del peligro.
 	var guard := _colony(_cfg(0), 6)
 	var s := guard.ants.add_ant_at(Vector2i(guard.cfg.nest_x, sy - 1), CasteDefs.Caste.SOLDIER)
