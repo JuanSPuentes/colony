@@ -151,13 +151,13 @@ func _ready() -> void:
 
 	# Fase 5: debajo de la línea de `_ratio` (a diferencia de `_buy_row`, que sí se superpone con
 	# `_ratio` a propósito porque nunca se muestran juntos — `_caste_row` sí se ve a la vez que
-	# `_ratio`, que le sirve de etiqueta con los porcentajes). Orden Obreras/Nodrizas/Soldados.
+	# `_ratio`, que le sirve de etiqueta con los porcentajes). Orden Obreras/Nodrizas/Soldados/Zánganos.
 	_caste_row = HBoxContainer.new()
 	_caste_row.position = Vector2(MARGIN_X, MARGIN_Y + cy + 8.0) * S
 	_caste_row.size = Vector2(CTRL_CONTENT_W, 8.0) * S
 	_caste_row.add_theme_constant_override("separation", int(3 * S))
 	_ctrl_panel.add_child(_caste_row)
-	var castes := [CasteDefs.Caste.WORKER, CasteDefs.Caste.NURSE, CasteDefs.Caste.SOLDIER]
+	var castes := [CasteDefs.Caste.WORKER, CasteDefs.Caste.NURSE, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE]
 	for c in castes:
 		var s := HSlider.new()
 		s.min_value = 0.05
@@ -558,7 +558,7 @@ func update_info(m: Node) -> void:
 		_threats.text = "Ninguna a la vista"
 
 	if sim.queen_id >= 0:
-		var c := {CasteDefs.Caste.WORKER: 0, CasteDefs.Caste.NURSE: 0, CasteDefs.Caste.SOLDIER: 0}
+		var c := {CasteDefs.Caste.WORKER: 0, CasteDefs.Caste.NURSE: 0, CasteDefs.Caste.SOLDIER: 0, CasteDefs.Caste.DRONE: 0}
 		for i in sim.ants.count:
 			if sim.ants.alive[i] == 1 and sim.ants.caste[i] != CasteDefs.Caste.QUEEN:
 				c[sim.ants.caste[i]] += 1
@@ -566,19 +566,20 @@ func update_info(m: Node) -> void:
 		var queen_hp := sim.ants.hp[sim.queen_id] if queen_alive else 0.0
 		var queen_hp_max := sim.cfg.queen_hp_base * CasteDefs.HP_MULT[CasteDefs.Caste.QUEEN]
 		# El bullet de cada casta usa el mismo color con el que se ve en el mundo.
-		_colony.text = "[color=#%s]●[/color]%d [color=#%s]●[/color]%d [color=#%s]●[/color]%d [color=#%s]●[/color]%d%%   %s" % [
+		_colony.text = "[color=#%s]●[/color]%d [color=#%s]●[/color]%d [color=#%s]●[/color]%d [color=#%s]●[/color]%d [color=#%s]●[/color]%d%%   %s" % [
 			CasteDefs.COLORS[CasteDefs.Caste.WORKER].to_html(false), c[CasteDefs.Caste.WORKER],
 			CasteDefs.COLORS[CasteDefs.Caste.NURSE].to_html(false), c[CasteDefs.Caste.NURSE],
 			CasteDefs.COLORS[CasteDefs.Caste.SOLDIER].to_html(false), c[CasteDefs.Caste.SOLDIER],
+			CasteDefs.COLORS[CasteDefs.Caste.DRONE].to_html(false), c[CasteDefs.Caste.DRONE],
 			CasteDefs.COLORS[CasteDefs.Caste.QUEEN].to_html(false), int(100.0 * queen_hp / maxf(queen_hp_max, 0.01)),
 			ERA_NAMES[sim.era]]
 		_resources.text = "Cría %d/%d/%d   Comida %.0f%s  Agua %.0f%s" % [
 			sim.brood.counts_by_stage[BroodSystem.Stage.EGG], sim.brood.counts_by_stage[BroodSystem.Stage.LARVA], sim.brood.counts_by_stage[BroodSystem.Stage.PUPA],
 			sim.colony.food, _trend_arrow(sim.colony.food_trend), sim.colony.water, _trend_arrow(sim.colony.water_trend)]
 		var t := sim.colony.target_pct
-		_ratio.text = "Reparto → Obreras %d%%  Nodrizas %d%%  Soldados %d%%" % [
-			int(t[CasteDefs.Caste.WORKER] * 100), int(t[CasteDefs.Caste.NURSE] * 100), int(t[CasteDefs.Caste.SOLDIER] * 100)]
-		var castes := [CasteDefs.Caste.WORKER, CasteDefs.Caste.NURSE, CasteDefs.Caste.SOLDIER]
+		_ratio.text = "Reparto → Obreras %d%%  Nodrizas %d%%  Soldados %d%%  Zánganos %d%%" % [
+			int(t[CasteDefs.Caste.WORKER] * 100), int(t[CasteDefs.Caste.NURSE] * 100), int(t[CasteDefs.Caste.SOLDIER] * 100), int(t[CasteDefs.Caste.DRONE] * 100)]
+		var castes := [CasteDefs.Caste.WORKER, CasteDefs.Caste.NURSE, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE]
 		for i in castes.size():
 			_caste_sliders[i].set_value_no_signal(t[castes[i]])
 		var lines := ""

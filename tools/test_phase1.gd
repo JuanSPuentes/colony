@@ -10,6 +10,7 @@ var _fail := 0
 
 func _initialize() -> void:
 	_t_queen_lays_eggs()
+	_t_drone_speeds_up_egg_laying()
 	_t_brood_stages()
 	_t_caste_ratio_changes_composition()
 	_t_rooms_have_effect()
@@ -78,6 +79,27 @@ func _t_queen_lays_eggs() -> void:
 	no_food.colony.food = 0.0
 	_run(no_food, no_food.cfg.egg_interval_s * 3.0)
 	_check("sin comida la reina no pone huevos", no_food.brood.stage.size() == 0, "huevos=%d" % no_food.brood.stage.size())
+
+
+## El zángano no hace nada por sí mismo (no explora, no decide, se queda donde nació), pero
+## mientras esté vivo acelera la puesta de huevos de la reina (liviano a propósito, ver README).
+func _t_drone_speeds_up_egg_laying() -> void:
+	var baseline := _colony(_cfg(0), 6)
+	baseline.colony.food = 1000.0
+	_run(baseline, baseline.cfg.egg_interval_s * 3.0)
+	var eggs_baseline := baseline.brood.stage.size()
+
+	var with_drones := _colony(_cfg(0), 6)
+	with_drones.colony.food = 1000.0
+	var drone_idx := with_drones.ants.add_ant_at(Vector2i(with_drones.cfg.nest_x, _below_nest(with_drones) - 1), CasteDefs.Caste.DRONE)
+	for k in 2:
+		with_drones.ants.add_ant_at(Vector2i(with_drones.cfg.nest_x, _below_nest(with_drones) - 1), CasteDefs.Caste.DRONE)
+	var start_pos := with_drones.ants.pos[drone_idx]
+	_run(with_drones, with_drones.cfg.egg_interval_s * 3.0)
+	var eggs_with_drones := with_drones.brood.stage.size()
+	_check("con zánganos vivos nacen más huevos en el mismo tiempo", eggs_with_drones > eggs_baseline,
+		"sin zánganos=%d, con 3 zánganos=%d" % [eggs_baseline, eggs_with_drones])
+	_check("el zángano no se mueve ni decide por su cuenta", with_drones.ants.pos[drone_idx] == start_pos)
 
 
 func _t_brood_stages() -> void:

@@ -31,9 +31,10 @@ func _init(c: SimConfig) -> void:
 	_last_food = food
 	_last_water = water
 	target_pct = {
-		CasteDefs.Caste.WORKER: 0.7,
+		CasteDefs.Caste.WORKER: 0.6,
 		CasteDefs.Caste.NURSE: 0.15,
 		CasteDefs.Caste.SOLDIER: 0.15,
+		CasteDefs.Caste.DRONE: 0.1,
 	}
 
 
@@ -74,9 +75,9 @@ func set_target(caste: int, value: float) -> void:
 			target_pct[k] = target_pct[k] / others_total * remaining
 
 
-## Casta (obrera/nodriza/soldado) cuyo porcentaje actual está más por debajo de su objetivo.
+## Casta (obrera/nodriza/soldado/zángano) cuyo porcentaje actual está más por debajo de su objetivo.
 func furthest_from_target(sim: Simulation) -> int:
-	var counts := {CasteDefs.Caste.WORKER: 0, CasteDefs.Caste.NURSE: 0, CasteDefs.Caste.SOLDIER: 0}
+	var counts := {CasteDefs.Caste.WORKER: 0, CasteDefs.Caste.NURSE: 0, CasteDefs.Caste.SOLDIER: 0, CasteDefs.Caste.DRONE: 0}
 	var total := 0
 	var ants := sim.ants
 	for i in ants.count:
@@ -110,15 +111,18 @@ func tick(sim: Simulation, dt: float) -> void:
 	# no hay una tarea dedicada de "traer agua").
 	var gain := cfg.water_regen_wet if sim.water.volume > 0.0 else cfg.water_regen_dry
 	water = minf(water_cap, water + gain * dt)
-	# Consumo por casta.
+	# Consumo por casta, y de paso contamos zánganos vivos (aceleran la puesta de huevos más abajo).
 	var consumed_food := 0.0
 	var consumed_water := 0.0
+	var drones_alive := 0
 	var ants := sim.ants
 	for i in ants.count:
 		if ants.alive[i] == 0:
 			continue
 		consumed_food += CasteDefs.FOOD_PER_S[ants.caste[i]] * dt
 		consumed_water += CasteDefs.WATER_PER_S[ants.caste[i]] * dt
+		if ants.caste[i] == CasteDefs.Caste.DRONE:
+			drones_alive += 1
 	food = maxf(0.0, food - consumed_food)
 	water = maxf(0.0, water - consumed_water)
 	starving = food <= 0.0
@@ -129,8 +133,9 @@ func tick(sim: Simulation, dt: float) -> void:
 				ants.hp[i] -= cfg.hunger_damage_per_s * dt
 				if ants.hp[i] <= 0.0:
 					ants._kill(i, false)
-	# Puesta de huevos: solo si hay una Real válida y comida suficiente.
-	egg_cooldown -= dt
+	# Puesta de huevos: solo si hay una Real válida y comida suficiente. Cada zángano vivo acelera
+	# el cooldown (liviano a propósito: no importa dónde esté parado, solo que esté vivo).
+	egg_cooldown -= dt * (1.0 + cfg.drone_egg_speed_bonus * drones_alive)
 	if egg_cooldown <= 0.0 and sim.queen_id >= 0 and ants.alive[sim.queen_id] == 1 \
 			and rooms.valid[WorldGrid.Room.ROYAL] and food >= cfg.egg_food_threshold:
 		food -= cfg.egg_lay_cost

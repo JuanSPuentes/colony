@@ -177,6 +177,8 @@ func tick() -> void:
 				_think_queen(i, cx, cy, ci)
 				_move(i, dt, lv)
 			continue
+		if caste[i] == CasteDefs.Caste.DRONE:
+			continue  # liviano a propósito: no explora, no decide, se queda donde nació (ver CasteDefs)
 		if state[i] == State.DIG and job[i] >= 0:
 			_dig_progress(i, dt)
 		if now >= next_think[i]:

@@ -10,6 +10,10 @@ extends Node2D
 
 const ANT_COLOR := Color("120b08")
 const LEAF_COLOR := Color("5fe05f")
+## Dos alas finas y translúcidas por zángano vivo (ver `CasteDefs`), la única casta con alas: así
+## se distingue de un vistazo sin depender solo del color morado.
+const WING_COLOR := Color(0.88, 0.8, 0.95, 0.55)
+const WING_SIZE := Vector2(2.4, 0.9)
 ## Silueta de hormiga mirando hacia +X, un solo polígono simple (sin huecos) para
 ## `Geometry2D.triangulate_polygon`: cabeza, tórax y abdomen como antes, pero con 3 patas por lado
 ## y 2 antenas horneadas como "picos" que salen y vuelven al contorno del cuerpo (misma técnica que
@@ -54,6 +58,7 @@ var color_by_state := false
 var color_by_caste := false
 var _ants_mm: MultiMesh
 var _leaf_mm: MultiMesh
+var _wings_mm: MultiMesh
 var _capacity := 0
 ## Último ángulo de cada hormiga (por índice de hormiga, no de instancia del MultiMesh), para que
 ## una hormiga detenida no vuelva a mirar hacia +X en vez de mantener hacia dónde miraba.
@@ -65,7 +70,8 @@ func setup(s: Simulation) -> void:
 	if _ants_mm == null:
 		_ants_mm = _make_mm(_make_ant_mesh())
 		_leaf_mm = _make_mm(_make_quad_mesh(Vector2(1, 1)))
-		for mm in [_ants_mm, _leaf_mm]:
+		_wings_mm = _make_mm(_make_quad_mesh(WING_SIZE))
+		for mm in [_wings_mm, _ants_mm, _leaf_mm]:  # alas primero: quedan debajo del cuerpo
 			var node := MultiMeshInstance2D.new()
 			node.multimesh = mm
 			add_child(node)
@@ -129,8 +135,10 @@ func _ensure_capacity(n: int) -> void:
 	_capacity = maxi(n, 256) * 2
 	_ants_mm.instance_count = _capacity
 	_leaf_mm.instance_count = _capacity
+	_wings_mm.instance_count = _capacity * 2  # 2 alas por zángano vivo, caso extremo "todos zánganos"
 	_ants_mm.visible_instance_count = 0
 	_leaf_mm.visible_instance_count = 0
+	_wings_mm.visible_instance_count = 0
 	if _last_angle.size() < _capacity:
 		_last_angle.resize(_capacity)
 
@@ -145,6 +153,7 @@ func update(alpha: float, frame_start_pos: PackedVector2Array = PackedVector2Arr
 	var has_frame_start := frame_start_pos.size() >= ants.count
 	var n := 0
 	var leaves := 0
+	var wings := 0
 	for i in ants.count:
 		if ants.alive[i] == 0:
 			continue
@@ -155,7 +164,13 @@ func update(alpha: float, frame_start_pos: PackedVector2Array = PackedVector2Arr
 		if delta.length_squared() > TURN_EPS2:
 			angle = delta.angle()
 			_last_angle[i] = angle
-		_ants_mm.set_instance_transform_2d(n, Transform2D(angle, p))
+		# Tamaño por casta (hoy solo la reina, bien más grande que el resto: ver CasteDefs.VISUAL_SCALE).
+		var scale := CasteDefs.VISUAL_SCALE[ants.caste[i]]
+		var t := Transform2D(angle, p)
+		if scale != 1.0:
+			t.x *= scale
+			t.y *= scale
+		_ants_mm.set_instance_transform_2d(n, t)
 		var c := ANT_COLOR
 		if color_by_state:
 			c = AntSystem.STATE_COLORS[ants.state[i]]
@@ -167,5 +182,13 @@ func update(alpha: float, frame_start_pos: PackedVector2Array = PackedVector2Arr
 			_leaf_mm.set_instance_transform_2d(leaves, Transform2D(0.0, p + Vector2(0, -2.0)))
 			_leaf_mm.set_instance_color(leaves, LEAF_COLOR)
 			leaves += 1
+		if ants.caste[i] == CasteDefs.Caste.DRONE:
+			var fwd := Vector2(cos(angle), sin(angle))
+			var perp := fwd.orthogonal()
+			for side in [-1.0, 1.0]:
+				_wings_mm.set_instance_transform_2d(wings, Transform2D(angle + side * 0.45, p + perp * side * 0.9))
+				_wings_mm.set_instance_color(wings, WING_COLOR)
+				wings += 1
 	_ants_mm.visible_instance_count = n
 	_leaf_mm.visible_instance_count = leaves
+	_wings_mm.visible_instance_count = wings

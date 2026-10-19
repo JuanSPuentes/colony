@@ -116,9 +116,12 @@ no para jugar. Las funciones siguen existiendo (`Simulation.cmd_force_rain`/`cmd
 ### Modo clásico (Fases 1-2; lo usan las pruebas de esas fases)
 
 **Castas** (`sim/colony/caste_defs.gd`): Reina (una sola, pone huevos si hay comida suficiente y una
-cámara Real válida en algún lado; su muerte termina la partida), Obrera (explora, corta hojas, carga,
+cámara Real válida en algún lado; su muerte termina la partida — se ve bien más grande que el resto
+y de un tono marfil "puro", distinto del ámbar de la Obrera), Obrera (explora, corta hojas, carga,
 cava), Nodriza (acelera el desarrollo de la cría cerca del nido), Soldado (patrulla, responde a la
-feromona de Ataque y pelea cuerpo a cuerpo contra la araña).
+feromona de Ataque y pelea cuerpo a cuerpo contra la araña), Zángano (morado, con alas — no explora
+ni decide nada, se queda donde nació, pero mientras esté vivo acelera la puesta de huevos de la
+reina: `cfg.drone_egg_speed_bonus` por cada uno, sin tope, liviano a propósito).
 
 **Mover a la reina (tecla 5):** no decide ni camina sola — el jugador la manda a una celda cavada y
 conectada al nido (clic derecho cancela la orden en curso) para alejarla de la araña o acercarla a
@@ -362,6 +365,12 @@ verdad:
   Real válida en algún lado. Mover a la reina es para protegerla de la araña, no para reubicar la
   cría; si en el futuro se quiere esa relación, hay que decidir qué pasa si no queda ninguna Real
   donde la reina termine (ver conversación de diseño, no construido a propósito por ahora).
+- **El Zángano no tiene vuelo nupcial ni se reproduce de verdad** (no hay otras colonias con las que
+  cruzarse todavía). Su única función hoy es acelerar la puesta de huevos mientras esté vivo
+  (`Colony.tick`, sin tope por cantidad: liviano a propósito, ver sección 3). No pelea, no explora,
+  no puede morir de hambre más rápido que cualquier otra casta — simplemente existe.
+- **El Zángano no se compra en el modo incremental** (`Juego normal`), igual que la Nodriza: ese
+  modo sigue siendo solo obrera/soldado al azar (ver sección 9b).
 
 ## 9. Simplificaciones deliberadas del guardado (Fase 2)
 

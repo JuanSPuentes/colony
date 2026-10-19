@@ -114,6 +114,9 @@ extends Resource
 @export var egg_food_threshold := 60.0
 @export var egg_lay_cost := 8.0
 @export var egg_interval_s := 14.0
+## Cada zángano vivo acelera la puesta de huevos este tanto (sin tope: liviano a propósito, ver
+## README). 0.2 = +20% de velocidad de puesta por zángano.
+@export var drone_egg_speed_bonus := 0.2
 
 @export_group("Fase 1: cría")
 @export var egg_time_s := 18.0
