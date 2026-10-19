@@ -32,7 +32,6 @@ const CONTENT_W := PANEL_W - MARGIN_X * 2.0
 ## Alto del panel de estado desplegado y plegado (solo la línea de `_top`).
 const STATUS_H := 100.0
 const STATUS_FOLDED_H := 7.0 + MARGIN_Y * 2.0
-const KEY_COLOR := "ffd43c"
 ## Columnas de la barra de controles: encabezado y pares [tecla, qué hace]. Si se agrega una tecla
 ## nueva en main.gd, se agrega aquí también para que el jugador la vea.
 ## Fase 5: COLONIA (comprar/ir a la reina) y PARTIDA (guardar/reiniciar) se quitaron de esta lista
@@ -82,6 +81,12 @@ var _tooltip: Label
 ## Fase 5: panel visible mientras el juego está en pausa (Espacio), para que una persona nueva
 ## pueda reiniciar o salir sin saber que Shift+F5/la tuerca existen.
 var _pause_panel: PanelContainer
+## Recuadro arriba al centro con la feromona activa (muestra de color + nombre), visible solo con
+## la herramienta Feromona [2]. Antes solo aparecía como texto chico dentro del panel de la
+## herramienta, mezclado con Capa/Zoom/Marcadas; esto lo hace imposible de perder de vista.
+var _phero_badge: PanelContainer
+var _phero_swatch: ColorRect
+var _phero_label: Label
 
 
 func _ready() -> void:
@@ -168,6 +173,7 @@ func _ready() -> void:
 	_legend = _panel_rich(_ctrl_panel, cy, 8.0, CTRL_CONTENT_W)
 
 	_build_gear_button(root)
+	_build_phero_badge(root)
 	_layout()
 
 	_defeat = Label.new()
@@ -223,26 +229,50 @@ func _build_gear_button(root: Control) -> void:
 	b.position = Vector2(-13.0, 2.0) * S
 	b.custom_minimum_size = Vector2(11.0, 8.0) * S
 	b.size = b.custom_minimum_size
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.07, 0.06, 0.08, 0.92)
-	style.border_color = Color("ffd43c")
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(int(3 * S))
+	var style := _panel_style()
 	for s in ["normal", "hover", "pressed"]:
 		b.add_theme_stylebox_override(s, style)
 	b.pressed.connect(func() -> void: gear_pressed.emit())
 	root.add_child(b)
 
 
+## Recuadro arriba al centro con la feromona activa: una muestra de color (mismo color que la capa
+## de depuración, `OverlayView.PHERO_COLORS`) y su nombre. Solo visible con la herramienta
+## Feromona [2] (ver `_layout`/`update_info`, que lo esconde el resto del tiempo).
+func _build_phero_badge(root: Control) -> void:
+	var panel := PanelContainer.new()
+	var style := _panel_style()
+	style.content_margin_left = 6.0 * S
+	style.content_margin_right = 6.0 * S
+	style.content_margin_top = 3.0 * S
+	style.content_margin_bottom = 3.0 * S
+	panel.add_theme_stylebox_override("panel", style)
+	panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	panel.position.y = 3.0 * S
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.visible = false
+	root.add_child(panel)
+	_phero_badge = panel
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", int(3 * S))
+	panel.add_child(row)
+
+	_phero_swatch = ColorRect.new()
+	_phero_swatch.custom_minimum_size = Vector2(7.0, 7.0) * S
+	row.add_child(_phero_swatch)
+
+	_phero_label = Label.new()
+	_phero_label.add_theme_font_size_override("font_size", PANEL_FONT)
+	_phero_label.add_theme_color_override("font_color", Color("f4ecd8"))
+	row.add_child(_phero_label)
+
+
 ## Fase 5: panel centrado con Reiniciar/Salir, visible solo en pausa manual (Espacio), para que una
 ## persona nueva no dependa de saber que Shift+F5 o la tuerca existen (prompt_fase3_godot.md 4.4).
 func _build_pause_panel(root: Control) -> void:
 	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.07, 0.06, 0.08, 0.95)
-	style.border_color = Color("ffd43c")
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(int(3 * S))
+	var style := _panel_style(0.95)
 	style.content_margin_left = 16.0 * S
 	style.content_margin_right = 16.0 * S
 	style.content_margin_top = 10.0 * S
@@ -322,16 +352,23 @@ func _layout() -> void:
 	_ctrl_panel.position.y = _status_panel.position.y + _status_panel.size.y + 4.0 * S
 
 
+## Mismo fondo oscuro y borde dorado en todos los recuadros de la interfaz (paneles, botones de
+## compra, tuerca, insignia de feromona, panel de pausa), para que se lean como una sola familia
+## en vez de cada uno inventando su propio estilo.
+func _panel_style(bg_alpha: float = 0.92) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.07, 0.06, 0.08, bg_alpha)
+	style.border_color = Color("ffd43c")
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(int(3 * S))
+	return style
+
+
 ## Un recuadro con el mismo fondo/borde en toda la interfaz, para que se lea como una sola familia
 ## de paneles (no uno con fondo y el resto suelto encima del mundo).
 func _make_panel(parent: Control, pos: Vector2, size: Vector2) -> Panel:
 	var panel := Panel.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.07, 0.06, 0.08, 0.92)
-	style.border_color = Color("ffd43c")
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(int(3 * S))
-	panel.add_theme_stylebox_override("panel", style)
+	panel.add_theme_stylebox_override("panel", _panel_style())
 	panel.position = pos * S
 	panel.size = size * S
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -568,6 +605,13 @@ func update_info(m: Node) -> void:
 		sub = " · %s (Q/E)" % WorldGrid.ROOM_NAMES[m.ROOM_TYPES[m.room_index]]
 	_tools.text = "Herramienta: %s%s   Capa: %s   Zoom: %sx   Marcadas: %d" % [
 		tool_names[m.tool], sub, OverlayView.LAYER_NAMES[m.overlay.layer], str(m.ZOOM_LEVELS[m.zoom_index]), sim.world.marked_count]
+
+	_phero_badge.visible = m.tool == 2
+	if _phero_badge.visible:
+		_phero_swatch.color = OverlayView.PHERO_COLORS[m.phero_index]
+		var name: String = OverlayView.LAYER_NAMES[m.phero_index + 1]
+		_phero_label.text = name[0].to_upper() + name.substr(1)
+		_phero_badge.position.x = (get_viewport().get_visible_rect().size.x - _phero_badge.size.x) * 0.5
 
 	if m.overlay.layer == OverlayView.Layer.STATES:
 		var parts := ""
