@@ -191,18 +191,24 @@ func _run() -> void:
 	_main.sim.cmd_add_ants(_main.cfg.stress_ants)
 	_check("cmd_add_ants agrega 400 hormigas", _main.sim.ants.alive_count == before + 400, "%d -> %d" % [before, _main.sim.ants.alive_count])
 
-	# Reinicio y semilla.
+	# Reinicio y semilla. `spawn_incremental_start` arranca el reloj ya pasado el amanecer (ver su
+	# nota en simulation.gd), así que un reinicio fresco no empieza en tick_count≈0 sino en ese
+	# mismo offset fijo; "recién reiniciado" se compara contra ese valor, no contra 0.
 	var seed0: int = _main.seed_value
 	var sim_before: Simulation = _main.sim
+	var fresh_tick_count: int = int(DayNight.FADE * cfg.day_length_s / _main.sim.dt)
 	await _frames(30)
 	await _key(KEY_F5)
-	_check("F5 reinicia con la misma semilla", _main.sim != sim_before and _main.sim.rng.seed == seed0 and _main.sim.tick_count < 5 and _main.sim.ants.alive_count == expected_total, "semilla %d" % _main.sim.rng.seed)
+	_check("F5 reinicia con la misma semilla", _main.sim != sim_before and _main.sim.rng.seed == seed0 and _main.sim.tick_count < fresh_tick_count + 5 and _main.sim.ants.alive_count == expected_total, "semilla %d" % _main.sim.rng.seed)
+	# Mismo tick_count absoluto en los dos: `b` puede llevar unos ticks de más por el jitter de
+	# frames entre pulsar F5 y este chequeo, así que se avanza a un objetivo absoluto, no "100 más".
+	var target_tick := fresh_tick_count + 100
 	var a: Simulation = Simulation.new(cfg, seed0)
 	a.spawn_incremental_start()
-	for i in 100:
+	while a.tick_count < target_tick:
 		a.tick()
 	var b: Simulation = _main.sim
-	while b.tick_count < 100:
+	while b.tick_count < target_tick:
 		b.tick()
 	_check("tras reiniciar, la misma semilla reproduce exactamente la partida", a.checksum() == b.checksum(), "huellas %d / %d" % [a.checksum(), b.checksum()])
 	await _key(KEY_F5, true)

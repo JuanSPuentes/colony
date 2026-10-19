@@ -377,6 +377,10 @@ verdad:
 - **No se compran nodrizas** y la cría no depende de ellas en este modo.
 - **Las cámaras siguen existiendo** pero solo el Almacén importa para la economía (sube el tope de
   comida). El Jardín de hongos no hace nada: las hojas ya son comida al llegar.
+- **El reloj no arranca en `tick_count = 0`**, sino ya pasado el amanecer
+  (`DayNight.FADE * day_length_s`, ver `spawn_incremental_start`): a tick 0 el mundo se ve casi
+  negro un instante por la transición de `DayNight.light()`, aunque `is_night()` ya diga "de día";
+  así la partida se ve a pleno día desde el primer frame en vez de a mitad de esa animación.
 
 ## 9c. Simplificaciones deliberadas de la Fase 4 (victoria)
 

@@ -122,6 +122,10 @@ func spawn_colony_court() -> void:
 ## constructor y empieza con una colonia mínima: reina, unas pocas obreras, un soldado y una larva.
 func spawn_incremental_start() -> void:
 	incremental = true
+	# Arranca el reloj ya pasado el amanecer (`DayNight.FADE`): a tick_count=0 el mundo se ve casi
+	# negro un instante (el amanecer empieza oscuro y se aclara), aunque `is_night()` ya dé "de
+	# día" — así la partida se ve a pleno día desde el primer frame, no a mitad de esa animación.
+	tick_count = int(DayNight.FADE * cfg.day_length_s / dt)
 	ants = AntSystem.new(self)
 	var cell := Vector2i(cfg.nest_x, cfg.surface_y + cfg.shaft_depth + 1)
 	queen_id = ants.add_ant_at(cell, CasteDefs.Caste.QUEEN)

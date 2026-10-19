@@ -15,7 +15,6 @@ signal play_infinite
 signal open_options
 signal quit_requested
 
-const BG := Color(0.05, 0.04, 0.04, 1.0)
 const GOLD := Color("ffd43c")
 const CREAM := Color("f4ecd8")
 
@@ -25,10 +24,17 @@ func _ready() -> void:
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(root)
 
-	var bg := ColorRect.new()
-	bg.color = BG
+	var bg := MenuBackground.new()
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(bg)
+
+	# Oscurece un poco la escena animada para que el título y los botones sigan leyéndose nítidos
+	# encima de un cielo claro.
+	var dim := ColorRect.new()
+	dim.color = Color(0.0, 0.0, 0.0, 0.2)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(dim)
 
 	var title := Label.new()
 	title.text = "Colony: Under the Earth"
@@ -45,7 +51,9 @@ func _ready() -> void:
 	var subtitle := Label.new()
 	subtitle.text = "Guías la colonia con feromonas y el diseño del nido; las hormigas hacen el trabajo."
 	subtitle.add_theme_font_size_override("font_size", 16)
-	subtitle.add_theme_color_override("font_color", Color(0.75, 0.75, 0.78))
+	subtitle.add_theme_color_override("font_color", Color(0.85, 0.85, 0.88))
+	subtitle.add_theme_color_override("font_outline_color", Color.BLACK)
+	subtitle.add_theme_constant_override("outline_size", 3)
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	subtitle.position = Vector2(-320, 128)
@@ -88,7 +96,9 @@ func _option(parent: Control, label: String, hint: String, cb: Callable) -> void
 	var hint_label := Label.new()
 	hint_label.text = hint
 	hint_label.add_theme_font_size_override("font_size", 12)
-	hint_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.63))
+	hint_label.add_theme_color_override("font_color", Color(0.78, 0.78, 0.8))
+	hint_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	hint_label.add_theme_constant_override("outline_size", 2)
 	hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	parent.add_child(hint_label)

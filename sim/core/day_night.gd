@@ -4,6 +4,11 @@ extends RefCounted
 ## que no hay nada que guardar/cargar y no puede desincronizarse. El ciclo arranca al amanecer;
 ## un día de luz seguido de una noche cuenta como 1 día (Día 1, Día 2, ...).
 
+## Fracción del ciclo que dura la transición de oscuridad a luz plena en `light()` (también se usa
+## al atardecer). `Simulation.spawn_incremental_start()` adelanta el reloj este mismo tramo para
+## que la partida arranque ya a pleno día en vez de a mitad de un amanecer que empieza casi negro.
+const FADE := 0.06
+
 
 ## Posición dentro del ciclo actual, de 0 (amanecer) a 1 (fin de la noche).
 static func phase(time_s: float, cfg: SimConfig) -> float:
@@ -31,7 +36,6 @@ static func seconds_to_change(time_s: float, cfg: SimConfig) -> float:
 static func light(time_s: float, cfg: SimConfig) -> float:
 	var p := phase(time_s, cfg)
 	var dusk := 1.0 - cfg.night_fraction
-	const FADE := 0.06
 	if p < FADE:
 		return smoothstep(0.0, FADE, p)
 	if p < dusk - FADE:
