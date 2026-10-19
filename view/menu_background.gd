@@ -183,11 +183,16 @@ func _draw_mound(base: Vector2) -> void:
 ## contrafase) y antenas quebradas en dos tramos. `pos` es el punto de apoyo en el suelo; el
 ## cuerpo se dibuja por encima. `dir` +1 mirando a la derecha, -1 a la izquierda. `leg_phase`
 ## (0..1) mueve el ciclo de marcha.
+## Escala del dibujo entero respecto del tamaño "base" con el que se diseñó (pos sigue siendo el
+## punto de apoyo en el suelo, sin cambios: solo crece el cuerpo por encima de él).
+const ANT_SCALE := 1.5
+
 func _draw_ant(pos: Vector2, dir: float, carrying: bool, leg_phase: float) -> void:
 	var s := dir
-	var gaster_c := pos + Vector2(s * -5.5, -3.0)
-	var thorax_c := pos + Vector2(s * -1.0, -3.4)
-	var head_c := pos + Vector2(s * 3.0, -3.6)
+	var k := ANT_SCALE
+	var gaster_c := pos + Vector2(s * -5.5, -3.0) * k
+	var thorax_c := pos + Vector2(s * -1.0, -3.4) * k
+	var head_c := pos + Vector2(s * 3.0, -3.6) * k
 
 	# Patas: 3 puntos de apoyo por lado a lo largo del cuerpo; cada una se "levanta" (knee más
 	# alto, pie más cerca del cuerpo) según su fase de marcha, dejando siempre al menos 3 patas
@@ -196,29 +201,29 @@ func _draw_ant(pos: Vector2, dir: float, carrying: bool, leg_phase: float) -> vo
 	for j in 3:
 		var group_phase := leg_phase if j != 1 else fmod(leg_phase + 0.5, 1.0)
 		var lift := maxf(0.0, sin(group_phase * TAU))
-		var attach := pos + Vector2(s * attach_x[j], -3.0)
-		var foot := pos + Vector2(s * attach_x[j], -lift * 1.6)
-		var knee := attach.lerp(foot, 0.5) + Vector2(0.0, 1.0)
-		draw_line(attach, knee, ANT_LIMB, 1.0)
-		draw_line(knee, foot, ANT_LIMB, 1.0)
+		var attach := pos + Vector2(s * attach_x[j], -3.0) * k
+		var foot := pos + Vector2(s * attach_x[j] * k, -lift * 1.6 * k)
+		var knee := attach.lerp(foot, 0.5) + Vector2(0.0, 1.0) * k
+		draw_line(attach, knee, ANT_LIMB, k)
+		draw_line(knee, foot, ANT_LIMB, k)
 
 	# Antenas: dos tramos curvándose hacia adelante y arriba desde la cabeza.
-	var antenna_base := head_c + Vector2(s * 1.6, -1.0)
+	var antenna_base := head_c + Vector2(s * 1.6, -1.0) * k
 	for sgn in [-1.0, 1.0]:
-		var mid := antenna_base + Vector2(s * 2.0, -2.0 + sgn * 0.7)
-		var tip := mid + Vector2(s * 1.6, -1.6 + sgn * 0.9)
-		draw_line(antenna_base, mid, ANT_LIMB, 0.8)
-		draw_line(mid, tip, ANT_LIMB, 0.8)
+		var mid := antenna_base + Vector2(s * 2.0, -2.0 + sgn * 0.7) * k
+		var tip := mid + Vector2(s * 1.6, -1.6 + sgn * 0.9) * k
+		draw_line(antenna_base, mid, ANT_LIMB, 0.8 * k)
+		draw_line(mid, tip, ANT_LIMB, 0.8 * k)
 
-	_draw_ellipse(gaster_c, 4.2, 3.0, ANT_GASTER)
-	_draw_ellipse(thorax_c, 2.6, 2.1, ANT_THORAX)
-	_draw_ellipse(head_c, 2.0, 1.8, ANT_HEAD)
-	draw_circle(gaster_c + Vector2(s * -1.2, -1.0), 1.0, ANT_GASTER_HILITE)
+	_draw_ellipse(gaster_c, 4.2 * k, 3.0 * k, ANT_GASTER)
+	_draw_ellipse(thorax_c, 2.6 * k, 2.1 * k, ANT_THORAX)
+	_draw_ellipse(head_c, 2.0 * k, 1.8 * k, ANT_HEAD)
+	draw_circle(gaster_c + Vector2(s * -1.2, -1.0) * k, 1.0 * k, ANT_GASTER_HILITE)
 	# Mandíbula: una línea corta hacia adelante desde la punta de la cabeza.
-	draw_line(head_c + Vector2(s * 1.6, 0.3), head_c + Vector2(s * 2.8, 0.6), ANT_LIMB, 0.8)
+	draw_line(head_c + Vector2(s * 1.6, 0.3) * k, head_c + Vector2(s * 2.8, 0.6) * k, ANT_LIMB, 0.8 * k)
 
 	if carrying:
-		draw_circle(pos + Vector2(s * 2.0, -8.0), 2.2, LEAF_COLOR)
+		draw_circle(pos + Vector2(s * 2.0, -8.0) * k, 2.2 * k, LEAF_COLOR)
 
 
 func _draw_ellipse(center: Vector2, rx: float, ry: float, color: Color) -> void:
