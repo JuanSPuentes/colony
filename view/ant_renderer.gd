@@ -49,16 +49,38 @@ func _make_quad_mesh(size: Vector2) -> Mesh:
 
 
 ## Triangula `BODY_POINTS` una sola vez al arrancar; las 500 hormigas comparten este mismo Mesh,
-## el MultiMesh solo varía transform y color por instancia.
+## el MultiMesh solo varía transform y color por instancia. El color por vértice (`_body_shading`)
+## es el mismo estilo de 3 lóbulos del menú (cabeza más oscura, gáster con un brillo cálido), pero
+## horneado en la malla en vez de 3 óvalos separados: a la escala de una hormiga en partida (unas
+## pocas decenas de píxeles) no se nota la diferencia y así sigue siendo una sola malla, un solo
+## dibujo por hormiga, el mismo costo de siempre para 500. Godot multiplica este color de vértice
+## por el color de instancia (`set_instance_color`), así que la casta/estado se sigue viendo con
+## su propio tono — solo se le suma el sombreado por segmento encima.
 func _make_ant_mesh() -> Mesh:
 	var indices := Geometry2D.triangulate_polygon(BODY_POINTS)
 	var mesh := ArrayMesh.new()
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = BODY_POINTS
+	arrays[Mesh.ARRAY_COLOR] = _body_shading()
 	arrays[Mesh.ARRAY_INDEX] = indices
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh
+
+
+## Un tono por vértice de `BODY_POINTS` (cabeza x>0.7 más oscura, gáster x<-0.9 más clara/cálida,
+## tórax en el medio) para que el cuerpo se lea segmentado en vez de un solo color plano, sin
+## agregar geometría ni un segundo dibujo.
+func _body_shading() -> PackedColorArray:
+	var colors := PackedColorArray()
+	for p in BODY_POINTS:
+		if p.x > 0.7:
+			colors.append(Color(0.6, 0.57, 0.55))
+		elif p.x < -0.9:
+			colors.append(Color(1.0, 0.93, 0.84))
+		else:
+			colors.append(Color(0.8, 0.78, 0.75))
+	return colors
 
 
 func _make_mm(mesh: Mesh) -> MultiMesh:
