@@ -2,18 +2,49 @@ class_name AntRenderer
 extends Node2D
 ## Dibuja todas las hormigas con un único MultiMeshInstance2D (más otro para el píxel verde de la hoja).
 ## La posición se interpola entre el tick anterior y el actual. El cuerpo (`_make_ant_mesh`) es una
-## silueta de 3 lóbulos (cabeza/tórax/abdomen) en vez del rectángulo plano de antes, y cada hormiga
-## gira para encarar hacia dónde camina (no hacia dónde cargan las piernas: no las dibujamos, un
-## `MultiMesh` no puede animar cada una por separado sin disparar el costo de las 500 hormigas).
+## silueta de 3 lóbulos (cabeza/tórax/abdomen) con patas y antenas horneadas en el mismo contorno
+## (ver `_body_outline`), y cada hormiga gira para encarar hacia dónde camina. Las patas no se animan
+## por hormiga (quedan fijas, parte de la silueta): un `MultiMesh` solo varía transform y color por
+## instancia, así que animar cada pata por separado dispararía el costo de las 500 hormigas; la
+## silueta fija ya se nota a partir de zoom medio/alto, que es donde más importa.
 
 const ANT_COLOR := Color("120b08")
 const LEAF_COLOR := Color("5fe05f")
-## Silueta de hormiga mirando hacia +X: cabeza puntiaguda, tórax ancho, abdomen redondeado y
-## alargado atrás. Mismo tamaño aproximado que el rectángulo 3x2 anterior.
-const BODY_POINTS: PackedVector2Array = [
-	Vector2(1.8, 0.0), Vector2(1.0, 0.55), Vector2(-0.2, 0.75), Vector2(-1.3, 0.45),
-	Vector2(-1.9, 0.0), Vector2(-1.3, -0.45), Vector2(-0.2, -0.75), Vector2(1.0, -0.55),
-]
+## Silueta de hormiga mirando hacia +X, un solo polígono simple (sin huecos) para
+## `Geometry2D.triangulate_polygon`: cabeza, tórax y abdomen como antes, pero con 3 patas por lado
+## y 2 antenas horneadas como "picos" que salen y vuelven al contorno del cuerpo (misma técnica que
+## una estrella/engranaje). Construido con `_body_outline()` en vez de a mano para que la posición
+## de cada pata quede clara.
+static func _body_outline() -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	pts.append(Vector2(1.8, 0.0))  # punta de la cabeza
+	# Antena superior: pico fino hacia adelante-arriba desde la cabeza.
+	pts.append_array([Vector2(1.65, 0.15), Vector2(2.5, 0.9), Vector2(1.45, 0.35)])
+	# Patas de arriba, en los 3 mismos puntos de la silueta de antes (hombro, giba, cadera).
+	for c in [Vector2(1.0, 0.55), Vector2(-0.2, 0.75), Vector2(-1.3, 0.45)]:
+		pts.append_array(_leg_spike(c, 1.0))
+	pts.append(Vector2(-1.9, 0.0))  # punta de la cola
+	# Patas de abajo, mismos puntos reflejados en Y.
+	for c in [Vector2(-1.3, -0.45), Vector2(-0.2, -0.75), Vector2(1.0, -0.55)]:
+		pts.append_array(_leg_spike(c, -1.0))
+	# Antena inferior: simétrica a la de arriba.
+	pts.append_array([Vector2(1.45, -0.35), Vector2(2.5, -0.9), Vector2(1.65, -0.15)])
+	return pts
+
+
+## Pico fino de "entra-sale" en el punto `center` del contorno, hacia afuera en Y (signo `out_y`):
+## entra por el lado de mayor |x| cuando se viene desde la cabeza (`out_y>0`, arriba) o desde la
+## cola (`out_y<0`, abajo), sale por el otro lado, para no cruzar el resto del contorno.
+static func _leg_spike(center: Vector2, out_y: float) -> PackedVector2Array:
+	const WIDTH := 0.12
+	const LEN := 0.5
+	var near_x := center.x + (WIDTH if out_y > 0.0 else -WIDTH)
+	var far_x := center.x - (WIDTH if out_y > 0.0 else -WIDTH)
+	return PackedVector2Array([
+		Vector2(near_x, center.y), Vector2(center.x, center.y + out_y * LEN), Vector2(far_x, center.y),
+	])
+
+
 ## Umbral de desplazamiento (al cuadrado) para actualizar el ángulo: por debajo de esto una
 ## hormiga casi quieta no gira hacia ruido de redondeo de posición.
 const TURN_EPS2 := 0.0004
@@ -48,7 +79,7 @@ func _make_quad_mesh(size: Vector2) -> Mesh:
 	return quad
 
 
-## Triangula `BODY_POINTS` una sola vez al arrancar; las 500 hormigas comparten este mismo Mesh,
+## Triangula `_body_outline()` una sola vez al arrancar; las 500 hormigas comparten este mismo Mesh,
 ## el MultiMesh solo varía transform y color por instancia. El color por vértice (`_body_shading`)
 ## es el mismo estilo de 3 lóbulos del menú (cabeza más oscura, gáster con un brillo cálido), pero
 ## horneado en la malla en vez de 3 óvalos separados: a la escala de una hormiga en partida (unas
@@ -57,23 +88,24 @@ func _make_quad_mesh(size: Vector2) -> Mesh:
 ## por el color de instancia (`set_instance_color`), así que la casta/estado se sigue viendo con
 ## su propio tono — solo se le suma el sombreado por segmento encima.
 func _make_ant_mesh() -> Mesh:
-	var indices := Geometry2D.triangulate_polygon(BODY_POINTS)
+	var pts := _body_outline()
+	var indices := Geometry2D.triangulate_polygon(pts)
 	var mesh := ArrayMesh.new()
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = BODY_POINTS
-	arrays[Mesh.ARRAY_COLOR] = _body_shading()
+	arrays[Mesh.ARRAY_VERTEX] = pts
+	arrays[Mesh.ARRAY_COLOR] = _body_shading(pts)
 	arrays[Mesh.ARRAY_INDEX] = indices
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh
 
 
-## Un tono por vértice de `BODY_POINTS` (cabeza x>0.7 más oscura, gáster x<-0.9 más clara/cálida,
-## tórax en el medio) para que el cuerpo se lea segmentado en vez de un solo color plano, sin
-## agregar geometría ni un segundo dibujo.
-func _body_shading() -> PackedColorArray:
+## Un tono por vértice de `pts` (cabeza x>0.7 más oscura, gáster x<-0.9 más clara/cálida, tórax en
+## el medio) para que el cuerpo se lea segmentado en vez de un solo color plano, sin agregar
+## geometría ni un segundo dibujo.
+func _body_shading(pts: PackedVector2Array) -> PackedColorArray:
 	var colors := PackedColorArray()
-	for p in BODY_POINTS:
+	for p in pts:
 		if p.x > 0.7:
 			colors.append(Color(0.6, 0.57, 0.55))
 		elif p.x < -0.9:
