@@ -13,7 +13,14 @@ const MOUNTAIN_NEAR := Color("4a5640")
 const GROUND_COLOR := Color("6b4a2f")
 const GROUND_DARK := Color("4a311e")
 const MOUND_COLOR := Color("5a3d26")
-const ANT_COLOR := Color("1a120d")
+## Paleta de la hormiga (estilo propio inspirado en referencias de pixel art: cuerpo cálido
+## segmentado, cabeza más oscura, gáster con un brillo, patas/antenas casi negras para que
+## contrasten a este tamaño tan chico).
+const ANT_HEAD := Color("2e1a10")
+const ANT_THORAX := Color("5a3420")
+const ANT_GASTER := Color("6b3f24")
+const ANT_GASTER_HILITE := Color("8a5633")
+const ANT_LIMB := Color("160d08")
 const LEAF_COLOR := Color("5fe05f")
 const CLOUD_COLOR := Color(1.0, 1.0, 1.0, 0.85)
 const RAIN_COLOR := Color(0.65, 0.78, 0.92, 0.6)
@@ -136,7 +143,10 @@ func _draw() -> void:
 	_draw_mound(Vector2(s.x * 0.17, horizon))
 
 	for w in _ants:
-		_draw_ant(Vector2(w.x * s.x, horizon + 14.0 + sin(w.x * 30.0) * 2.0), w.dir, w.carrying)
+		# Fase de marcha derivada de la posición (determinista, sin acumulador propio por hormiga):
+		# a este ritmo da unos 2-3 ciclos de trípode por el ancho de su franja de paseo.
+		var leg_phase := fmod(absf(w.x) * 60.0, 1.0)
+		_draw_ant(Vector2(w.x * s.x, horizon + 14.0 + sin(w.x * 30.0) * 2.0), w.dir, w.carrying, leg_phase)
 	for c in _clouds:
 		_draw_cloud(Vector2(c.x * s.x, c.y * s.y), c.scale * s.y * 0.05)
 	for d in _rain_drops:
@@ -168,21 +178,56 @@ func _draw_mound(base: Vector2) -> void:
 	draw_circle(base + Vector2(0.0, -h * 0.5), 4.0, GROUND_DARK)
 
 
-## Silueta chica de 3 lóbulos (igual de espíritu que `AntRenderer.BODY_POINTS`, pero sin
-## triangular: a este tamaño un polígono convexo dibujado directo alcanza).
-func _draw_ant(pos: Vector2, dir: float, carrying: bool) -> void:
-	var pts := PackedVector2Array([
-		Vector2(7.0, 0.0), Vector2(4.0, 2.2), Vector2(-1.0, 3.0), Vector2(-5.5, 1.8),
-		Vector2(-8.0, 0.0), Vector2(-5.5, -1.8), Vector2(-1.0, -3.0), Vector2(4.0, -2.2),
-	])
-	if dir < 0.0:
-		for i in pts.size():
-			pts[i].x = -pts[i].x
-	for i in pts.size():
-		pts[i] += pos
-	draw_colored_polygon(pts, ANT_COLOR)
+## Hormiga de perfil con cuerpo en 3 segmentos (cabeza/tórax/gáster, cada uno un óvalo propio en
+## vez de una silueta plana de un solo tono), patas en marcha de trípode (0 y 2 en fase, 1 en
+## contrafase) y antenas quebradas en dos tramos. `pos` es el punto de apoyo en el suelo; el
+## cuerpo se dibuja por encima. `dir` +1 mirando a la derecha, -1 a la izquierda. `leg_phase`
+## (0..1) mueve el ciclo de marcha.
+func _draw_ant(pos: Vector2, dir: float, carrying: bool, leg_phase: float) -> void:
+	var s := dir
+	var gaster_c := pos + Vector2(s * -5.5, -3.0)
+	var thorax_c := pos + Vector2(s * -1.0, -3.4)
+	var head_c := pos + Vector2(s * 3.0, -3.6)
+
+	# Patas: 3 puntos de apoyo por lado a lo largo del cuerpo; cada una se "levanta" (knee más
+	# alto, pie más cerca del cuerpo) según su fase de marcha, dejando siempre al menos 3 patas
+	# firmes en el suelo como un trípode real.
+	var attach_x := [3.2, -0.8, -4.2]
+	for j in 3:
+		var group_phase := leg_phase if j != 1 else fmod(leg_phase + 0.5, 1.0)
+		var lift := maxf(0.0, sin(group_phase * TAU))
+		var attach := pos + Vector2(s * attach_x[j], -3.0)
+		var foot := pos + Vector2(s * attach_x[j], -lift * 1.6)
+		var knee := attach.lerp(foot, 0.5) + Vector2(0.0, 1.0)
+		draw_line(attach, knee, ANT_LIMB, 1.0)
+		draw_line(knee, foot, ANT_LIMB, 1.0)
+
+	# Antenas: dos tramos curvándose hacia adelante y arriba desde la cabeza.
+	var antenna_base := head_c + Vector2(s * 1.6, -1.0)
+	for sgn in [-1.0, 1.0]:
+		var mid := antenna_base + Vector2(s * 2.0, -2.0 + sgn * 0.7)
+		var tip := mid + Vector2(s * 1.6, -1.6 + sgn * 0.9)
+		draw_line(antenna_base, mid, ANT_LIMB, 0.8)
+		draw_line(mid, tip, ANT_LIMB, 0.8)
+
+	_draw_ellipse(gaster_c, 4.2, 3.0, ANT_GASTER)
+	_draw_ellipse(thorax_c, 2.6, 2.1, ANT_THORAX)
+	_draw_ellipse(head_c, 2.0, 1.8, ANT_HEAD)
+	draw_circle(gaster_c + Vector2(s * -1.2, -1.0), 1.0, ANT_GASTER_HILITE)
+	# Mandíbula: una línea corta hacia adelante desde la punta de la cabeza.
+	draw_line(head_c + Vector2(s * 1.6, 0.3), head_c + Vector2(s * 2.8, 0.6), ANT_LIMB, 0.8)
+
 	if carrying:
-		draw_circle(pos + Vector2(0.0, -6.0), 2.2, LEAF_COLOR)
+		draw_circle(pos + Vector2(s * 2.0, -8.0), 2.2, LEAF_COLOR)
+
+
+func _draw_ellipse(center: Vector2, rx: float, ry: float, color: Color) -> void:
+	const SEGMENTS := 10
+	var pts := PackedVector2Array()
+	for i in SEGMENTS:
+		var a := TAU * float(i) / SEGMENTS
+		pts.append(center + Vector2(cos(a) * rx, sin(a) * ry))
+	draw_colored_polygon(pts, color)
 
 
 func _draw_cloud(center: Vector2, r: float) -> void:
