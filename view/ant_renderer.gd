@@ -15,24 +15,34 @@ const LEAF_COLOR := Color("5fe05f")
 const WING_COLOR := Color(0.88, 0.8, 0.95, 0.55)
 const WING_SIZE := Vector2(2.4, 0.9)
 ## Silueta de hormiga mirando hacia +X, un solo polígono simple (sin huecos) para
-## `Geometry2D.triangulate_polygon`: cabeza, tórax y abdomen como antes, pero con 3 patas por lado
-## y 2 antenas horneadas como "picos" que salen y vuelven al contorno del cuerpo (misma técnica que
-## una estrella/engranaje). Construido con `_body_outline()` en vez de a mano para que la posición
-## de cada pata quede clara.
+## `Geometry2D.triangulate_polygon`. A diferencia de la versión anterior (un óvalo continuo que a
+## este tamaño se leía más como cucaracha que como hormiga), el tórax y el gáster están separados
+## por un pecíolo bien angosto (`WAIST`): es la "cintura" que de verdad distingue a una hormiga de
+## cualquier otro insecto de cuerpo plano. Las 6 patas quedan todas en el tórax (como en una
+## hormiga real, no repartidas por todo el cuerpo) y el gáster es más grande y redondo que antes.
+## Antenas horneadas como "picos" que salen y vuelven al contorno, misma técnica que las patas.
 static func _body_outline() -> PackedVector2Array:
 	var pts := PackedVector2Array()
-	pts.append(Vector2(1.8, 0.0))  # punta de la cabeza
+	pts.append(Vector2(1.9, 0.0))  # punta de la cabeza
 	# Antena superior: pico fino hacia adelante-arriba desde la cabeza.
-	pts.append_array([Vector2(1.65, 0.15), Vector2(2.5, 0.9), Vector2(1.45, 0.35)])
-	# Patas de arriba, en los 3 mismos puntos de la silueta de antes (hombro, giba, cadera).
-	for c in [Vector2(1.0, 0.55), Vector2(-0.2, 0.75), Vector2(-1.3, 0.45)]:
+	pts.append_array([Vector2(1.7, 0.15), Vector2(2.6, 0.9), Vector2(1.5, 0.35)])
+	# Tórax: 3 patas por lado, todas acá (no en el gáster).
+	for c in [Vector2(1.3, 0.45), Vector2(0.75, 0.5), Vector2(0.2, 0.45)]:
 		pts.append_array(_leg_spike(c, 1.0))
-	pts.append(Vector2(-1.9, 0.0))  # punta de la cola
-	# Patas de abajo, mismos puntos reflejados en Y.
-	for c in [Vector2(-1.3, -0.45), Vector2(-0.2, -0.75), Vector2(1.0, -0.55)]:
+	# Pecíolo: el punto más angosto de todo el contorno, la "cintura" entre tórax y gáster.
+	pts.append(Vector2(-0.05, 0.12))
+	# Gáster: más ancho que el tórax y redondeado, sin patas.
+	pts.append(Vector2(-0.55, 0.6))
+	pts.append(Vector2(-1.3, 0.55))
+	pts.append(Vector2(-2.1, 0.0))  # punta de la cola
+	pts.append(Vector2(-1.3, -0.55))
+	pts.append(Vector2(-0.55, -0.6))
+	pts.append(Vector2(-0.05, -0.12))
+	# Tórax de abajo, mismos puntos reflejados en Y.
+	for c in [Vector2(0.2, -0.45), Vector2(0.75, -0.5), Vector2(1.3, -0.45)]:
 		pts.append_array(_leg_spike(c, -1.0))
 	# Antena inferior: simétrica a la de arriba.
-	pts.append_array([Vector2(1.45, -0.35), Vector2(2.5, -0.9), Vector2(1.65, -0.15)])
+	pts.append_array([Vector2(1.5, -0.35), Vector2(2.6, -0.9), Vector2(1.7, -0.15)])
 	return pts
 
 
@@ -106,15 +116,15 @@ func _make_ant_mesh() -> Mesh:
 	return mesh
 
 
-## Un tono por vértice de `pts` (cabeza x>0.7 más oscura, gáster x<-0.9 más clara/cálida, tórax en
-## el medio) para que el cuerpo se lea segmentado en vez de un solo color plano, sin agregar
-## geometría ni un segundo dibujo.
+## Un tono por vértice de `pts` (cabeza x>0.7 más oscura, gáster x<-0.3 más clara/cálida —ya del
+## otro lado del pecíolo—, tórax en el medio) para que el cuerpo se lea segmentado en vez de un
+## solo color plano, sin agregar geometría ni un segundo dibujo.
 func _body_shading(pts: PackedVector2Array) -> PackedColorArray:
 	var colors := PackedColorArray()
 	for p in pts:
 		if p.x > 0.7:
 			colors.append(Color(0.6, 0.57, 0.55))
-		elif p.x < -0.9:
+		elif p.x < -0.3:
 			colors.append(Color(1.0, 0.93, 0.84))
 		else:
 			colors.append(Color(0.8, 0.78, 0.75))
