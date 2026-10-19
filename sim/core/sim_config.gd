@@ -179,11 +179,14 @@ extends Resource
 ## Comida que vale cada hoja que una obrera trae al nido. Todo se mide en comida: no hay agua ni
 ## hongo como recursos aparte en este modo.
 @export var inc_food_per_leaf := 4.0
-## Precio base de cada casta comprable; cada compra multiplica el siguiente precio por `growth`.
-@export var inc_worker_cost := 15.0
-@export var inc_worker_cost_growth := 1.12
-@export var inc_soldier_cost := 40.0
-@export var inc_soldier_cost_growth := 1.2
+## El jugador compra un huevo (no una casta): precio base, y cada compra multiplica el siguiente
+## por `growth`. Qué sale al nacer es al azar (`inc_egg_soldier_chance`), no una elección del
+## jugador — ver README sección 9b.
+@export var inc_egg_cost := 20.0
+@export var inc_egg_cost_growth := 1.15
+## Probabilidad de que un huevo nazca soldado; el resto, obrera. Las nodrizas no se compran en
+## este modo (sin cambios: ver sección 9b).
+@export var inc_egg_soldier_chance := 0.3
 ## La auto-compra deja siempre esta comida de reserva para no matar de hambre a la reina.
 @export var inc_auto_reserve := 10.0
 ## Multiplica la velocidad de la cría (huevo, larva y pupa) para que una compra no tarde minutos.

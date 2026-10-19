@@ -170,7 +170,13 @@ func tick() -> void:
 				_kill(i, true)
 				continue
 		if caste[i] == CasteDefs.Caste.QUEEN:
-			continue  # la reina no se mueve ni decide: vive en la cámara Real
+			# La reina no decide sola (sin EXPLORE/FOOD/etc.): solo camina cuando el jugador la
+			# manda con `cmd_move_queen` (ver `_think_queen`), y se queda quieta el resto del
+			# tiempo, igual que siempre.
+			if sim.queen_goal_cell >= 0:
+				_think_queen(i, cx, cy, ci)
+				_move(i, dt, lv)
+			continue
 		if state[i] == State.DIG and job[i] >= 0:
 			_dig_progress(i, dt)
 		if now >= next_think[i]:
@@ -622,6 +628,39 @@ func _step(i: int, cx: int, cy: int, ci: int, mode: int, extra: Variant) -> void
 		return
 	target[i] = _center(cx + DX[best_k], cy + DY[best_k])
 	heading[i] = (heading[i] * 0.4 + _dirs[best_k] * 0.6).normalized()
+
+
+## Sigue la BFS de `sim.queen_goal_dist` (calculada una sola vez en `cmd_move_queen`) celda a celda,
+## igual de greedy que `Mode.NEST` con `nest_dist`. Se llama todo tick mientras haya una orden en
+## curso (no solo cada `next_think`): es una sola hormiga, no vale la pena esperar a que le toque
+## pensar para que la orden del jugador se sienta inmediata.
+func _think_queen(i: int, cx: int, cy: int, ci: int) -> void:
+	if ci == sim.queen_goal_cell:
+		sim.queen_goal_cell = -1
+		target[i] = pos[i]
+		return
+	var world := sim.world
+	var w := world.w
+	var dist := sim.queen_goal_dist
+	var best_k := -1
+	var best_d: int = NestDistanceField.FAR
+	for k in 8:
+		var nx := cx + DX[k]
+		var ny := cy + DY[k]
+		if not world.is_passable(nx, ny):
+			continue
+		if DX[k] != 0 and DY[k] != 0:
+			if not world.is_passable(cx + DX[k], cy) or not world.is_passable(cx, cy + DY[k]):
+				continue  # nada de cortar esquinas de tierra, igual que `_step`
+		var nd: int = dist[ny * w + nx]
+		if nd < best_d:
+			best_d = nd
+			best_k = k
+	if best_k < 0 or best_d >= NestDistanceField.FAR:
+		sim.queen_goal_cell = -1  # sin camino posible (p.ej. alguien tapó el túnel): cancela la orden
+		target[i] = pos[i]
+		return
+	target[i] = _center(cx + DX[best_k], cy + DY[best_k])
 
 
 ## Busca la celda seca más cercana (BFS acotado) y se dirige a su primer paso.

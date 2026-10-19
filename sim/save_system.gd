@@ -46,7 +46,7 @@ static func to_dict(sim: Simulation) -> Dictionary:
 	# Fase 3: modo incremental.
 	d["incremental"] = sim.incremental
 	d["econ"] = {
-		"bought": _int_keys_to_str(sim.econ.bought),
+		"bought_eggs": sim.econ.bought_eggs,
 		"auto_mode": sim.econ.auto_mode,
 		"food_earned": sim.econ.food_earned,
 		"known_plants": Array(sim.econ.known_plants),
@@ -170,9 +170,7 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	sim.incremental = bool(d.get("incremental", false))
 	if d.has("econ"):
 		var ed: Dictionary = d["econ"]
-		var bought: Dictionary = ed["bought"]
-		for k in bought:
-			sim.econ.bought[int(k)] = int(bought[k])
+		sim.econ.bought_eggs = int(ed.get("bought_eggs", 0))
 		sim.econ.auto_mode = int(ed["auto_mode"]) as IncrementalEconomy.Auto
 		sim.econ.food_earned = float(ed["food_earned"])
 		sim.econ.known_plants = PackedByteArray(ed["known_plants"])

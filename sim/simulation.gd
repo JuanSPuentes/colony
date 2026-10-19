@@ -57,6 +57,13 @@ var rains_started := 0
 
 ## Fase 1: -1 mientras no haya colonia completa (ver nota arriba).
 var queen_id := -1
+## Orden del jugador para mover a la reina (`cmd_move_queen`): -1 si no hay ninguna en curso.
+## `queen_goal_cell` es el índice plano de la celda destino; `queen_goal_dist` es una BFS de una
+## sola vez contra esa celda (no se recalcula si cambia el terreno mientras camina: simplificación
+## deliberada, ver README). `AntSystem._think_queen` la sigue greedy, igual que `Mode.NEST` sigue
+## `fields.nest_dist`.
+var queen_goal_cell := -1
+var queen_goal_dist := PackedInt32Array()
 var era := Era.FOUNDATION
 var game_over := false
 var game_over_reason := ""
@@ -358,6 +365,24 @@ func cmd_clear_room(x: int, y: int) -> bool:
 	return world.clear_room(x, y)
 
 
+## Orden del jugador para mover a la reina a una celda pasable y conectada al nido (protegerla de
+## la araña moviéndola lejos de la entrada, o acercarla a una cámara nueva). Devuelve si la orden
+## se aceptó; no exige que la celda sea la cámara Real, cualquier túnel o superficie conectados al
+## nido sirve. La reina sigue poniendo huevos igual mientras camina (ver README: desacoplado a
+## propósito de dónde esté parada, solo importa que exista una Real válida en algún lado).
+func cmd_move_queen(x: int, y: int) -> bool:
+	if queen_id < 0 or ants.alive[queen_id] == 0:
+		return false
+	if not world.is_passable(x, y):
+		return false
+	var goal := y * world.w + x
+	if fields.nest_dist[goal] >= NestDistanceField.FAR:
+		return false
+	queen_goal_cell = goal
+	queen_goal_dist = fields.bfs_from([goal])
+	return true
+
+
 func cmd_nudge_caste(caste: int, amount: float) -> void:
 	colony.nudge_target(caste, amount)
 
@@ -376,9 +401,9 @@ func cmd_add_ants(n: int) -> void:
 	ants.add_ants(n)
 
 
-## Fase 3: compra una hormiga de la casta dada (obrera o soldado) con comida.
-func cmd_buy(caste: int) -> bool:
-	return incremental and econ.buy(caste)
+## Fase 3: compra un huevo con comida; qué sale al nacer (obrera o soldado) es al azar.
+func cmd_buy_egg() -> bool:
+	return incremental and econ.buy_egg()
 
 
 func cmd_cycle_auto_buy() -> void:
@@ -413,5 +438,5 @@ func checksum() -> int:
 	if queen_id >= 0:
 		h = (h * 31 + int(colony.food * 10.0) + int(colony.water * 10.0) + brood.hatched * 7 + brood.died * 13) & 0x7fffffff
 	if incremental:
-		h = (h * 31 + econ.bought[CasteDefs.Caste.WORKER] * 7 + econ.bought[CasteDefs.Caste.SOLDIER] * 11 + total_leaves_left) & 0x7fffffff
+		h = (h * 31 + econ.bought_eggs * 7 + total_leaves_left) & 0x7fffffff
 	return h

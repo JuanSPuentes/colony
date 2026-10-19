@@ -5,15 +5,16 @@ extends RefCounted
 ##
 ## Todo se mide en COMIDA (la guarda `sim.colony.food`, para que HUD y guardado la sigan leyendo
 ## del mismo lugar): las hojas que traen las obreras se convierten en comida al llegar al nido,
-## las adultas la consumen, y el jugador la gasta en comprar obreras o soldados. Cada compra
-## encarece la siguiente de esa casta (precio base × crecimiento^compradas). La auto-compra, si
-## está activa, compra sola la casta elegida en cuanto alcanza, dejando una reserva.
+## las adultas la consumen, y el jugador la gasta en comprar huevos (no castas: ver sección 9b del
+## README). Cada compra encarece la siguiente (precio base × crecimiento^comprados). La
+## auto-compra, si está activa, compra sola en cuanto alcanza, dejando una reserva.
 
-enum Auto { OFF, WORKER, SOLDIER }
-const AUTO_NAMES: Array[String] = ["apagada", "obreras", "soldados"]
+enum Auto { OFF, ON }
+const AUTO_NAMES: Array[String] = ["apagada", "encendida"]
 
 var sim: Simulation
-var bought := {CasteDefs.Caste.WORKER: 0, CasteDefs.Caste.SOLDIER: 0}
+## Huevos comprados en total (ya no por casta: la casta sale al azar al comprar, ver `buy_egg`).
+var bought_eggs := 0
 var auto_mode := Auto.OFF
 ## Comida que entró por hojas en total (para pruebas y estadísticas).
 var food_earned := 0.0
@@ -38,30 +39,22 @@ func _init(s: Simulation) -> void:
 	known_plants.resize(sim.plants.size())
 
 
-func is_buyable(caste: int) -> bool:
-	return bought.has(caste)
+func egg_cost() -> float:
+	return roundf(sim.cfg.inc_egg_cost * pow(sim.cfg.inc_egg_cost_growth, bought_eggs))
 
 
-func cost(caste: int) -> float:
-	var cfg := sim.cfg
-	match caste:
-		CasteDefs.Caste.WORKER:
-			return roundf(cfg.inc_worker_cost * pow(cfg.inc_worker_cost_growth, bought[caste]))
-		CasteDefs.Caste.SOLDIER:
-			return roundf(cfg.inc_soldier_cost * pow(cfg.inc_soldier_cost_growth, bought[caste]))
-	return INF
+func can_buy_egg() -> bool:
+	return _queen_alive() and sim.colony.food >= egg_cost()
 
 
-func can_buy(caste: int) -> bool:
-	return is_buyable(caste) and _queen_alive() and sim.colony.food >= cost(caste)
-
-
-## Paga la comida y la reina pone un huevo de esa casta (la cría hace el resto). Devuelve si pudo.
-func buy(caste: int) -> bool:
-	if not can_buy(caste):
+## Paga la comida y la reina pone un huevo; la casta que sale (obrera o soldado) es al azar, no la
+## elige el jugador (ver README sección 9b). Devuelve si pudo comprar.
+func buy_egg() -> bool:
+	if not can_buy_egg():
 		return false
-	sim.colony.food -= cost(caste)
-	bought[caste] += 1
+	sim.colony.food -= egg_cost()
+	bought_eggs += 1
+	var caste := CasteDefs.Caste.SOLDIER if sim.rng.randf() < sim.cfg.inc_egg_soldier_chance else CasteDefs.Caste.WORKER
 	sim.brood.lay_egg(caste)
 	return true
 
@@ -102,11 +95,9 @@ func tick(dt: float) -> void:
 				ants.hp[i] -= cfg.hunger_damage_per_s * dt
 				if ants.hp[i] <= 0.0:
 					ants._kill(i, false)
-	# Auto-compra.
-	if auto_mode != Auto.OFF:
-		var caste := CasteDefs.Caste.WORKER if auto_mode == Auto.WORKER else CasteDefs.Caste.SOLDIER
-		if colony.food >= cost(caste) + cfg.inc_auto_reserve:
-			buy(caste)
+	# Auto-compra: compra un huevo sola en cuanto alcanza, dejando la reserva.
+	if auto_mode == Auto.ON and colony.food >= egg_cost() + cfg.inc_auto_reserve:
+		buy_egg()
 	_trend_timer += dt
 	if _trend_timer >= 5.0:
 		colony.food_trend = (colony.food - _last_food) / _trend_timer * 60.0

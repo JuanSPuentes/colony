@@ -369,6 +369,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			tool = 3
 		KEY_4:
 			tool = 4
+		KEY_5:
+			tool = 5
 		KEY_Q:
 			if tool == 2:
 				phero_index = (phero_index - 1 + PHERO_FIELDS.size()) % PHERO_FIELDS.size()
@@ -379,17 +381,17 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				phero_index = (phero_index + 1) % PHERO_FIELDS.size()
 			elif tool == 3:
 				room_index = (room_index + 1) % ROOM_TYPES.size()
-		# Fase 3 (modo incremental): 7/8 compran obrera/soldado y 9 cambia la auto-compra. En una
-		# partida clásica (cargada de un guardado viejo) siguen ajustando el reparto de castas.
+		# Fase 3 (modo incremental): 7 compra un huevo (la casta que nace es al azar, ya no la
+		# elige el jugador) y 9 cambia la auto-compra; 8 no hace nada en este modo (antes compraba
+		# soldado directo). En una partida clásica (cargada de un guardado viejo) 7/8/9 siguen
+		# ajustando el reparto de castas.
 		KEY_7:
 			if sim.incremental:
-				sim.cmd_buy(CasteDefs.Caste.WORKER)
+				sim.cmd_buy_egg()
 			else:
 				sim.cmd_nudge_caste(CasteDefs.Caste.WORKER, 0.08)
 		KEY_8:
-			if sim.incremental:
-				sim.cmd_buy(CasteDefs.Caste.SOLDIER)
-			else:
+			if not sim.incremental:
 				sim.cmd_nudge_caste(CasteDefs.Caste.NURSE, 0.08)
 		KEY_9:
 			if sim.incremental:
@@ -499,6 +501,13 @@ func _apply_at(c: Vector2i) -> void:
 			for field_name in PHERO_FIELDS:
 				var f: PheromoneField = sim.get(field_name)
 				sim.cmd_erase_phero(f, c.x, c.y)
+		5:
+			# Clic izquierdo: ordena a la reina caminar hasta ahí. Clic derecho: cancela la orden en
+			# curso (se queda donde esté parada, no vuelve atrás).
+			if _erasing:
+				sim.queen_goal_cell = -1
+			else:
+				sim.cmd_move_queen(c.x, c.y)
 
 
 ## Un clic en el cielo pinta sobre la fila del suelo.

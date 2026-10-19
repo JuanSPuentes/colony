@@ -40,6 +40,7 @@ const STATUS_FOLDED_H := 7.0 + MARGIN_Y * 2.0
 ## siguen funcionando igual en `main.gd`; solo se dejaron de documentar aquí.
 const CONTROLS := [
 	["HERRAMIENTAS", [["1", "Cavar túneles"], ["2 / 3", "Feromona / Cámara"], ["4", "Borrar todo bajo el pincel"],
+		["5", "Mover reina (clic der. cancela la orden)"],
 		["Q / E", "Cambiar subtipo"], ["Clic izq / der", "Pintar / quitar"]]],
 	["CÁMARA Y TIEMPO", [["WASD / clic medio", "Mover la cámara"], ["Rueda", "Zoom"], ["Espacio", "Pausa"],
 		["F1 / F2 / F3", "Velocidad x1 / x2 / x4"], ["I", "Plegar / desplegar estado"]]],
@@ -141,13 +142,12 @@ func _ready() -> void:
 	_buy_row.add_theme_constant_override("separation", int(3 * S))
 	_buy_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_ctrl_panel.add_child(_buy_row)
-	for k in 3:
+	for k in 2:
 		var b := _buy_button()
 		_buy_row.add_child(b)
 		_buy_btns.append(b)
-	_buy_btns[0].pressed.connect(func() -> void: _m.sim.cmd_buy(CasteDefs.Caste.WORKER))
-	_buy_btns[1].pressed.connect(func() -> void: _m.sim.cmd_buy(CasteDefs.Caste.SOLDIER))
-	_buy_btns[2].pressed.connect(func() -> void: _m.sim.cmd_cycle_auto_buy())
+	_buy_btns[0].pressed.connect(func() -> void: _m.sim.cmd_buy_egg())
+	_buy_btns[1].pressed.connect(func() -> void: _m.sim.cmd_cycle_auto_buy())
 
 	# Fase 5: debajo de la línea de `_ratio` (a diferencia de `_buy_row`, que sí se superpone con
 	# `_ratio` a propósito porque nunca se muestran juntos — `_caste_row` sí se ve a la vez que
@@ -463,26 +463,33 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 			weather += "   · Lloviendo"
 	_weather.text = weather
 
-	# Cría en camino, por casta (lo que el jugador compró y aún no nació).
+	# Cría en camino, por casta (lo que el jugador compró y aún no nació). La casta de cada huevo
+	# ya se sorteó al comprarlo (`IncrementalEconomy.buy_egg`), así que esto no es una previsión:
+	# es lo que de verdad va a nacer. Un punto de color por huevo (no por larva/pupa, para no
+	# amontonar la línea) adelanta el resultado antes de que se vea la hormiga.
 	var coming := {CasteDefs.Caste.WORKER: 0, CasteDefs.Caste.SOLDIER: 0}
+	var egg_dots := ""
 	for i in sim.brood.stage.size():
-		if sim.brood.alive[i] and coming.has(sim.brood.caste[i]):
-			coming[sim.brood.caste[i]] += 1
+		if not sim.brood.alive[i] or not coming.has(sim.brood.caste[i]):
+			continue
+		coming[sim.brood.caste[i]] += 1
+		if sim.brood.stage[i] == BroodSystem.Stage.EGG:
+			egg_dots += "[color=#%s]●[/color]" % CasteDefs.COLORS[sim.brood.caste[i]].to_html(false)
 	var st := sim.brood.counts_by_stage
 	if coming[CasteDefs.Caste.WORKER] + coming[CasteDefs.Caste.SOLDIER] == 0:
-		_threats.text = "Nada en camino: compra obreras o soldados abajo"
+		_threats.text = "Nada en camino: compra un huevo abajo"
 	else:
-		_threats.text = "En camino: %s y %s   (huevo %d · larva %d · pupa %d)" % [
+		_threats.text = "En camino: %s y %s   (larva %d · pupa %d)" % [
 			_plural(coming[CasteDefs.Caste.WORKER], "obrera", "obreras"),
 			_plural(coming[CasteDefs.Caste.SOLDIER], "soldado", "soldados"),
-			st[BroodSystem.Stage.EGG], st[BroodSystem.Stage.LARVA], st[BroodSystem.Stage.PUPA]]
+			st[BroodSystem.Stage.LARVA], st[BroodSystem.Stage.PUPA]]
+	if egg_dots != "":
+		_colony.text += "   Huevos: " + egg_dots
 
 	var econ := sim.econ
-	_buy_btns[0].text = "[7] Obrera: %.0f" % econ.cost(CasteDefs.Caste.WORKER)
-	_buy_btns[0].disabled = not econ.can_buy(CasteDefs.Caste.WORKER)
-	_buy_btns[1].text = "[8] Soldado: %.0f" % econ.cost(CasteDefs.Caste.SOLDIER)
-	_buy_btns[1].disabled = not econ.can_buy(CasteDefs.Caste.SOLDIER)
-	_buy_btns[2].text = "[9] Auto: %s" % IncrementalEconomy.AUTO_NAMES[econ.auto_mode]
+	_buy_btns[0].text = "[7] Huevo: %.0f" % econ.egg_cost()
+	_buy_btns[0].disabled = not econ.can_buy_egg()
+	_buy_btns[1].text = "[9] Auto: %s" % IncrementalEconomy.AUTO_NAMES[econ.auto_mode]
 
 
 ## Fase 5: tooltip al pasar el mouse. Se recalcula cada frame (barato: una hormiga cercana y una
@@ -597,7 +604,7 @@ func update_info(m: Node) -> void:
 	if sim.incremental:
 		_update_incremental(m, sim)
 
-	var tool_names := ["", "Cavar [1]", "Feromona [2]", "Cámara [3]", "Borrar [4]"]
+	var tool_names := ["", "Cavar [1]", "Feromona [2]", "Cámara [3]", "Borrar [4]", "Mover reina [5]"]
 	var sub := ""
 	if m.tool == 2:
 		sub = " · %s (Q/E)" % OverlayView.LAYER_NAMES[m.phero_index + 1]

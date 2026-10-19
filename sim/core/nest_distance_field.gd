@@ -58,6 +58,17 @@ func recompute_dig() -> void:
 	_bfs(sources, dig_dist)
 
 
+## BFS puntual contra celdas pasables, para un destino que no es el nido ni la superficie (hoy lo
+## usa `cmd_move_queen`: distancia de cada celda hasta la celda elegida por el jugador). A
+## diferencia de `nest_dist`/`surface_dist`/`dig_dist`, no se guarda ni se recalcula solo: cada
+## llamado es una BFS nueva de principio a fin.
+func bfs_from(sources: Array[int]) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	out.resize(world.w * world.h)
+	_bfs(sources, out)
+	return out
+
+
 func _bfs(sources: Array[int], out: PackedInt32Array) -> void:
 	out.fill(FAR)
 	var w := world.w

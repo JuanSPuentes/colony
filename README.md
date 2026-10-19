@@ -65,10 +65,10 @@ volumen, brillo) o te deja salir, sin perder la partida (vuelve exactamente a do
 | **2** | Feromona (Q/E cambia el tipo: Comida, Hogar, Peligro, Ataque, Evacuar) |
 | **3** | Cámara (Q/E cambia el tipo: Guardería, Almacén, Jardín de hongos, Drenaje, Real) |
 | **4** | Borrar (quita marca de excavar, cámara y las 5 feromonas bajo el pincel) |
+| **5** | Mover reina: clic izquierdo la manda a caminar hasta esa celda, clic derecho cancela la orden |
 | Clic izquierdo / derecho, arrastrar | Pintar / borrar con la herramienta activa |
-| **7** | Comprar una obrera con comida (también con el botón del panel) |
-| **8** | Comprar un soldado con comida (también con el botón del panel) |
-| **9** | Auto-compra: apagada → obreras → soldados (compra sola en cuanto alcanza, dejando una reserva) |
+| **7** | Modo normal: comprar un huevo con comida (también con el botón del panel; qué nace es al azar) |
+| **9** | Modo normal: auto-compra de huevos, apagada/encendida (compra sola en cuanto alcanza, dejando una reserva) |
 | **Espacio** | Pausa / reanudar |
 | **F1 / F2 / F3** | Velocidad x1 / x2 / x4 |
 | **WASD** | Mover la cámara |
@@ -97,11 +97,12 @@ no para jugar. Las funciones siguen existiendo (`Simulation.cmd_force_rain`/`cmd
 - **Todo es comida.** Cada hoja que una obrera trae al nido vale `inc_food_per_leaf` de comida al
   llegar. No hay agua ni hongo como recursos aparte. Todas las adultas comen; si la comida llega
   a 0, la reina y los soldados se debilitan (las obreras no).
-- **Comprar hormigas:** 7 (obrera) u 8 (soldado), o los botones del panel. Se paga la comida, la
-  reina pone un huevo de esa casta y la cría hace el resto (huevo → larva → pupa, `inc_brood_speed`
-  veces más rápido que en la Fase 1 y sin depender de nodrizas). Cada compra multiplica el precio
-  de la siguiente de esa casta (`inc_*_cost_growth`).
-- **Auto-compra (9):** apagada → obreras → soldados. Compra sola en cuanto alcanza, dejando
+- **Comprar un huevo (7), o el botón del panel.** Se paga la comida y la reina pone un huevo; qué
+  casta nace (obrera o soldado) es al azar (`inc_egg_soldier_chance`), no la elige el jugador — ver
+  sección 9b. La cría hace el resto (huevo → larva → pupa, `inc_brood_speed` veces más rápido que
+  en la Fase 1 y sin depender de nodrizas). Cada compra multiplica el precio del siguiente huevo
+  (`inc_egg_cost_growth`).
+- **Auto-compra (9):** apagada / encendida. Compra un huevo sola en cuanto alcanza, dejando
   `inc_auto_reserve` de comida para no matar de hambre a la reina.
 - **Día y noche:** el ciclo dura `day_length_s` (60 % de luz, 40 % de noche) y arranca al amanecer.
   Un día de luz + una noche = 1 día; el HUD muestra "Día N". De noche el mundo se oscurece y las
@@ -114,10 +115,15 @@ no para jugar. Las funciones siguen existiendo (`Simulation.cmd_force_rain`/`cmd
 
 ### Modo clásico (Fases 1-2; lo usan las pruebas de esas fases)
 
-**Castas** (`sim/colony/caste_defs.gd`): Reina (una sola, vive en la cámara Real, pone huevos si hay comida
-suficiente; su muerte termina la partida), Obrera (explora, corta hojas, carga, cava), Nodriza (acelera
-el desarrollo de la cría cerca del nido), Soldado (patrulla, responde a la feromona de Ataque y pelea
-cuerpo a cuerpo contra la araña).
+**Castas** (`sim/colony/caste_defs.gd`): Reina (una sola, pone huevos si hay comida suficiente y una
+cámara Real válida en algún lado; su muerte termina la partida), Obrera (explora, corta hojas, carga,
+cava), Nodriza (acelera el desarrollo de la cría cerca del nido), Soldado (patrulla, responde a la
+feromona de Ataque y pelea cuerpo a cuerpo contra la araña).
+
+**Mover a la reina (tecla 5):** no decide ni camina sola — el jugador la manda a una celda cavada y
+conectada al nido (clic derecho cancela la orden en curso) para alejarla de la araña o acercarla a
+una cámara nueva. Camina más lento que el resto (`CasteDefs.SPEED_MULT`) y sigue poniendo huevos
+igual mientras viaja: dónde esté parada no afecta la cría, a propósito (ver sección 8).
 
 **Cría** (`sim/colony/brood_system.gd`): huevo → larva → pupa → adulta. Al poner un huevo, la reina le asigna
 la casta que más lejos esté del reparto objetivo del jugador (ajustable con 7/8/9). Sin nodrizas cerca
@@ -348,6 +354,14 @@ verdad:
   pantalla.
 - **No hay herramienta de inspección por pasar el mouse** sobre hormigas o cámaras; la capa de
   depuración y los colores cumplen ese papel por ahora.
+- **Mover a la reina no recalcula el camino si el terreno cambia a mitad de viaje.** `cmd_move_queen`
+  calcula una BFS contra la celda destino una sola vez; si alguien tapa el túnel que estaba usando
+  mientras camina, la orden se cancela sola en vez de buscar una ruta nueva (no se queda caminando
+  contra una pared: `is_passable` se revisa en cada paso).
+- **La puesta de huevos no depende de dónde esté parada la reina**, solo de que exista una cámara
+  Real válida en algún lado. Mover a la reina es para protegerla de la araña, no para reubicar la
+  cría; si en el futuro se quiere esa relación, hay que decidir qué pasa si no queda ninguna Real
+  donde la reina termine (ver conversación de diseño, no construido a propósito por ahora).
 
 ## 9. Simplificaciones deliberadas del guardado (Fase 2)
 
@@ -375,6 +389,11 @@ verdad:
 - **La reina no se ahoga en este modo**, y la primera lluvia llega el día 3: una colonia de 5
   hormigas no alcanza a cavar un drenaje antes de la lluvia de los 150 s de la Fase 1.
 - **No se compran nodrizas** y la cría no depende de ellas en este modo.
+- **El jugador compra un huevo, no una casta.** Qué nace (obrera o soldado) se sortea al comprar
+  (`IncrementalEconomy.buy_egg`, `cfg.inc_egg_soldier_chance`), no al nacer: la casta ya queda fija
+  en `BroodSystem.caste` desde el huevo, así que el punto de color del HUD no es una predicción,
+  es el resultado real. Reemplaza los precios separados de obrera/soldado de antes de esta sesión;
+  las nodrizas nunca fueron parte del sorteo (siguen sin comprarse en este modo).
 - **Las cámaras siguen existiendo** pero solo el Almacén importa para la economía (sube el tope de
   comida). El Jardín de hongos no hace nada: las hojas ya son comida al llegar.
 - **El reloj no arranca en `tick_count = 0`**, sino ya pasado el amanecer

@@ -8,7 +8,9 @@ extends RefCounted
 enum Caste { QUEEN, WORKER, NURSE, SOLDIER }
 
 const NAMES: Array[String] = ["Reina", "Obrera", "Nodriza", "Soldado"]
-const SPEED_MULT: Array[float] = [0.0, 1.0, 0.9, 0.95]
+## La reina era 0.0 porque nunca se movía sola; ahora puede caminar cuando el jugador la manda
+## (`cmd_move_queen`), más lenta que el resto por ser la más grande/pesada de las 4 castas.
+const SPEED_MULT: Array[float] = [0.5, 1.0, 0.9, 0.95]
 const HP_MULT: Array[float] = [3.0, 1.0, 1.0, 1.8]
 ## Comida y agua que consume cada adulta por segundo.
 const FOOD_PER_S: Array[float] = [0.045, 0.018, 0.018, 0.024]

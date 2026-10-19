@@ -110,17 +110,17 @@ func _run() -> void:
 	# Fase 3: la semilla ya no se muestra; en su lugar va el día (y si es de día o de noche).
 	_check("el HUD muestra los datos en español", _main.hud._top.text.contains("Hormigas: %d" % expected_total) and _main.hud._top.text.contains("Día 1") and not _main.hud._top.text.contains("Semilla") and _main.hud._top.text.contains("FPS:") and _main.hud._top.text.contains("Vel:") and _main.hud._weather.text.length() > 0, _main.hud._top.text + " | " + _main.hud._weather.text)
 
-	# Fase 3: comprar con 7/8 y la auto-compra con 9 (y con los botones del panel).
+	# Fase 3: 7 compra un huevo (la casta nace al azar, 8 ya no hace nada en este modo), 9 cambia
+	# la auto-compra (y el botón del panel también compra).
 	_main.sim.colony.food = 200.0
 	var eggs0: int = _main.sim.brood.total_alive()
 	await _key(KEY_7)
 	await _key(KEY_8)
-	_check("7 y 8 compran una obrera y un soldado", _main.sim.econ.bought[CasteDefs.Caste.WORKER] == 1 and _main.sim.econ.bought[CasteDefs.Caste.SOLDIER] == 1 and _main.sim.brood.total_alive() == eggs0 + 2)
+	_check("7 compra un huevo y 8 no hace nada en este modo", _main.sim.econ.bought_eggs == 1 and _main.sim.brood.total_alive() == eggs0 + 1)
 	_main.hud._buy_btns[0].pressed.emit()
-	_check("el botón de obrera también compra", _main.sim.econ.bought[CasteDefs.Caste.WORKER] == 2)
+	_check("el botón de comprar huevo también compra", _main.sim.econ.bought_eggs == 2)
 	await _key(KEY_9)
-	_check("9 cambia la auto-compra", _main.sim.econ.auto_mode == IncrementalEconomy.Auto.WORKER and _main.hud._buy_btns[2].text.contains("obreras"))
-	await _key(KEY_9)
+	_check("9 activa la auto-compra", _main.sim.econ.auto_mode == IncrementalEconomy.Auto.ON and _main.hud._buy_btns[1].text.contains("encendida"))
 	await _key(KEY_9)
 
 	# Panel plegable: I pliega el estado (la línea de arriba sigue visible). La barra de controles

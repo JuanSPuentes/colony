@@ -13,7 +13,7 @@ func _initialize() -> void:
 	_t_day_night()
 	_t_leaves_become_food()
 	_t_buy_costs_food_and_scales()
-	_t_bought_egg_hatches_as_that_caste()
+	_t_bought_egg_hatches_as_sorted_caste()
 	_t_auto_buy_keeps_reserve()
 	_t_plants_regrow_only_by_day()
 	_t_colony_grows_on_its_own()
@@ -104,47 +104,61 @@ func _t_leaves_become_food() -> void:
 	_check("cada hoja que llega al nido se vuelve comida", sim.leaves_stored == 0 and absf(gained - 5.0 * cfg.inc_food_per_leaf) < 0.1, "ganó %.2f" % gained)
 
 
+## El jugador ya no elige la casta: compra un huevo (precio único, creciente) y lo que nace es al
+## azar entre obrera y soldado (`cfg.inc_egg_soldier_chance`), ver README sección 9b.
 func _t_buy_costs_food_and_scales() -> void:
 	var cfg := _cfg()
 	var sim := _inc(cfg)
 	sim.colony.food = 5.0
-	_check("sin comida suficiente no se puede comprar", not sim.cmd_buy(CasteDefs.Caste.WORKER) and sim.brood.total_alive() == 1)
+	_check("sin comida suficiente no se puede comprar", not sim.cmd_buy_egg() and sim.brood.total_alive() == 1)
 	sim.colony.food = 200.0
-	var c1 := sim.econ.cost(CasteDefs.Caste.WORKER)
-	var ok := sim.cmd_buy(CasteDefs.Caste.WORKER)
-	_check("comprar una obrera cuesta su precio y pone un huevo", ok and sim.colony.food == 200.0 - c1 and sim.brood.total_alive() == 2, "precio %.0f" % c1)
-	_check("la siguiente obrera sale más cara", sim.econ.cost(CasteDefs.Caste.WORKER) > c1, "%.0f -> %.0f" % [c1, sim.econ.cost(CasteDefs.Caste.WORKER)])
-	var s1 := sim.econ.cost(CasteDefs.Caste.SOLDIER)
-	_check("el soldado cuesta más que la obrera", s1 > c1 and sim.cmd_buy(CasteDefs.Caste.SOLDIER))
-	_check("las nodrizas no se compran", not sim.cmd_buy(CasteDefs.Caste.NURSE))
+	var c1 := sim.econ.egg_cost()
+	var ok := sim.cmd_buy_egg()
+	_check("comprar un huevo cuesta su precio y lo pone", ok and sim.colony.food == 200.0 - c1 and sim.brood.total_alive() == 2, "precio %.0f" % c1)
+	_check("el siguiente huevo sale más caro", sim.econ.egg_cost() > c1, "%.0f -> %.0f" % [c1, sim.econ.egg_cost()])
+	var born_caste: int = sim.brood.caste[sim.brood.caste.size() - 1]
+	_check("lo que nace es obrera o soldado, nunca nodriza", born_caste == CasteDefs.Caste.WORKER or born_caste == CasteDefs.Caste.SOLDIER, "casta=%d" % born_caste)
 
 
-func _t_bought_egg_hatches_as_that_caste() -> void:
+## La casta de un huevo se sortea al comprarlo (no al nacer): lo que hay en `brood.caste` apenas
+## se compra ya es lo que va a nacer. Esta prueba fija la semilla hasta encontrar un huevo que
+## salga soldado y confirma que efectivamente nace soldado, no obrera.
+func _t_bought_egg_hatches_as_sorted_caste() -> void:
 	var cfg := _cfg()
-	var sim := _inc(cfg)
-	sim.colony.food = 200.0
-	sim.cmd_buy(CasteDefs.Caste.SOLDIER)
+	var sim: Simulation
+	var seed_value := 1
+	var egg_idx := -1
+	while true:
+		sim = _inc(cfg, seed_value)
+		sim.colony.food = 200.0
+		sim.cmd_buy_egg()
+		egg_idx = sim.brood.caste.size() - 1  # el último, no el 0: la larva inicial ya ocupa el 0
+		if sim.brood.caste[egg_idx] == CasteDefs.Caste.SOLDIER:
+			break
+		seed_value += 1
+		if seed_value > 50:
+			break  # no debería hacer falta, pero evita un bucle infinito si algo más cambió
+	_check("se encontró una semilla donde el huevo sale soldado (para probar el caso)", sim.brood.caste[egg_idx] == CasteDefs.Caste.SOLDIER, "semilla=%d" % seed_value)
 	var soldiers := _count(sim, CasteDefs.Caste.SOLDIER)
 	var total_s := (cfg.egg_time_s + cfg.larva_time_s + cfg.pupa_time_s) / cfg.inc_brood_speed / CasteDefs.DEV_SPEED_MULT[CasteDefs.Caste.SOLDIER]
 	_run(sim, total_s + 5.0)
-	_check("el huevo comprado nace como soldado (sin nodrizas, en %.0f s)" % total_s, _count(sim, CasteDefs.Caste.SOLDIER) == soldiers + 1, "soldados %d -> %d" % [soldiers, _count(sim, CasteDefs.Caste.SOLDIER)])
+	_check("el huevo sorteado como soldado nace soldado (sin nodrizas, en %.0f s)" % total_s, _count(sim, CasteDefs.Caste.SOLDIER) == soldiers + 1, "soldados %d -> %d" % [soldiers, _count(sim, CasteDefs.Caste.SOLDIER)])
 
 
 func _t_auto_buy_keeps_reserve() -> void:
 	var cfg := _cfg()
 	var sim := _inc(cfg)
 	sim.cmd_cycle_auto_buy()
-	_check("9 activa la auto-compra de obreras", sim.econ.auto_mode == IncrementalEconomy.Auto.WORKER)
-	var cost := sim.econ.cost(CasteDefs.Caste.WORKER)
+	_check("9 activa la auto-compra", sim.econ.auto_mode == IncrementalEconomy.Auto.ON)
+	var cost := sim.econ.egg_cost()
 	sim.colony.food = cost + cfg.inc_auto_reserve - 1.0
 	sim.tick()
-	_check("no compra si se comería la reserva", sim.econ.bought[CasteDefs.Caste.WORKER] == 0)
+	_check("no compra si se comería la reserva", sim.econ.bought_eggs == 0)
 	sim.colony.food = cost + cfg.inc_auto_reserve + 1.0
 	sim.tick()
-	_check("compra sola en cuanto alcanza", sim.econ.bought[CasteDefs.Caste.WORKER] == 1 and sim.colony.food >= cfg.inc_auto_reserve - 0.1)
+	_check("compra sola en cuanto alcanza", sim.econ.bought_eggs == 1 and sim.colony.food >= cfg.inc_auto_reserve - 0.1)
 	sim.cmd_cycle_auto_buy()
-	sim.cmd_cycle_auto_buy()
-	_check("9 recorre obreras -> soldados -> apagada", sim.econ.auto_mode == IncrementalEconomy.Auto.OFF)
+	_check("9 recorre encendida -> apagada", sim.econ.auto_mode == IncrementalEconomy.Auto.OFF)
 
 
 func _t_plants_regrow_only_by_day() -> void:
@@ -176,12 +190,12 @@ func _t_save_load_keeps_incremental() -> void:
 	var cfg := _cfg()
 	var sim := _inc(cfg)
 	sim.colony.food = 120.0
-	sim.cmd_buy(CasteDefs.Caste.WORKER)
+	sim.cmd_buy_egg()
 	sim.cmd_cycle_auto_buy()
 	_run(sim, 40.0)
 	var loaded := SaveSystem.from_dict(JSON.parse_string(JSON.stringify(SaveSystem.to_dict(sim))), cfg)
 	_check("guardar y cargar conserva el modo incremental, compras y auto-compra",
-		loaded.incremental and loaded.econ.bought[CasteDefs.Caste.WORKER] == sim.econ.bought[CasteDefs.Caste.WORKER]
+		loaded.incremental and loaded.econ.bought_eggs == sim.econ.bought_eggs
 		and loaded.econ.auto_mode == sim.econ.auto_mode and loaded.econ.known_plants == sim.econ.known_plants)
 	_check("y la huella no cambia", loaded.checksum() == sim.checksum(), "%d / %d" % [sim.checksum(), loaded.checksum()])
 	_run(sim, 30.0)

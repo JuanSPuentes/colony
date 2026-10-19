@@ -19,6 +19,7 @@ func _initialize() -> void:
 	_t_spider()
 	_t_eras()
 	_t_queen_death_ends_game()
+	_t_queen_move()
 	_t_determinism()
 	_t_performance()
 	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
@@ -268,6 +269,31 @@ func _t_queen_death_ends_game() -> void:
 	sim.ants._kill(sim.queen_id, true)
 	sim.tick()
 	_check("la muerte de la reina termina la partida con la causa correcta", sim.game_over and sim.game_over_reason.length() > 0, sim.game_over_reason)
+
+
+## La reina puede caminar a donde la mande el jugador (protegerla de la araña), pero solo si se le
+## ordena: sin orden, sigue quieta exactamente como siempre.
+func _t_queen_move() -> void:
+	var sim := _colony(_cfg(0), 20)
+	var nx := sim.cfg.nest_x
+	var y0 := _below_nest(sim)
+	var start_pos := sim.ants.pos[sim.queen_id]
+	_run(sim, 1.0)
+	_check("sin orden, la reina no se mueve", sim.ants.pos[sim.queen_id] == start_pos)
+
+	_carve(sim, nx - 1, y0, nx + 6, y0 + 1)
+	var target_cell := Vector2i(nx + 6, y0)
+	_check("cmd_move_queen acepta una celda cavada y conectada al nido", sim.cmd_move_queen(target_cell.x, target_cell.y))
+	_check("no acepta tierra sin cavar", not sim.cmd_move_queen(nx + 20, y0))
+	_run(sim, 15.0)
+	var d := sim.ants.pos[sim.queen_id].distance_to(Vector2((target_cell.x + 0.5) * sim.cfg.cell_px, (target_cell.y + 0.5) * sim.cfg.cell_px))
+	_check("la reina llega a la celda ordenada", sim.queen_goal_cell == -1 and d < sim.cfg.cell_px, "distancia=%.1f" % d)
+
+	# Desacoplado a propósito (ver respuesta del usuario): la puesta de huevos no exige que la
+	# reina esté parada en la cámara Real, solo que exista una Real válida en algún lado.
+	sim.colony.food = 200.0
+	_run(sim, sim.cfg.egg_interval_s + 1.0)
+	_check("sigue poniendo huevos aunque no esté en la cámara Real", sim.brood.total_alive() > 0 or sim.brood.hatched > 0)
 
 
 func _t_determinism() -> void:
