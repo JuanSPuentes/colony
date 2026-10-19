@@ -80,6 +80,12 @@ var _zoom_from_z := 1.0
 var _zoom_from_pos := Vector2.ZERO
 var _zoom_to_z := 1.0
 var _zoom_to_pos := Vector2.ZERO
+## Tween de cámara para el salto a la reina (tecla H, punto 4 de fluidez): en vez de teletransporte
+## instantáneo, se desliza desde donde estaba la cámara hasta la reina en `JUMP_DURATION`.
+const JUMP_DURATION := 0.25
+var _jump_t := 1.0
+var _jump_from := Vector2.ZERO
+var _jump_to := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -225,6 +231,11 @@ func _process(delta: float) -> void:
 		camera.zoom = Vector2(z, z)
 		camera.position = _zoom_from_pos.lerp(_zoom_to_pos, e)
 		_clamp_camera(z)
+	if _jump_t < 1.0:
+		_jump_t = minf(1.0, _jump_t + delta / JUMP_DURATION)
+		var e2 := smoothstep(0.0, 1.0, _jump_t)
+		camera.position = _jump_from.lerp(_jump_to, e2)
+		_clamp_camera(camera.zoom.x)
 	if _pan != Vector2.ZERO:
 		camera.position += _pan * (160.0 / ZOOM_LEVELS[zoom_index]) * delta
 		_apply_camera()
@@ -391,8 +402,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			sim.cmd_force_spider()
 		KEY_H:
 			if sim.queen_id >= 0:
-				camera.position = sim.ants.pos[sim.queen_id]
-				_apply_camera()
+				_jump_from = camera.position
+				_jump_to = sim.ants.pos[sim.queen_id]
+				_jump_t = 0.0
 		KEY_F5:
 			if k.shift_pressed:
 				var rng := RandomNumberGenerator.new()
