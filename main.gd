@@ -281,10 +281,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		match mb.button_index:
 			MOUSE_BUTTON_WHEEL_UP:
 				if mb.pressed:
-					_set_zoom(zoom_index + 1)
+					_set_zoom(zoom_index + 1, mb.position)
 			MOUSE_BUTTON_WHEEL_DOWN:
 				if mb.pressed:
-					_set_zoom(zoom_index - 1)
+					_set_zoom(zoom_index - 1, mb.position)
 			MOUSE_BUTTON_MIDDLE:
 				_panning = mb.pressed
 			MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT:
@@ -387,8 +387,19 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			load_game()
 
 
-func _set_zoom(i: int) -> void:
-	zoom_index = clampi(i, 0, ZOOM_LEVELS.size() - 1)
+## `anchor_screen_pos`, si se pasa, es el punto de pantalla (mouse) que debe quedar fijo en el
+## mundo tras el cambio de zoom (en vez de que todo se corra alrededor del centro de cámara).
+func _set_zoom(i: int, anchor_screen_pos: Vector2 = Vector2.INF) -> void:
+	var new_index := clampi(i, 0, ZOOM_LEVELS.size() - 1)
+	if new_index == zoom_index:
+		return
+	var has_anchor := is_finite(anchor_screen_pos.x) and sim != null
+	var before := _to_world(anchor_screen_pos) if has_anchor else Vector2.ZERO
+	zoom_index = new_index
+	if has_anchor:
+		camera.zoom = Vector2(ZOOM_LEVELS[zoom_index], ZOOM_LEVELS[zoom_index])
+		var after := _to_world(anchor_screen_pos)
+		camera.position += before - after
 	_apply_camera()
 
 
