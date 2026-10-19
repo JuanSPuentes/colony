@@ -10,6 +10,19 @@ extends Node2D
 
 const ANT_COLOR := Color("120b08")
 const LEAF_COLOR := Color("5fe05f")
+## Contorno: la misma malla del cuerpo, un poco más grande y en negro, dibujada detrás. Sin esto el
+## cuerpo se fundía con la tierra (tonos parecidos) y la silueta costaba distinguirla del fondo.
+const OUTLINE_COLOR := Color("0a0604")
+const OUTLINE_SCALE := 1.25
+## Un par de ojos chicos cerca de la cabeza, en todas las castas (sin esto se leía como una mancha
+## con patas, no como un bicho). Chicos a propósito: a este tamaño un ojo grande se ve como un
+## parche en vez de un ojo.
+## Rojo oscuro, no negro: el contorno, las patas y las antenas ya son negras, así que un ojo
+## negro se pierde contra todo eso. Un color propio se distingue sin importar en qué ángulo quede.
+const EYE_COLOR := Color("8b1a1a")
+const EYE_SIZE := Vector2(0.35, 0.35)
+## Cerca de la punta de la cabeza, no del tórax: ahí es donde se juntan las patas y el contorno.
+const EYE_OFFSET := Vector2(1.6, 0.3)
 ## Dos alas finas y translúcidas por zángano vivo (ver `CasteDefs`), la única casta con alas: así
 ## se distingue de un vistazo sin depender solo del color morado.
 const WING_COLOR := Color(0.88, 0.8, 0.95, 0.55)
@@ -67,6 +80,8 @@ var sim: Simulation
 var color_by_state := false
 var color_by_caste := false
 var _ants_mm: MultiMesh
+var _outline_mm: MultiMesh
+var _eyes_mm: MultiMesh
 var _leaf_mm: MultiMesh
 var _wings_mm: MultiMesh
 var _capacity := 0
@@ -78,10 +93,17 @@ var _last_angle := PackedFloat32Array()
 func setup(s: Simulation) -> void:
 	sim = s
 	if _ants_mm == null:
-		_ants_mm = _make_mm(_make_ant_mesh())
+		var body_mesh := _make_ant_mesh()
+		# El contorno reusa la misma malla del cuerpo (no una nueva): como el color de instancia
+		# multiplica al de vértice, pintándolo de un color casi negro (`OUTLINE_COLOR`, ver
+		# `update()`) el sombreado por segmento queda invisible y se ve de un solo tono oscuro.
+		_outline_mm = _make_mm(body_mesh)
+		_ants_mm = _make_mm(body_mesh)
+		_eyes_mm = _make_mm(_make_quad_mesh(EYE_SIZE))
 		_leaf_mm = _make_mm(_make_quad_mesh(Vector2(1, 1)))
 		_wings_mm = _make_mm(_make_quad_mesh(WING_SIZE))
-		for mm in [_wings_mm, _ants_mm, _leaf_mm]:  # alas primero: quedan debajo del cuerpo
+		# Orden de dibujo (de atrás hacia adelante): contorno, alas, cuerpo, ojos, hoja cargada.
+		for mm in [_outline_mm, _wings_mm, _ants_mm, _eyes_mm, _leaf_mm]:
 			var node := MultiMeshInstance2D.new()
 			node.multimesh = mm
 			add_child(node)
@@ -144,9 +166,13 @@ func _ensure_capacity(n: int) -> void:
 		return
 	_capacity = maxi(n, 256) * 2
 	_ants_mm.instance_count = _capacity
+	_outline_mm.instance_count = _capacity
+	_eyes_mm.instance_count = _capacity * 2  # 2 ojos por hormiga, todas las castas
 	_leaf_mm.instance_count = _capacity
 	_wings_mm.instance_count = _capacity * 2  # 2 alas por zángano vivo, caso extremo "todos zánganos"
 	_ants_mm.visible_instance_count = 0
+	_outline_mm.visible_instance_count = 0
+	_eyes_mm.visible_instance_count = 0
 	_leaf_mm.visible_instance_count = 0
 	_wings_mm.visible_instance_count = 0
 	if _last_angle.size() < _capacity:
@@ -164,6 +190,7 @@ func update(alpha: float, frame_start_pos: PackedVector2Array = PackedVector2Arr
 	var n := 0
 	var leaves := 0
 	var wings := 0
+	var eyes := 0
 	for i in ants.count:
 		if ants.alive[i] == 0:
 			continue
@@ -187,6 +214,12 @@ func update(alpha: float, frame_start_pos: PackedVector2Array = PackedVector2Arr
 		elif color_by_caste:
 			c = CasteDefs.COLORS[ants.caste[i]]
 		_ants_mm.set_instance_color(n, c)
+		# Contorno: mismo transform que el cuerpo pero un poco más grande, para que asome por detrás.
+		var ot := Transform2D(angle, p)
+		ot.x *= scale * OUTLINE_SCALE
+		ot.y *= scale * OUTLINE_SCALE
+		_outline_mm.set_instance_transform_2d(n, ot)
+		_outline_mm.set_instance_color(n, OUTLINE_COLOR)
 		n += 1
 		if ants.carry[i] == 1:
 			_leaf_mm.set_instance_transform_2d(leaves, Transform2D(0.0, p + Vector2(0, -2.0)))
@@ -199,6 +232,15 @@ func update(alpha: float, frame_start_pos: PackedVector2Array = PackedVector2Arr
 				_wings_mm.set_instance_transform_2d(wings, Transform2D(angle + side * 0.45, p + perp * side * 0.9))
 				_wings_mm.set_instance_color(wings, WING_COLOR)
 				wings += 1
+		# Ojos: dos puntos chicos cerca de la cabeza, en todas las castas (escalan con `scale`
+		# igual que el cuerpo, para que en la reina no queden chicos en proporción).
+		for sgn in [-1.0, 1.0]:
+			var local_off := Vector2(EYE_OFFSET.x, EYE_OFFSET.y * sgn) * scale
+			_eyes_mm.set_instance_transform_2d(eyes, Transform2D(angle, p + local_off.rotated(angle)))
+			_eyes_mm.set_instance_color(eyes, EYE_COLOR)
+			eyes += 1
 	_ants_mm.visible_instance_count = n
+	_outline_mm.visible_instance_count = n
 	_leaf_mm.visible_instance_count = leaves
 	_wings_mm.visible_instance_count = wings
+	_eyes_mm.visible_instance_count = eyes
