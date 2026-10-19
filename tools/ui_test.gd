@@ -174,20 +174,22 @@ func _run() -> void:
 	_check("el zoom tiene un mínimo", cam.zoom.x == 0.5)
 	await _wheel(true)
 
-	# Lluvia, capas y prueba de carga.
-	await _key(KEY_L)
-	_check("L fuerza la lluvia", _main.sim.weather == Simulation.Weather.RAINING)
+	# Lluvia, capas y prueba de carga: ya no tienen tecla asignada (L/Tab/F9 se quitaron del juego
+	# por simplificar los controles que ve el jugador), pero las funciones siguen existiendo para
+	# `tools/screenshot.gd` y la propia depuración, así que se llaman directo en vez de simular teclas.
+	_main.sim.cmd_force_rain()
+	_check("cmd_force_rain fuerza la lluvia", _main.sim.weather == Simulation.Weather.RAINING)
 	var layer0: int = _main.overlay.layer
-	await _key(KEY_TAB)
-	_check("Tab cambia de capa de depuración", _main.overlay.layer != layer0, OverlayView.LAYER_NAMES[_main.overlay.layer])
+	_main.overlay.cycle_layer()
+	_check("overlay.cycle_layer cambia de capa de depuración", _main.overlay.layer != layer0, OverlayView.LAYER_NAMES[_main.overlay.layer])
 	var seen := {}
 	for i in 5:
 		seen[_main.overlay.layer] = true
-		await _key(KEY_TAB)
-	_check("Tab recorre las 5 capas (ninguna, comida, hogar, agua, estados)", seen.size() == 5)
+		_main.overlay.cycle_layer()
+	_check("overlay.cycle_layer recorre las 5 capas (ninguna, comida, hogar, agua, estados)", seen.size() == 5)
 	var before: int = _main.sim.ants.alive_count
-	await _key(KEY_F9)
-	_check("F9 agrega 400 hormigas", _main.sim.ants.alive_count == before + 400, "%d -> %d" % [before, _main.sim.ants.alive_count])
+	_main.sim.cmd_add_ants(_main.cfg.stress_ants)
+	_check("cmd_add_ants agrega 400 hormigas", _main.sim.ants.alive_count == before + 400, "%d -> %d" % [before, _main.sim.ants.alive_count])
 
 	# Reinicio y semilla.
 	var seed0: int = _main.seed_value

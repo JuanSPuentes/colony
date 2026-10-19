@@ -96,6 +96,7 @@ tools/
                    de la fase (tutorial, interfaz) a medida que se construya.
   test_phase3.gd   Modo incremental (`spawn_incremental_start`): economía de comida, compras,
                    auto-compra, día y noche, sin araña.
+  test_phase4.gd   Condición de victoria de la colonia con reina (README sección 11).
   test_phaseN.gd   (la que corresponda cuando llegue)
   test_app_menu.gd Flujo del menú (app/): qué pantalla se ve tras cada botón, que la tuerca
                    durante la partida vuelva al juego (no al menú), que Salir pida confirmación.

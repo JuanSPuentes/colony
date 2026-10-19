@@ -355,14 +355,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			speed = 2
 		KEY_F3:
 			speed = 4
-		KEY_L:
-			sim.cmd_force_rain()
 		KEY_F10:
 			sim.cmd_force_spider()
-		KEY_TAB:
-			overlay.cycle_layer()
-		KEY_F9:
-			sim.cmd_add_ants(cfg.stress_ants)
 		KEY_H:
 			if sim.queen_id >= 0:
 				camera.position = sim.ants.pos[sim.queen_id]

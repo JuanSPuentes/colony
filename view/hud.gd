@@ -39,11 +39,10 @@ const CONTROLS := [
 	["HERRAMIENTAS", [["1", "Cavar túneles"], ["2 / 3", "Feromona / Cámara"], ["4", "Borrar todo bajo el pincel"],
 		["Q / E", "Cambiar subtipo"], ["Clic izq / der", "Pintar / quitar"]]],
 	["COLONIA", [["7", "Comprar obrera (comida)"], ["8", "Comprar soldado (comida)"], ["9", "Cambiar auto-compra"],
-		["H", "Ir a la reina"], ["Tab", "Capas de depuración"]]],
+		["H", "Ir a la reina"]]],
 	["CÁMARA Y TIEMPO", [["WASD / clic medio", "Mover la cámara"], ["Rueda", "Zoom"], ["Espacio", "Pausa"],
 		["F1 / F2 / F3", "Velocidad x1 / x2 / x4"], ["I", "Plegar / desplegar estado"]]],
-	["PARTIDA", [["F6 / F7", "Guardar / cargar"], ["F5", "Reiniciar (mismo mapa)"], ["Shift+F5", "Reiniciar con mapa nuevo"],
-		["L", "Forzar lluvia"], ["F9", "+400 obreras (prueba)"]]],
+	["PARTIDA", [["F6 / F7", "Guardar / cargar"], ["F5", "Reiniciar (mismo mapa)"], ["Shift+F5", "Reiniciar con mapa nuevo"]]],
 ]
 
 ## Estado de plegado del panel de estado. `main.gd` lo cambia con I; el botón, con clic.
@@ -141,7 +140,6 @@ func _ready() -> void:
 
 	_defeat = Label.new()
 	_defeat.add_theme_font_size_override("font_size", FONT * 2.0)
-	_defeat.add_theme_color_override("font_color", Color("ff6a6a"))
 	_defeat.add_theme_color_override("font_outline_color", Color.BLACK)
 	_defeat.add_theme_constant_override("outline_size", OUTLINE + 1)
 	_defeat.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -458,6 +456,11 @@ func update_info(m: Node) -> void:
 
 	_defeat.visible = sim.game_over
 	if sim.game_over:
-		_defeat.text = "LA COLONIA CAYÓ\n%s\n\nF5 para reiniciar" % sim.game_over_reason
+		if sim.victory:
+			_defeat.text = "¡LA COLONIA PROSPERÓ!\n%s\n\nF5 para reiniciar" % sim.game_over_reason
+			_defeat.add_theme_color_override("font_color", Color("7fe08a"))
+		else:
+			_defeat.text = "LA COLONIA CAYÓ\n%s\n\nF5 para reiniciar" % sim.game_over_reason
+			_defeat.add_theme_color_override("font_color", Color("ff6a6a"))
 		_defeat.size = Vector2(400, 120) * S / 2.0
 		_defeat.position = (Vector2(240, 135) * S) - _defeat.size * 0.5

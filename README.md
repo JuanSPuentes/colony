@@ -34,6 +34,7 @@ convención de una prueba por fase. Existe justo para que el proyecto no se vuel
 8. [Simplificaciones deliberadas de la Fase 1](#8-simplificaciones-deliberadas-de-la-fase-1)
 9. [Simplificaciones deliberadas del guardado (Fase 2)](#9-simplificaciones-deliberadas-del-guardado-fase-2)
 10. [Hoja de ruta: qué falta de la Fase 2](#10-hoja-de-ruta-qué-falta-de-la-fase-2)
+11. [Fase 4: condición de victoria](#11-fase-4-condición-de-victoria)
 
 ---
 
@@ -70,18 +71,20 @@ volumen, brillo) o te deja salir, sin perder la partida (vuelve exactamente a do
 | **9** | Auto-compra: apagada → obreras → soldados (compra sola en cuanto alcanza, dejando una reserva) |
 | **Espacio** | Pausa / reanudar |
 | **F1 / F2 / F3** | Velocidad x1 / x2 / x4 |
-| **Tab** | Recorre las capas de depuración (feromonas, agua, estados, castas) |
 | **WASD** | Mover la cámara |
 | Rueda del mouse | Zoom en pasos fijos |
 | **H** | Saltar a la reina |
-| **L** | Forzar la lluvia |
-| **F9** | Agregar 400 hormigas (prueba de carga) |
 | **F5** | Reiniciar con el mismo mapa |
 | **Shift+F5** | Reiniciar con un mapa nuevo |
 | **F6** | Guardar partida |
 | **F7** | Cargar la última partida guardada |
 | **I** | Plegar / desplegar el panel de estado (también con el botón "ocultar" del panel) |
 | Clic medio, arrastrar | Mover la cámara |
+
+Herramientas de depuración/prueba (forzar lluvia, recorrer capas de feromonas y estados, agregar
+400 hormigas) se quitaron de las teclas del juego y de esta lista a propósito: son para desarrollo,
+no para jugar. Las funciones siguen existiendo (`Simulation.cmd_force_rain`/`cmd_add_ants`,
+`OverlayView.cycle_layer`) y las usan `tools/screenshot.gd` y `tools/ui_test.gd` directamente.
 
 ## 3. Cómo funciona ahora mismo
 
@@ -288,14 +291,15 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 |---|---|
 | `Godot --headless --path . --script tools/test_phase0.gd` | Regresión de la Fase 0: determinismo, forrajeo, feromonas, excavación, lluvia/drenaje, huida/muerte, rendimiento. **34 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase1.gd` | Criterios de la Fase 1: reina y puesta de huevos, las 4 etapas de cría, reparto de castas, cámaras (válidas/inválidas), economía del jardín de hongos, Peligro/Evacuar, Drenaje, la araña (caza, la espantan, causa bajas sin soldados), eras, derrota, determinismo con colonia completa, rendimiento. **25 pruebas.** |
-| `Godot --headless --path . --script tools/ui_test.gd` | La escena real con eventos inyectados: arranque con reina+nodrizas, pausa, compras 7/8/9 y botones, panel de estado plegable (I), herramientas, cámara, capas, F9, reinicio. **26 pruebas.** |
+| `Godot --headless --path . --script tools/ui_test.gd` | La escena real con eventos inyectados: arranque con reina+nodrizas, pausa, compras 7/8/9 y botones, panel de estado plegable (I), herramientas, cámara, las funciones de depuración (lluvia forzada, capas, agregar hormigas, ya sin tecla propia), reinicio. **26 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase2.gd` | Guardado y carga: la huella no cambia al guardar y cargar (en memoria y desde un archivo real), la partida sigue igual tras cargar como si nunca se hubiera guardado, un archivo inexistente no revienta, funciona con y sin reina, las cámaras y la lluvia en curso sobreviven. **10 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase3.gd` | Modo incremental: colonia inicial exacta, sin araña ni eras, día y noche, hojas → comida, compras y precios crecientes, el huevo comprado nace de esa casta, auto-compra con reserva, rebrote solo de día, la colonia crece sola 6 min con lluvia sin morir, guardado y carga (también por JSON), determinismo. **28 pruebas.** |
+| `Godot --headless --path . --script tools/test_phase4.gd` | Condición de victoria de la colonia con reina (sección 11): gana al sobrevivir `victory_survive_s` en Colonia madura con la reina viva, no gana antes de tiempo, morir la reina antes del umbral sigue siendo derrota (no victoria), el modo incremental nunca la dispara, guardar/cargar conserva el progreso hacia la victoria. **7 pruebas.** |
 | `Godot --headless --path . --script tools/test_app_menu.gd` | El menú (`app/`): arranca mostrando el menú, Opciones desde el menú vuelve al menú, Opciones desde la tuerca en partida vuelve a la partida (pausada) y no al menú, Juego normal arranca en modo incremental (comida/compra), Modo infinito arranca en modo Historia con la colonia completa, F5 conserva el modo, volumen/brillo se guardan, Salir pide confirmación en vez de cerrar directo. **11 pruebas.** |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
-**Última ejecución verificada (2026-10-16, Godot 4.7.2):** las seis suites en 34/34 (Fase 0),
-25/25 (Fase 1), 10/10 (Fase 2), 28/28 (Fase 3), 26/26 (ui_test) y 11/11 (menú).
+**Última ejecución verificada (2026-10-19, Godot 4.7.2):** las siete suites en 34/34 (Fase 0),
+25/25 (Fase 1), 10/10 (Fase 2), 28/28 (Fase 3), 7/7 (Fase 4), 26/26 (ui_test) y 11/11 (menú).
 
 ### Notas para escribir pruebas
 - Si tallas túneles a mano con un helper tipo `_carve()`, llama también a
@@ -374,6 +378,19 @@ verdad:
 - **Las cámaras siguen existiendo** pero solo el Almacén importa para la economía (sube el tope de
   comida). El Jardín de hongos no hace nada: las hojas ya son comida al llegar.
 
+## 9c. Simplificaciones deliberadas de la Fase 4 (victoria)
+
+- **`victory_survive_s` (180 s por defecto) es una primera estimación, sin playtesting real
+  todavía** — igual que el resto del balance del proyecto (ver sección 10). Ajustarlo es cambiar un
+  número en `SimConfig`, no lógica.
+- **Solo la colonia con reina (`Modo infinito` en el menú de hoy) puede ganar.** El modo de
+  comida/compra (`Juego normal`) no tiene condición de derrota tampoco, así que agregarle una
+  victoria sin una amenaza real que la haga sentir ganada quedó fuera de esta fase a propósito.
+- **El cronómetro de victoria no se reinicia si la población baja de Colonia madura.** Una vez que
+  la colonia llega ahí por primera vez (`Simulation._mature_since_s`), el reloj corre aunque
+  mueran hormigas después; bajar de era no existe hoy (las eras solo suben), así que esto no se
+  puede probar todavía, pero quede documentado por si `_update_era` cambia en el futuro.
+
 ## 10. Hoja de ruta: qué falta de la Fase 2
 
 - Arte final: hormigas y araña dibujadas a mano, animaciones direccionales, variedad de tiles.
@@ -382,7 +399,35 @@ verdad:
 - Playtesting real con una persona (hasta ahora el balance solo se validó con las pruebas
   automatizadas).
 - Mejoras y progresión entre partidas (vuelo nupcial, eras avanzadas): ver el documento de diseño
-  del proyecto para el detalle (Fase 4 del plan original).
+  del proyecto para el detalle (Fase 4 del plan original). La condición de victoria que esa misma
+  fase también incluía (`prompt_fase3_godot.md` sección 4.1, nunca construida porque la Fase 3 real
+  terminó siendo el modo incremental) ya se hizo — ver sección 11.
 
 **Ideas deliberadamente no construidas:** multiplayer, cuentas, monetización, diplomacia, árbol
 tecnológico elaborado, otras especies.
+
+## 11. Fase 4: condición de victoria
+
+Hasta esta fase ninguno de los dos modos tenía forma de **ganar** (la colonia con reina solo podía
+perder, y el modo de comida/compra no tenía final de ningún tipo). Esto retoma la sección 4.1 de
+`prompt_fase3_godot.md` (el plan original), que especificaba una victoria para la colonia con reina
+y nunca se construyó porque la Fase 3 real terminó siendo el modo incremental.
+
+- **Condición:** sobrevivir `cfg.victory_survive_s` segundos de simulación (180 s por defecto)
+  DESPUÉS de llegar a Colonia madura, con la reina viva. El plan original decía "sobrevivir hasta
+  el día 10"; como este modo no tiene día/noche (eso es solo del modo incremental), se adaptó a
+  segundos de simulación tras la última era en vez de un número de día de calendario.
+- **Dónde vive:** `Simulation._mature_since_s` (cuándo se llegó a Colonia madura por primera vez,
+  -1.0 si nunca) y `Simulation._check_victory()`, llamada junto a `_check_game_over()` solo en la
+  rama `elif queen_id >= 0:` de `tick()` — el modo incremental nunca entra ahí, así que nunca puede
+  ganar (confirmado en `tools/test_phase4.gd`).
+- **`sim.victory: bool`** distingue cuál de las dos pantallas mostrar; `sim.game_over` sigue siendo
+  la única bandera que detiene `tick()` (ganar y perder paran la partida igual). `Hud` muestra
+  "¡LA COLONIA PROSPERÓ!" en verde o "LA COLONIA CAYÓ" en rojo según corresponda, en el mismo lugar
+  de pantalla.
+- **Guardado:** `victory` y `_mature_since_s` se guardan y cargan como `incremental` en la Fase 3
+  (con `d.get(..., default)`), así que cargar una partida guardada antes de esta fase sigue
+  funcionando exactamente igual que antes (nunca llegó a "Colonia madura" según el guardado viejo,
+  nunca ganó).
+
+Ver sección 9c para lo que se dejó deliberadamente simplificado.

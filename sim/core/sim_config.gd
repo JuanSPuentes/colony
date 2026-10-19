@@ -190,3 +190,9 @@ extends Resource
 @export var inc_rain_first_s := 360.0
 ## Hojas que rebrota cada planta por segundo, solo de día y hasta su máximo.
 @export var inc_plant_regrow_per_s := 0.06
+
+@export_group("Fase 4: victoria")
+## Cuánto tiempo de simulación hay que sobrevivir en Colonia madura (con la reina viva) para ganar.
+## Valor inicial sin playtesting real todavía (ver README sección 9c): 3 minutos de simulación
+## después de llegar a Colonia madura, encima de los 10-15 minutos que ya toma llegar ahí.
+@export var victory_survive_s := 180.0

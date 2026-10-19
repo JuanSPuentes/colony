@@ -57,10 +57,18 @@ var queen_id := -1
 var era := Era.FOUNDATION
 var game_over := false
 var game_over_reason := ""
+## Fase 4: true si `game_over` se puso por ganar, no por perder. `game_over` sigue siendo la única
+## bandera que detiene `tick()` (ver el `if game_over: return` al principio): ganar y perder paran
+## la partida igual, esta bandera solo distingue cuál de las dos pantallas mostrar.
+var victory := false
 var spiders_spawned := 0
 var spider_next_s := 0.0
 var notifications: Array[String] = []
 const MAX_NOTIFICATIONS := 5
+
+## Fase 4: -1 hasta que la colonia (no incremental) llega a Colonia madura por primera vez; desde
+## ahí mide cuánto tiempo de simulación lleva viva en esa era para la condición de victoria.
+var _mature_since_s := -1.0
 
 var _terrain_seen := -1
 var _jobs_seen := -1
@@ -196,6 +204,7 @@ func tick() -> void:
 		if tick_count % 3 == 0:
 			_update_spider(dt * 3.0)
 		_check_game_over()
+		_check_victory()
 
 
 func _apply_drainage(step_dt: float) -> void:
@@ -225,6 +234,8 @@ func _update_era() -> void:
 				notify("Nueva era: Colonia joven. Jardín de hongos y soldados disponibles.")
 			Era.MATURE:
 				notify("Nueva era: Colonia madura. Drenaje, Peligro, Ataque, Evacuar y la araña.")
+				if _mature_since_s < 0.0:
+					_mature_since_s = time_s()
 
 
 func _update_spider(step_dt: float) -> void:
@@ -254,6 +265,20 @@ func _check_game_over() -> void:
 	if ants.alive[queen_id] == 0:
 		game_over = true
 		game_over_reason = "La reina murió."
+
+
+## Fase 4: condición de victoria que el plan original dejaba pendiente (prompt_fase3_godot.md,
+## sección 4.1: "sobrevivir hasta el final del día 10 con la reina viva"), adaptada a que este modo
+## no tiene día/noche: en vez de un día de calendario, sobrevivir `cfg.victory_survive_s` segundos
+## de simulación DESPUÉS de llegar a Colonia madura, con la reina viva. Solo aplica a la colonia
+## con reina (nunca al modo incremental, que no entra a esta rama de `tick()`).
+func _check_victory() -> void:
+	if game_over or _mature_since_s < 0.0:
+		return
+	if time_s() - _mature_since_s >= cfg.victory_survive_s:
+		game_over = true
+		victory = true
+		game_over_reason = "La colonia prosperó."
 
 
 # --- Clima --------------------------------------------------------------------------------------

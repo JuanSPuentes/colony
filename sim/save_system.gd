@@ -38,6 +38,8 @@ static func to_dict(sim: Simulation) -> Dictionary:
 	d["era"] = sim.era
 	d["game_over"] = sim.game_over
 	d["game_over_reason"] = sim.game_over_reason
+	d["victory"] = sim.victory
+	d["mature_since_s"] = sim._mature_since_s
 	d["spiders_spawned"] = sim.spiders_spawned
 	d["spider_next_s"] = sim.spider_next_s
 	d["notifications"] = sim.notifications.duplicate()
@@ -154,6 +156,11 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	sim.era = int(d["era"])
 	sim.game_over = d["game_over"]
 	sim.game_over_reason = d["game_over_reason"]
+	# Fase 4: ausentes en guardados de antes de la condición de victoria; -1.0 reproduce "nunca
+	# llegó a Colonia madura" y false "no ganó", igual que si la partida nunca hubiera tenido esta
+	# bandera.
+	sim.victory = bool(d.get("victory", false))
+	sim._mature_since_s = float(d.get("mature_since_s", -1.0))
 	sim.spiders_spawned = int(d["spiders_spawned"])
 	sim.spider_next_s = float(d["spider_next_s"])
 	sim.notifications.clear()
