@@ -67,6 +67,11 @@ var _panning := false
 var _stroke_n := 0
 var _last_cell := Vector2i(-1, -1)
 var _pan := Vector2.ZERO
+## Posiciones de las hormigas justo antes de correr los ticks de este frame real. A velocidad
+## x2/x4 varios ticks corren en el mismo frame; `AntSystem.prev` solo guarda el penúltimo de esos
+## ticks, así que interpolar desde ahí perdía todo el movimiento anterior y las hormigas se veían
+## saltar. Esto guarda el punto de partida real del frame para interpolar el tramo completo.
+var _frame_start_pos := PackedVector2Array()
 
 
 func _ready() -> void:
@@ -212,6 +217,8 @@ func _process(delta: float) -> void:
 		_acc += delta
 		var tick_dt := sim.dt
 		var ran := 0
+		if _acc >= tick_dt:
+			_frame_start_pos = sim.ants.pos.duplicate()
 		while _acc >= tick_dt and ran < MAX_TICKS_PER_FRAME:
 			_acc -= tick_dt
 			for k in speed:
@@ -229,7 +236,7 @@ func _process(delta: float) -> void:
 	# tiempo, no solo en la capa de depuración; la capa de Estados la reemplaza mientras está activa.
 	ant_renderer.color_by_state = overlay.layer == OverlayView.Layer.STATES
 	ant_renderer.color_by_caste = not ant_renderer.color_by_state
-	ant_renderer.update(clampf(_acc / sim.dt, 0.0, 1.0) if not paused else 1.0)
+	ant_renderer.update(clampf(_acc / sim.dt, 0.0, 1.0) if not paused else 1.0, _frame_start_pos)
 	hud.update_info(self)
 	tutorial.update(sim)
 

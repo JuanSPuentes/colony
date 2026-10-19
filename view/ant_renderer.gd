@@ -81,16 +81,21 @@ func _ensure_capacity(n: int) -> void:
 		_last_angle.resize(_capacity)
 
 
-## `alpha` (0..1) es qué fracción del tick actual ha transcurrido.
-func update(alpha: float) -> void:
+## `alpha` (0..1) es qué fracción del tick actual ha transcurrido. `frame_start_pos`, si viene con
+## tamaño suficiente, es de dónde partió cada hormiga al inicio de este frame real (puede cubrir
+## varios ticks a velocidad x2/x4); una hormiga nacida después de capturarlo cae al `ants.prev` de
+## siempre.
+func update(alpha: float, frame_start_pos: PackedVector2Array = PackedVector2Array()) -> void:
 	var ants := sim.ants
 	_ensure_capacity(ants.count)
+	var has_frame_start := frame_start_pos.size() >= ants.count
 	var n := 0
 	var leaves := 0
 	for i in ants.count:
 		if ants.alive[i] == 0:
 			continue
-		var p := ants.prev[i].lerp(ants.pos[i], alpha)
+		var from := frame_start_pos[i] if has_frame_start else ants.prev[i]
+		var p := from.lerp(ants.pos[i], alpha)
 		var delta := ants.pos[i] - ants.prev[i]
 		var angle := _last_angle[i]
 		if delta.length_squared() > TURN_EPS2:
