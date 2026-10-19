@@ -86,6 +86,11 @@ const JUMP_DURATION := 0.25
 var _jump_t := 1.0
 var _jump_from := Vector2.ZERO
 var _jump_to := Vector2.ZERO
+## El pan WASD apuntaba la velocidad directo a -1/0/1 (arranca y frena en seco). `_pan` sigue
+## siendo esa dirección objetivo (la fija `_unhandled_key_input`); `_pan_vel` la persigue con
+## aceleración limitada para que arrancar/frenar se sienta gradual, no digital.
+const PAN_ACCEL := 10.0
+var _pan_vel := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -236,9 +241,10 @@ func _process(delta: float) -> void:
 		var e2 := smoothstep(0.0, 1.0, _jump_t)
 		camera.position = _jump_from.lerp(_jump_to, e2)
 		_clamp_camera(camera.zoom.x)
-	if _pan != Vector2.ZERO:
-		camera.position += _pan * (160.0 / ZOOM_LEVELS[zoom_index]) * delta
-		_apply_camera()
+	_pan_vel = _pan_vel.move_toward(_pan, PAN_ACCEL * delta)
+	if _pan_vel != Vector2.ZERO:
+		camera.position += _pan_vel * (160.0 / camera.zoom.x) * delta
+		_clamp_camera(camera.zoom.x)
 	if not paused and not sim.game_over:
 		_acc += delta
 		var tick_dt := sim.dt
