@@ -20,8 +20,10 @@ const HP_MULT: Array[float] = [3.0, 1.0, 1.0, 1.8, 0.8]
 ## Comida y agua que consume cada adulta por segundo.
 const FOOD_PER_S: Array[float] = [0.045, 0.018, 0.018, 0.024, 0.02]
 const WATER_PER_S: Array[float] = [0.03, 0.012, 0.012, 0.018, 0.012]
-## Daño cuerpo a cuerpo por segundo (solo el soldado pelea).
-const DAMAGE_PER_S: Array[float] = [0.0, 0.0, 0.0, 6.0, 0.0]
+## Daño cuerpo a cuerpo por segundo. Toda la colonia defiende la colmena ante una amenaza real
+## (araña y lo que se sume después), no solo el Soldado — cada una con lo suyo: la Nodriza se
+## queda cuidando la cría y no pelea.
+const DAMAGE_PER_S: Array[float] = [0.0, 3.0, 0.0, 8.0, 1.0]
 ## Comida que cuesta criar un huevo hasta adulta, por casta objetivo.
 const EGG_FOOD_COST: Array[float] = [0.0, 4.0, 5.0, 8.0, 5.0]
 ## Multiplicador de velocidad de desarrollo de la larva (el soldado tarda más).

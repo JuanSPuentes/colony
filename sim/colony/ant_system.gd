@@ -178,7 +178,12 @@ func tick() -> void:
 				_move(i, dt, lv)
 			continue
 		if caste[i] == CasteDefs.Caste.DRONE:
-			continue  # liviano a propósito: no explora, no decide, se queda donde nació (ver CasteDefs)
+			# Liviano a propósito: no explora, no decide, no se mueve a buscar pelea. Pero si una
+			# amenaza lo alcanza donde está parado, sí devuelve el golpe (defensa pasiva).
+			var threat := _nearest_threat(p, cfg.soldier_melee_range_px)
+			if threat != null:
+				threat.take_damage(CasteDefs.DAMAGE_PER_S[CasteDefs.Caste.DRONE] * dt)
+			continue
 		if state[i] == State.DIG and job[i] >= 0:
 			_dig_progress(i, dt)
 		if now >= next_think[i]:
@@ -297,6 +302,22 @@ func _think(i: int, cx: int, cy: int, ci: int) -> void:
 	if lv > cfg.flee_level and state[i] != State.FLEE_WATER:
 		_release_job(i)
 		state[i] = State.FLEE_WATER
+	# Defensa de la colmena: ante una amenaza real (hoy la araña; más adelante otros insectos) toda
+	# la colonia pelea, no solo el soldado — cada casta con su propio daño (`CasteDefs.DAMAGE_PER_S`).
+	# Tiene prioridad sobre huir de la feromona de Peligro (que sigue existiendo tal cual para avisos
+	# del jugador sin amenaza real detrás) pero no sobre ahogarse. La Nodriza se queda cuidando la
+	# cría; el Soldado sigue con su propio `_think_soldier` (ya reacciona a esto de siempre).
+	if caste[i] != CasteDefs.Caste.NURSE and caste[i] != CasteDefs.Caste.SOLDIER and state[i] != State.FLEE_WATER:
+		var threat := _nearest_threat(pos[i], cfg.soldier_sight_px)
+		if threat != null:
+			if state[i] != State.ATTACK:
+				_release_job(i)
+			_think_defend(i, cx, cy, ci, threat, think_dt)
+			return
+		elif state[i] == State.ATTACK:
+			# La amenaza ya no está (murió o se fue de rango): vuelve a decidir desde cero.
+			state[i] = State.IDLE
+			target[i] = pos[i]
 	# Peligro y evacuación (Fase 1): el soldado no les teme. Estas condiciones nunca se cumplen
 	# si nada pintó esas feromonas (como en toda la Fase 0), así que no cambian ese comportamiento.
 	if caste[i] != CasteDefs.Caste.SOLDIER and state[i] != State.FLEE_WATER:
@@ -521,20 +542,44 @@ func _think_nurse(i: int, cx: int, cy: int, ci: int) -> void:
 		target[i] = pos[i]  # se queda cuidando la cría cerca del nido
 
 
+## La amenaza activa más cercana dentro de `max_range`, o null si no hay ninguna al alcance. Hoy
+## solo existe la araña; cuando se sumen más insectos (ciempiés, mantis...) esto es lo único que
+## hay que tocar para que toda la colonia (y el soldado) también reaccione a ellos — el resto de
+## `_think_defend`/`_think_soldier` ya es genérico (solo necesita `.pos`, `.alive`, `.take_damage()`).
+func _nearest_threat(p: Vector2, max_range: float) -> Spider:
+	var s := sim.spider
+	if s != null and s.alive and p.distance_to(s.pos) <= max_range:
+		return s
+	return null
+
+
+## Obrera y Zángano (en combate activo; el Zángano además pelea pasivo si lo alcanzan, ver
+## `tick()`) defendiendo la colmena: igual de simple que el Soldado (acercarse y pegar), pero con
+## el daño de su propia casta (`CasteDefs.DAMAGE_PER_S`), bastante menor.
+func _think_defend(i: int, cx: int, cy: int, ci: int, threat: Spider, think_dt: float) -> void:
+	var cfg := sim.cfg
+	var d := pos[i].distance_to(threat.pos)
+	state[i] = State.ATTACK
+	if d <= cfg.soldier_melee_range_px:
+		target[i] = pos[i]
+		threat.take_damage(CasteDefs.DAMAGE_PER_S[caste[i]] * think_dt)
+	else:
+		_step(i, cx, cy, ci, Mode.PLANT, threat.pos)
+
+
 func _think_soldier(i: int, cx: int, cy: int, ci: int, think_dt: float) -> void:
 	var cfg := sim.cfg
-	var sim_spider := sim.spider
-	if sim_spider != null and sim_spider.alive:
+	var sim_spider := _nearest_threat(pos[i], cfg.soldier_sight_px)
+	if sim_spider != null:
 		var d := pos[i].distance_to(sim_spider.pos)
 		if d <= cfg.soldier_melee_range_px:
 			state[i] = State.ATTACK
 			target[i] = pos[i]
 			sim_spider.take_damage(CasteDefs.DAMAGE_PER_S[CasteDefs.Caste.SOLDIER] * think_dt)
 			return
-		if d <= cfg.soldier_sight_px:
-			state[i] = State.ATTACK
-			_step(i, cx, cy, ci, Mode.PLANT, sim_spider.pos)
-			return
+		state[i] = State.ATTACK
+		_step(i, cx, cy, ci, Mode.PLANT, sim_spider.pos)
+		return
 	var here := sim.attack.data[ci]
 	var best := here
 	for k in 8:

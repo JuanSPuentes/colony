@@ -18,6 +18,7 @@ func _initialize() -> void:
 	_t_danger_and_evacuate()
 	_t_drain_reduces_flood_loss()
 	_t_spider()
+	_t_colony_wide_defense_by_caste()
 	_t_eras()
 	_t_queen_death_ends_game()
 	_t_queen_move()
@@ -266,12 +267,52 @@ func _t_spider() -> void:
 	_run(guarded, 10.0)
 	_check("4-6 soldados espantan o derrotan a la araña", not guarded.spider.alive or guarded.spider.state == Spider.State.RETREAT, "viva=%s estado=%d" % [guarded.spider.alive, guarded.spider.state])
 
+	# Cambio intencional (ver sesión de diseño): toda la colonia defiende la colmena ante una
+	# amenaza real, no solo el soldado (obrera 3 de daño, zángano 1, pasivo). Sin soldados, un
+	# puñado de obreras ya no es presa fácil e indefensa: o terminan espantando/matando a la araña
+	# entre todas, o mueren peleando — lo que NO puede pasar es que la araña ronde sin que nadie le
+	# haga nada (eso sí sería una regresión real de esta función).
 	var alone := _colony(cfg, 10)
 	for k in 10:
 		alone.ants.add_ant_at(Vector2i(alone.cfg.nest_x + 10 + k, alone.cfg.surface_y - 1))
 	alone.cmd_force_spider()
 	_run(alone, 60.0)
-	_check("sin soldados la araña causa bajas", alone.deaths > 0 or alone.ants.alive_count < 15, "muertes=%d vivas=%d" % [alone.deaths, alone.ants.alive_count])
+	var fought_back := not alone.spider.alive or alone.spider.hp < alone.spider.max_hp or alone.spider.state == Spider.State.RETREAT
+	_check("sin soldados, las obreras igual se defienden entre todas", fought_back or alone.deaths > 0,
+		"araña viva=%s vida=%.0f/%.0f muertes=%d" % [alone.spider.alive, alone.spider.hp, alone.spider.max_hp, alone.deaths])
+
+
+## Daño por casta al defender (Obrera 3, Zángano 1 pasivo, Nodriza no pelea), probado uno por uno
+## para no depender de que ganen o pierdan la pelea completa (eso ya lo prueba `_t_spider`).
+func _t_colony_wide_defense_by_caste() -> void:
+	var cfg := _cfg(0)
+	cfg.spider_first_population = 1
+
+	var with_worker := _colony(cfg, 30)
+	var w := with_worker.ants.add_ant_at(Vector2i(with_worker.cfg.nest_x, with_worker.cfg.surface_y - 1))
+	with_worker.cmd_force_spider()
+	with_worker.spider.pos = with_worker.ants.pos[w]
+	var hp0 := with_worker.spider.hp
+	_run(with_worker, 3.0)
+	_check("la obrera también pelea cuerpo a cuerpo", with_worker.spider.hp < hp0, "vida araña %.1f -> %.1f" % [hp0, with_worker.spider.hp])
+
+	var with_drone := _colony(cfg, 31)
+	var d := with_drone.ants.add_ant_at(Vector2i(with_drone.cfg.nest_x, with_drone.cfg.surface_y - 1), CasteDefs.Caste.DRONE)
+	with_drone.cmd_force_spider()
+	with_drone.spider.pos = with_drone.ants.pos[d]
+	var hp1 := with_drone.spider.hp
+	var start_pos := with_drone.ants.pos[d]
+	_run(with_drone, 3.0)
+	_check("el zángano pelea pasivo (daño chico) sin moverse", with_drone.spider.hp < hp1 and with_drone.ants.pos[d] == start_pos,
+		"vida araña %.1f -> %.1f" % [hp1, with_drone.spider.hp])
+
+	var with_nurse := _colony(cfg, 32)
+	# `spawn_colony_court` ya pone nodrizas; usamos la que venga puesta, no hace falta agregar otra.
+	with_nurse.cmd_force_spider()
+	with_nurse.spider.pos = with_nurse.ants.pos[with_nurse.queen_id]  # cerca del nido, donde están las nodrizas
+	var hp2 := with_nurse.spider.hp
+	_run(with_nurse, 3.0)
+	_check("la nodriza no pelea (se queda cuidando la cría)", with_nurse.spider.hp == hp2, "vida araña %.1f -> %.1f" % [hp2, with_nurse.spider.hp])
 
 
 # --- Eras, derrota y determinismo ------------------------------------------------------------------

@@ -123,10 +123,19 @@ no para jugar. Las funciones siguen existiendo (`Simulation.cmd_force_rain`/`cmd
 **Castas** (`sim/colony/caste_defs.gd`): Reina (una sola, pone huevos si hay comida suficiente y una
 cámara Real válida en algún lado; su muerte termina la partida — se ve bien más grande que el resto
 y de un tono marfil "puro", distinto del ámbar de la Obrera), Obrera (explora, corta hojas, carga,
-cava), Nodriza (acelera el desarrollo de la cría cerca del nido), Soldado (patrulla, responde a la
-feromona de Ataque y pelea cuerpo a cuerpo contra la araña), Zángano (morado, con alas — no explora
-ni decide nada, se queda donde nació, pero mientras esté vivo acelera la puesta de huevos de la
-reina: `cfg.drone_egg_speed_bonus` por cada uno, sin tope, liviano a propósito).
+cava), Nodriza (acelera el desarrollo de la cría cerca del nido, no pelea), Soldado (patrulla,
+responde a la feromona de Ataque, el mayor daño cuerpo a cuerpo), Zángano (morado, con alas — no
+explora ni decide nada, se queda donde nació, pero mientras esté vivo acelera la puesta de huevos
+de la reina: `cfg.drone_egg_speed_bonus` por cada uno, sin tope, liviano a propósito).
+
+**Defensa de la colmena:** ante una amenaza real (araña, y lo que se sume después) toda la colonia
+pelea, no solo el Soldado — cada casta con su propio daño cuerpo a cuerpo
+(`CasteDefs.DAMAGE_PER_S`): Obrera 3, Soldado 8, Zángano 1 (la Nodriza nunca pelea). La Obrera se
+acerca y ataca igual que el Soldado (tiene prioridad sobre huir de la feromona de Peligro, que
+sigue existiendo tal cual para avisos del jugador sin amenaza real detrás); el Zángano pelea
+*pasivo*, sin moverse ni decidir ir a buscar pelea — solo devuelve el golpe si la amenaza lo
+alcanza donde está parado, consistente con que sigue siendo la casta "liviana". Una colonia sin
+soldados ya no es presa fácil: un grupo de obreras puede espantar o matar a la araña entre todas.
 
 **Mover a la reina (tecla 5):** no decide ni camina sola — el jugador la manda a una celda cavada y
 conectada al nido (clic derecho cancela la orden en curso) para alejarla de la araña o acercarla a
