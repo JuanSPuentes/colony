@@ -100,8 +100,10 @@ extends Resource
 @export var start_water := 400.0
 @export var base_food_cap := 300.0
 @export var base_water_cap := 300.0
-## Comida que convierte en hongo cada celda válida de Jardín de hongos, por segundo.
-@export var fungus_rate_per_cell := 0.08
+## Comida que vale cada hoja que una obrera trae al nido (modo clásico; el incremental tiene su
+## propio `inc_food_per_leaf`). Reemplaza al Jardín de hongos: ya no hay conversión con ritmo
+## propio, la hoja se vuelve comida apenas llega.
+@export var leaf_food_value := 1.0
 @export var storage_food_per_cell := 15.0
 @export var storage_water_per_cell := 15.0
 ## Simplificación de la Fase 1: el agua entra despacio mientras haya charcos tras la lluvia
@@ -129,10 +131,6 @@ extends Resource
 @export var room_min_royal := 9
 @export var room_min_nursery := 6
 @export var room_min_storage := 6
-@export var room_min_fungus := 12
-@export var room_min_drain := 4
-## Cuánta agua absorbe cada celda válida de Drenaje, por segundo (se resta del nivel de agua).
-@export var drain_rate_per_cell := 0.05
 
 @export_group("Fase 1: feromonas nuevas")
 @export var danger_decay_per_s := 0.03

@@ -1,17 +1,16 @@
 class_name TutorialView
 extends CanvasLayer
 ## Fase 5: pasos contextuales para una persona que nunca vio el juego, en la colonia con reina
-## (prompt_fase3_godot.md sección 4.3). No aplica al modo incremental (otra economía, sin Jardín
-## de hongos, Drenaje ni araña de por medio). Cada paso se cumple solo con lo que el jugador ya
-## hizo, sin botón "siguiente"; el jugador puede ignorar la burbuja mientras tanto. Tras el último
-## paso no se muestra nada más.
+## (prompt_fase3_godot.md sección 4.3). No aplica al modo incremental (otra economía, sin araña de
+## por medio). Cada paso se cumple solo con lo que el jugador ya hizo, sin botón "siguiente"; el
+## jugador puede ignorar la burbuja mientras tanto. Tras el último paso no se muestra nada más.
+## Jardín de hongos y Drenaje se quitaron del juego (ver README): la comida llega sola al entregar
+## hojas, y el agua solo se maneja esperando a que evapore.
 
 const STEPS: Array[String] = [
 	"Pinta un rastro de Comida (tecla 2) hacia una planta",
 	"Espera a que una obrera cargada de hojas llegue al nido",
 	"Cava (tecla 1) para ampliar el nido",
-	"Designa un Jardín de hongos (tecla 3) junto al nido",
-	"Se acerca una lluvia: designa un Drenaje antes de que llegue",
 	"Una araña ronda la superficie: pon soldados de guardia junto a la entrada",
 ]
 
@@ -65,10 +64,6 @@ func update(sim: Simulation) -> void:
 		2:
 			done = sim.dug > 0
 		3:
-			done = sim.rooms.valid[WorldGrid.Room.FUNGUS]
-		4:
-			done = sim.weather != Simulation.Weather.CLEAR
-		5:
 			done = sim.spiders_spawned > 0
 	if done:
 		step += 1

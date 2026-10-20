@@ -104,9 +104,9 @@ func _t_rooms_and_rain_survive() -> void:
 	sim.fields.recompute_terrain()
 	for y in range(y0, y0 + 2):
 		for x in range(nx - 3, nx + 3):
-			sim.cmd_assign_room(x, y, WorldGrid.Room.FUNGUS)
+			sim.cmd_assign_room(x, y, WorldGrid.Room.STORAGE)
 	sim.cmd_force_rain()
 	_run(sim, 5.0)
 	var loaded := SaveSystem.from_dict(SaveSystem.to_dict(sim), sim.cfg)
-	_check("las cámaras designadas sobreviven al guardado", loaded.rooms.counts[WorldGrid.Room.FUNGUS] == sim.rooms.counts[WorldGrid.Room.FUNGUS], "%d / %d" % [sim.rooms.counts[WorldGrid.Room.FUNGUS], loaded.rooms.counts[WorldGrid.Room.FUNGUS]])
+	_check("las cámaras designadas sobreviven al guardado", loaded.rooms.counts[WorldGrid.Room.STORAGE] == sim.rooms.counts[WorldGrid.Room.STORAGE], "%d / %d" % [sim.rooms.counts[WorldGrid.Room.STORAGE], loaded.rooms.counts[WorldGrid.Room.STORAGE]])
 	_check("la lluvia en curso sobrevive al guardado", loaded.weather == sim.weather and absf(loaded.water.volume - sim.water.volume) < 0.01)

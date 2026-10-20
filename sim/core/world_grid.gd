@@ -7,8 +7,8 @@ enum Cell { AIR, DIRT, ROCK, TUNNEL, MARKED }
 ## Cámaras que el jugador designa sobre túneles ya excavados (Fase 1). Simplificación del MVP:
 ## una cámara es "todas las celdas de túnel con esa etiqueta conectadas al nido", no exige una
 ## forma contigua concreta; lo que importa para el efecto es el tamaño total y la conexión.
-enum Room { NONE, ROYAL, NURSERY, STORAGE, FUNGUS, DRAIN }
-const ROOM_NAMES: Array[String] = ["(ninguna)", "Real", "Guardería", "Almacén", "Jardín de hongos", "Drenaje"]
+enum Room { NONE, ROYAL, NURSERY, STORAGE }
+const ROOM_NAMES: Array[String] = ["(ninguna)", "Real", "Guardería", "Almacén"]
 
 var cfg: SimConfig
 var w := 0

@@ -14,9 +14,8 @@ func _initialize() -> void:
 	_t_brood_stages()
 	_t_caste_ratio_changes_composition()
 	_t_rooms_have_effect()
-	_t_fungus_economy()
+	_t_leaves_become_food_directly()
 	_t_danger_and_evacuate()
-	_t_drain_reduces_flood_loss()
 	_t_spider()
 	_t_colony_wide_defense_by_caste()
 	_t_eras()
@@ -151,32 +150,25 @@ func _t_rooms_have_effect() -> void:
 	var nx := sim.cfg.nest_x
 	var y0 := _below_nest(sim)
 	_carve(sim, nx - 3, y0, nx + 2, y0 + 1)
-	_assign(sim, nx - 3, y0, nx + 2, y0 + 1, WorldGrid.Room.FUNGUS)  # 6x2=12 celdas: cumple el mínimo (12)
+	_assign(sim, nx - 3, y0, nx + 2, y0 + 1, WorldGrid.Room.STORAGE)  # 6x2=12 celdas: de sobra para el mínimo
 	sim.rooms.maybe_recompute()
-	_check("una cámara con el tamaño mínimo queda válida", sim.rooms.valid[WorldGrid.Room.FUNGUS], "celdas=%d" % sim.rooms.counts[WorldGrid.Room.FUNGUS])
+	_check("una cámara con el tamaño mínimo queda válida", sim.rooms.valid[WorldGrid.Room.STORAGE], "celdas=%d" % sim.rooms.counts[WorldGrid.Room.STORAGE])
 	var small := _colony(_cfg(0), 4)
 	var y0s := _below_nest(small)
 	_carve(small, nx - 3, y0s, nx - 2, y0s)
-	_assign(small, nx - 3, y0s, nx - 2, y0s, WorldGrid.Room.FUNGUS)  # 2 celdas: no alcanza
+	_assign(small, nx - 3, y0s, nx - 2, y0s, WorldGrid.Room.STORAGE)  # 2 celdas: no alcanza
 	small.rooms.maybe_recompute()
-	_check("una cámara demasiado pequeña queda inválida (y se puede saber por qué)", not small.rooms.valid[WorldGrid.Room.FUNGUS], "celdas=%d de %d" % [small.rooms.counts[WorldGrid.Room.FUNGUS], small.cfg.room_min_fungus])
+	_check("una cámara demasiado pequeña queda inválida (y se puede saber por qué)", not small.rooms.valid[WorldGrid.Room.STORAGE], "celdas=%d de %d" % [small.rooms.counts[WorldGrid.Room.STORAGE], small.cfg.room_min_storage])
 
 
-func _t_fungus_economy() -> void:
+## Se quitó el Jardín de hongos (ver README): ya no hace falta designar ninguna cámara para que
+## las hojas entregadas se vuelvan comida, pasa solo con llegar al nido.
+func _t_leaves_become_food_directly() -> void:
 	var sim := _colony(_cfg(0), 5)
-	var nx := sim.cfg.nest_x
-	var y0 := _below_nest(sim)
-	_carve(sim, nx - 3, y0, nx + 2, y0 + 1)
-	_assign(sim, nx - 3, y0, nx + 2, y0 + 1, WorldGrid.Room.FUNGUS)
 	sim.leaves_stored = 200
 	sim.colony.food = 0.0
-	_run(sim, 30.0)
-	_check("el jardín de hongos convierte hojas almacenadas en comida", sim.colony.food > 0.0 and sim.leaves_stored < 200, "comida=%.1f hojas=%d" % [sim.colony.food, sim.leaves_stored])
-	var none := _colony(_cfg(0), 5)
-	none.leaves_stored = 200
-	none.colony.food = 0.0
-	_run(none, 30.0)
-	_check("sin jardín de hongos la comida no se repone sola", none.colony.food == 0.0, "comida=%.1f" % none.colony.food)
+	_run(sim, 1.0)
+	_check("las hojas entregadas se vuelven comida sin designar ninguna cámara", sim.colony.food > 0.0 and sim.leaves_stored < 200, "comida=%.1f hojas=%d" % [sim.colony.food, sim.leaves_stored])
 
 
 # --- Feromonas nuevas -------------------------------------------------------------------------------
@@ -217,30 +209,6 @@ func _t_danger_and_evacuate() -> void:
 	_check("ninguna feromona lleva a una hormiga al agua profunda a propósito", wet.ants.alive[w2] == 0 or wet.water.level[ci] < wet.cfg.deep_level)
 
 
-func _t_drain_reduces_flood_loss() -> void:
-	var with_drain := _colony(_cfg(0), 7)
-	var sy := with_drain.cfg.surface_y
-	_carve(with_drain, 90, sy, 90, sy + 10)
-	_carve(with_drain, 86, sy + 10, 94, sy + 12)
-	_assign(with_drain, 86, sy + 11, 89, sy + 12, WorldGrid.Room.DRAIN)  # 8 celdas >= mínimo (4)
-	with_drain.cmd_force_rain()
-	_run(with_drain, with_drain.cfg.rain_duration_s + 20.0)
-	var vol_with := 0.0
-	for x in range(86, 95):
-		for y in range(sy + 10, sy + 13):
-			vol_with += with_drain.water.level[y * with_drain.world.w + x]
-
-	var no_drain := Simulation.new(with_drain.cfg, 7)
-	no_drain.spawn_colony_court()
-	_carve(no_drain, 90, sy, 90, sy + 10)
-	_carve(no_drain, 86, sy + 10, 94, sy + 12)
-	no_drain.cmd_force_rain()
-	_run(no_drain, no_drain.cfg.rain_duration_s + 20.0)
-	var vol_without := 0.0
-	for x in range(86, 95):
-		for y in range(sy + 10, sy + 13):
-			vol_without += no_drain.water.level[y * no_drain.world.w + x]
-	_check("un nido con Drenaje pierde menos agua que uno sin Drenaje (misma semilla)", vol_with < vol_without * 0.8, "con=%.2f sin=%.2f" % [vol_with, vol_without])
 
 
 # --- Araña ------------------------------------------------------------------------------------------

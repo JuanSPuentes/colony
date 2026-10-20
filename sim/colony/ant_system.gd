@@ -588,12 +588,11 @@ func _think_soldier(i: int, cx: int, cy: int, ci: int, think_dt: float) -> void:
 		state[i] = State.ATTACK
 		_step(i, cx, cy, ci, Mode.TOWARD, sim.attack)
 		return
+	# Sin amenaza, el soldado patrulla libre en vez de volver a pararse junto al nido: se mueve
+	# igual que una obrera explorando (misma puntuación de `Mode.EXPLORE`), solo que sin cortar
+	# hojas ni cavar. Pedido explícito: antes quedaba plantado cerca de la entrada.
 	state[i] = State.GUARD
-	var nd := sim.fields.nest_dist[ci]
-	if nd > 2 and nd < FAR:
-		_step(i, cx, cy, ci, Mode.NEST, null)
-	else:
-		target[i] = pos[i]
+	_step(i, cx, cy, ci, Mode.EXPLORE, null)
 
 
 ## Elige la mejor celda vecina según el modo y fija el objetivo de movimiento.

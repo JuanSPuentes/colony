@@ -23,8 +23,7 @@ const WORLD_SIZE := Vector2(480.0, 270.0)
 ## Subtipos de feromona que recorre Q/E con la herramienta 2 (coincide con PHERO_NAMES del HUD).
 const PHERO_FIELDS := ["food", "home", "danger", "attack", "evacuate"]
 ## Subtipos de cámara que recorre Q/E con la herramienta 3.
-const ROOM_TYPES: Array[int] = [WorldGrid.Room.NURSERY, WorldGrid.Room.STORAGE, WorldGrid.Room.FUNGUS,
-	WorldGrid.Room.DRAIN, WorldGrid.Room.ROYAL]
+const ROOM_TYPES: Array[int] = [WorldGrid.Room.NURSERY, WorldGrid.Room.STORAGE, WorldGrid.Room.ROYAL]
 
 ## Fase 3 (menú): si `app.gd` instancia esta escena, pone esto en `false` antes de añadirla al
 ## árbol y arranca la partida él mismo (con el modo que eligió el jugador). Si se abre

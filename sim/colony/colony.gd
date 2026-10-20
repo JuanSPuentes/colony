@@ -100,13 +100,14 @@ func tick(sim: Simulation, dt: float) -> void:
 	var rooms := sim.rooms
 	food_cap = cfg.base_food_cap + rooms.capacity(WorldGrid.Room.STORAGE, cfg.storage_food_per_cell)
 	water_cap = cfg.base_water_cap + rooms.capacity(WorldGrid.Room.STORAGE, cfg.storage_water_per_cell)
-	# Jardín de hongos: convierte hojas almacenadas en comida (limitado por hojas, tope y ritmo).
-	var fungus_rate := rooms.capacity(WorldGrid.Room.FUNGUS, cfg.fungus_rate_per_cell)
-	var convert := minf(fungus_rate * dt, float(sim.leaves_stored))
-	convert = minf(convert, maxf(food_cap - food, 0.0))
-	if convert > 0.0:
-		sim.leaves_stored -= int(ceil(convert))
-		food = minf(food_cap, food + convert)
+	# Las hojas se vuelven comida apenas llegan al nido (reemplaza al Jardín de hongos, que se
+	# quitó: ya no hay paso intermedio ni cámara que designar para reponer comida). El Almacén
+	# conserva su función de siempre: subir el tope de comida y agua, no convertir nada.
+	if sim.leaves_stored > 0:
+		var convert := minf(float(sim.leaves_stored) * cfg.leaf_food_value, maxf(food_cap - food, 0.0))
+		if convert > 0.0:
+			sim.leaves_stored -= int(ceil(convert / cfg.leaf_food_value))
+			food = minf(food_cap, food + convert)
 	# Agua: entra despacio mientras haya charcos tras la lluvia (simplificación de la Fase 1;
 	# no hay una tarea dedicada de "traer agua").
 	var gain := cfg.water_regen_wet if sim.water.volume > 0.0 else cfg.water_regen_dry

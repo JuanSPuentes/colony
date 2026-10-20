@@ -8,8 +8,8 @@ extends RefCounted
 var world: WorldGrid
 var fields: NestDistanceField
 var cfg: SimConfig
-var counts: Array[int] = [0, 0, 0, 0, 0, 0]
-var valid: Array[bool] = [false, false, false, false, false, false]
+var counts: Array[int] = [0, 0, 0, 0]
+var valid: Array[bool] = [false, false, false, false]
 var _seen_rooms_version := -1
 var _seen_terrain_recomputes := -1
 
@@ -28,10 +28,6 @@ func min_size(room_type: int) -> int:
 			return cfg.room_min_nursery
 		WorldGrid.Room.STORAGE:
 			return cfg.room_min_storage
-		WorldGrid.Room.FUNGUS:
-			return cfg.room_min_fungus
-		WorldGrid.Room.DRAIN:
-			return cfg.room_min_drain
 		_:
 			return 0
 
@@ -47,7 +43,7 @@ func maybe_recompute() -> void:
 		return
 	_seen_rooms_version = world.rooms_version
 	_seen_terrain_recomputes = fields.recomputes
-	for k in 6:
+	for k in 4:
 		counts[k] = 0
 	for i in world.room.size():
 		var r := world.room[i]
@@ -58,5 +54,5 @@ func maybe_recompute() -> void:
 		if fields.nest_dist[i] >= NestDistanceField.FAR:
 			continue
 		counts[r] += 1
-	for r in 6:
+	for r in 4:
 		valid[r] = counts[r] >= min_size(r)

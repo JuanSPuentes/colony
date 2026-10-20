@@ -122,10 +122,6 @@ func _room_color(room_type: int, is_valid: bool) -> Color:
 			base = Color(0.3, 0.85, 0.9)
 		WorldGrid.Room.STORAGE:
 			base = Color(0.8, 0.6, 0.2)
-		WorldGrid.Room.FUNGUS:
-			base = Color(0.4, 0.9, 0.3)
-		WorldGrid.Room.DRAIN:
-			base = Color(0.3, 0.4, 1.0)
 		_:
 			return Color(0, 0, 0, 0)
 	return Color(base.r, base.g, base.b, 0.55 if is_valid else 0.22)

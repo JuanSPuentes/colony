@@ -183,7 +183,6 @@ func tick() -> void:
 	_update_weather()
 	if tick_count % cfg.water_step_ticks == 0:
 		water.step(dt * cfg.water_step_ticks)
-		_apply_drainage(dt * cfg.water_step_ticks)
 	if tick_count % cfg.pheromone_step_ticks == 0:
 		var mult := cfg.rain_decay_mult if weather == Weather.RAINING else 1.0
 		var step_dt := dt * cfg.pheromone_step_ticks
@@ -223,19 +222,6 @@ func tick() -> void:
 		_check_victory()
 
 
-func _apply_drainage(step_dt: float) -> void:
-	if rooms.counts[WorldGrid.Room.DRAIN] <= 0:
-		return
-	var rate := rooms.capacity(WorldGrid.Room.DRAIN, cfg.drain_rate_per_cell) * step_dt
-	if rate <= 0.0:
-		return
-	for i in world.room.size():
-		if world.room[i] == WorldGrid.Room.DRAIN and water.level[i] > 0.0:
-			var take := minf(water.level[i], rate)
-			water.level[i] -= take
-			water.wet[i] = water.level[i] > 0.0
-
-
 func _update_era() -> void:
 	var pop := ants.alive_count
 	var new_era := Era.FOUNDATION
@@ -247,9 +233,9 @@ func _update_era() -> void:
 		era = new_era
 		match era:
 			Era.YOUNG:
-				notify("Nueva era: Colonia joven. Jardín de hongos y soldados disponibles.")
+				notify("Nueva era: Colonia joven. Soldados disponibles.")
 			Era.MATURE:
-				notify("Nueva era: Colonia madura. Drenaje, Peligro, Ataque, Evacuar y la araña.")
+				notify("Nueva era: Colonia madura. Peligro, Ataque, Evacuar y la araña.")
 				if _mature_since_s < 0.0:
 					_mature_since_s = time_s()
 

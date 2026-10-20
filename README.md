@@ -63,7 +63,7 @@ volumen, brillo) o te deja salir, sin perder la partida (vuelve exactamente a do
 |---|---|
 | **1** | Cavar: arrastra desde un túnel existente hacia tierra |
 | **2** | Feromona (Q/E cambia el tipo: Comida, Hogar, Peligro, Ataque, Evacuar) |
-| **3** | Cámara (Q/E cambia el tipo: Guardería, Almacén, Jardín de hongos, Drenaje, Real) |
+| **3** | Cámara (Q/E cambia el tipo: Guardería, Almacén, Real) |
 | **4** | Borrar (quita marca de excavar, cámara y las 5 feromonas bajo el pincel) |
 | **5** | Mover reina: clic izquierdo la manda a caminar hasta esa celda, clic derecho cancela la orden |
 | Clic izquierdo / derecho, arrastrar | Pintar / borrar con la herramienta activa |
@@ -123,10 +123,11 @@ no para jugar. Las funciones siguen existiendo (`Simulation.cmd_force_rain`/`cmd
 **Castas** (`sim/colony/caste_defs.gd`): Reina (una sola, pone huevos si hay comida suficiente y una
 cámara Real válida en algún lado; su muerte termina la partida — se ve bien más grande que el resto
 y de un tono marfil "puro", distinto del ámbar de la Obrera), Obrera (explora, corta hojas, carga,
-cava), Nodriza (acelera el desarrollo de la cría cerca del nido, no pelea), Soldado (patrulla,
-responde a la feromona de Ataque, el mayor daño cuerpo a cuerpo), Zángano (morado, con alas — no
-explora ni decide nada, se queda donde nació, pero mientras esté vivo acelera la puesta de huevos
-de la reina: `cfg.drone_egg_speed_bonus` por cada uno, sin tope, liviano a propósito).
+cava), Nodriza (acelera el desarrollo de la cría cerca del nido, no pelea), Soldado (ronda libre
+por el nido y la superficie, no se queda plantado; responde a la feromona de Ataque, el mayor daño
+cuerpo a cuerpo), Zángano (morado, con alas — no explora ni decide nada, se queda donde nació, pero
+mientras esté vivo acelera la puesta de huevos de la reina: `cfg.drone_egg_speed_bonus` por cada
+uno, sin tope, liviano a propósito).
 
 **Defensa de la colmena:** ante una amenaza real (araña, y lo que se sume después) toda la colonia
 pelea, no solo el Soldado — cada casta con su propio daño cuerpo a cuerpo
@@ -155,14 +156,16 @@ tipo necesita un tamaño mínimo y estar conectado al nido para activarse:
 | Real | La reina solo pone huevos aquí (la cámara inicial ya viene designada) |
 | Guardería | La cría se desarrolla a velocidad completa |
 | Almacén | Sube el tope de comida y agua |
-| Jardín de hongos | Convierte hojas almacenadas en comida, con el tiempo |
-| Drenaje | Absorbe agua de inundación, celda por celda |
 
-**Economía** (`sim/colony/colony.gd`): las obreras cortan hojas y las traen al nido (igual que en la Fase 0);
-el Jardín de hongos las convierte en comida. El agua entra despacio mientras hay charcos tras la
-lluvia (ver simplificaciones). Todas las adultas consumen comida y agua; sin jardín de hongos, la
-colonia no repone comida sola. La falta de comida o agua no afecta a la obrera (compatibilidad con la
-Fase 0), pero sí debilita a la reina, las nodrizas y los soldados hasta matarlos.
+El Jardín de hongos y el Drenaje se quitaron del juego (ver sección 8): ya no hace falta designar
+ninguna cámara para reponer comida ni para lidiar con una inundación.
+
+**Economía** (`sim/colony/colony.gd`): las obreras cortan hojas y las traen al nido (igual que en la
+Fase 0); la hoja se vuelve comida apenas llega, sin cámara que designar ni espera de por medio
+(`cfg.leaf_food_value`). El agua entra despacio mientras hay charcos tras la lluvia y sale sola por
+evaporación (ver simplificaciones) — no hay forma activa de drenarla. Todas las adultas consumen
+comida y agua; la falta de comida o agua no afecta a la obrera (compatibilidad con la Fase 0), pero
+sí debilita a la reina, las nodrizas y los soldados hasta matarlos.
 
 **Feromonas.** A las dos de la Fase 0 (Comida, Hogar) se suman:
 
@@ -177,8 +180,7 @@ obreras sueltas y, si nadie la detiene en la entrada por un tiempo, hiere a la r
 débil o si varios soldados la rodean; vuelve otra más fuerte pasado un intervalo.
 
 **Eras:** la población desbloquea contenido — Fundación (excavar, Comida, Hogar), Colonia joven
-(Jardín de hongos, soldados, primera lluvia) y Colonia madura (Drenaje, Peligro, Ataque, Evacuar, la
-araña).
+(soldados, primera lluvia) y Colonia madura (Peligro, Ataque, Evacuar, la araña).
 
 **Derrota:** la partida termina cuando muere la reina (ahogada, por la araña o por hambre/sed
 prolongadas); el HUD muestra la causa y F5 reinicia.
@@ -277,7 +279,7 @@ main.gd
  '- Simulation (RefCounted)   todo el estado y las reglas del juego
       |- WorldGrid             terreno, excavación, cámaras designadas (Fase 1)
       |- PheromoneField x5     Comida, Hogar, Peligro, Ataque, Evacuar
-      |- WaterSim              agua: caída, esparcido, evaporación, drenaje
+      |- WaterSim              agua: caída, esparcido, evaporación
       |- NestDistanceField     campo de distancias al nido (BFS)
       |- RoomSystem            cuenta cámaras válidas y su capacidad (Fase 1)
       |- Colony                comida, agua, consumo, puesta de huevos (Fase 1)
@@ -301,7 +303,7 @@ sin que la economía, la cría o la araña interfieran. El código revisa `queen
 cualquier sistema de la Fase 1.
 
 ### Orden del tick (`Simulation.tick`)
-clima → agua + drenaje → decaimiento de las 5 feromonas → recálculo de campos si cambió el terreno →
+clima → agua → decaimiento de las 5 feromonas → recálculo de campos si cambió el terreno →
 cámaras (`rooms.maybe_recompute`) → `AntSystem.tick()` → si hay reina: economía → cría → era →
 araña (cada 3 ticks) → revisión de derrota.
 
@@ -313,7 +315,7 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | Comando | Qué comprueba |
 |---|---|
 | `Godot --headless --path . --script tools/test_phase0.gd` | Regresión de la Fase 0: determinismo, forrajeo, feromonas, excavación, lluvia/drenaje, huida/muerte, rendimiento. **34 pruebas.** |
-| `Godot --headless --path . --script tools/test_phase1.gd` | Criterios de la Fase 1: reina y puesta de huevos, las 4 etapas de cría, reparto de castas, cámaras (válidas/inválidas), economía del jardín de hongos, Peligro/Evacuar, Drenaje, la araña (caza, la espantan, causa bajas sin soldados), eras, derrota, determinismo con colonia completa, rendimiento. **25 pruebas.** |
+| `Godot --headless --path . --script tools/test_phase1.gd` | Criterios de la Fase 1: reina y puesta de huevos, zánganos, las 4 etapas de cría, reparto de castas, cámaras (válidas/inválidas), hojas que se vuelven comida al llegar, Peligro/Evacuar, la araña (caza, la espantan, defensa de toda la colonia sin soldados), movimiento de la reina, eras, derrota, determinismo con colonia completa, rendimiento. **33 pruebas.** |
 | `Godot --headless --path . --script tools/ui_test.gd` | La escena real con eventos inyectados: arranque con reina+nodrizas, pausa, compras 7/8/9 y botones, panel de estado plegable (I), herramientas, cámara, las funciones de depuración (lluvia forzada, capas, agregar hormigas, ya sin tecla propia), reinicio. **26 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase2.gd` | Guardado y carga: la huella no cambia al guardar y cargar (en memoria y desde un archivo real), la partida sigue igual tras cargar como si nunca se hubiera guardado, un archivo inexistente no revienta, funciona con y sin reina, las cámaras y la lluvia en curso sobreviven. **10 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase3.gd` | Modo incremental: colonia inicial exacta, sin araña ni eras, día y noche, hojas → comida, compras y precios crecientes, el huevo comprado nace de esa casta, auto-compra con reserva, rebrote solo de día, la colonia crece sola 6 min con lluvia sin morir, guardado y carga (también por JSON), determinismo. **28 pruebas.** |
@@ -321,8 +323,8 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | `Godot --headless --path . --script tools/test_app_menu.gd` | El menú (`app/`): arranca mostrando el menú, Opciones desde el menú vuelve al menú, Opciones desde la tuerca en partida vuelve a la partida (pausada) y no al menú, Juego normal arranca en modo incremental (comida/compra), Modo infinito arranca en modo Historia con la colonia completa, F5 conserva el modo, volumen/brillo se guardan, Salir pide confirmación en vez de cerrar directo. **11 pruebas.** |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
-**Última ejecución verificada (2026-10-19, Godot 4.7.2):** las siete suites en 34/34 (Fase 0),
-25/25 (Fase 1), 10/10 (Fase 2), 28/28 (Fase 3), 7/7 (Fase 4), 26/26 (ui_test) y 11/11 (menú).
+**Última ejecución verificada (2026-10-20, Godot 4.7.2):** las siete suites en 34/34 (Fase 0),
+33/33 (Fase 1), 10/10 (Fase 2), 30/30 (Fase 3), 7/7 (Fase 4), 26/26 (ui_test) y 11/11 (menú).
 
 ### Notas para escribir pruebas
 - Si tallas túneles a mano con un helper tipo `_carve()`, llama también a
@@ -380,11 +382,25 @@ verdad:
   cría; si en el futuro se quiere esa relación, hay que decidir qué pasa si no queda ninguna Real
   donde la reina termine (ver conversación de diseño, no construido a propósito por ahora).
 - **El Zángano no tiene vuelo nupcial ni se reproduce de verdad** (no hay otras colonias con las que
-  cruzarse todavía). Su única función hoy es acelerar la puesta de huevos mientras esté vivo
-  (`Colony.tick`, sin tope por cantidad: liviano a propósito, ver sección 3). No pelea, no explora,
-  no puede morir de hambre más rápido que cualquier otra casta — simplemente existe.
+  cruzarse todavía). Su función principal es acelerar la puesta de huevos mientras esté vivo
+  (`Colony.tick`, sin tope por cantidad: liviano a propósito, ver sección 3); desde que toda la
+  colonia defiende la colmena (ver más abajo) también devuelve un golpe chico si una amenaza lo
+  alcanza donde está parado, pero sigue sin explorar ni decidir nada por su cuenta.
 - **El Zángano no se compra en el modo incremental** (`Juego normal`), igual que la Nodriza: ese
   modo sigue siendo solo obrera/soldado al azar (ver sección 9b).
+- **Toda la colonia defiende la colmena ante una amenaza real, no solo el Soldado** (Obrera 3 de
+  daño, Soldado 8, Zángano 1 pasivo; la Nodriza nunca pelea). Tiene prioridad sobre huir de la
+  feromona de Peligro pintada por el jugador, que sigue funcionando igual para avisos sin amenaza
+  real detrás. `AntSystem._nearest_threat()` es el único lugar que hay que tocar cuando se sumen
+  más insectos, ya que el resto de la lógica de combate es genérica.
+- **El Soldado ronda libre cuando no hay amenaza** en vez de volver a pararse junto a la entrada:
+  explora igual que una obrera (sin cortar hojas ni cavar), así no queda "guardia inmóvil" todo
+  el juego.
+- **Se quitaron el Jardín de hongos y el Drenaje.** La hoja se vuelve comida apenas llega al nido
+  (`cfg.leaf_food_value`, sin cámara que designar ni espera); el Almacén conserva su función de
+  subir los topes de comida y agua. El agua de inundación ya no tiene una forma activa de drenarse,
+  solo evapora sola con el tiempo — una colonia que se inunda a fondo depende de que pase, no de
+  que el jugador construya algo para apurarlo.
 
 ## 9. Simplificaciones deliberadas del guardado (Fase 2)
 
@@ -409,8 +425,10 @@ verdad:
   feromona no se refrescan lo bastante: se desgastaban por la punta de la planta y terminaban
   justo fuera del alcance de vista, así que las obreras daban vueltas junto al nido hasta que la
   reina moría de hambre. Solo pasa en este modo; las Fases 0-2 siguen usando solo los rastros.
-- **La reina no se ahoga en este modo**, y la primera lluvia llega el día 3: una colonia de 5
-  hormigas no alcanza a cavar un drenaje antes de la lluvia de los 150 s de la Fase 1.
+- **La reina no se ahoga en este modo**, y la primera lluvia llega el día 3 en vez de a los 150 s
+  de la Fase 1: una colonia de 5 hormigas no tendría forma de defenderse de una inundación tan
+  pronto (ni esta ni la Fase 1 tienen ya una cámara de Drenaje que cavar; antes era la razón del
+  retraso, ahora es solo darle tiempo a la colonia a crecer un poco primero).
 - **No se compran nodrizas** y la cría no depende de ellas en este modo.
 - **El jugador compra un huevo, no una casta.** Qué nace (obrera o soldado) se sortea al comprar
   (`IncrementalEconomy.buy_egg`, `cfg.inc_egg_soldier_chance`), no al nacer: la casta ya queda fija
@@ -418,7 +436,8 @@ verdad:
   es el resultado real. Reemplaza los precios separados de obrera/soldado de antes de esta sesión;
   las nodrizas nunca fueron parte del sorteo (siguen sin comprarse en este modo).
 - **Las cámaras siguen existiendo** pero solo el Almacén importa para la economía (sube el tope de
-  comida). El Jardín de hongos no hace nada: las hojas ya son comida al llegar.
+  comida); las hojas ya son comida al llegar, igual que en el modo clásico desde que se quitó el
+  Jardín de hongos (ver sección 8).
 - **El reloj no arranca en `tick_count = 0`**, sino ya pasado el amanecer
   (`DayNight.FADE * day_length_s`, ver `spawn_incremental_start`): a tick 0 el mundo se ve casi
   negro un instante por la transición de `DayNight.light()`, aunque `is_night()` ya diga "de día";
