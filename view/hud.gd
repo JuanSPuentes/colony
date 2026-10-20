@@ -485,6 +485,15 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 			st[BroodSystem.Stage.LARVA], st[BroodSystem.Stage.PUPA]]
 	if egg_dots != "":
 		_colony.text += "   Huevos: " + egg_dots
+	# La araña también aparece en este modo (por población, sin eras: ver
+	# cfg.inc_spider_first_population). Reusa la línea de "en camino" en vez de sumar una línea
+	# nueva: el panel tiene la altura de siempre calculada para una sola línea acá, y agregar una
+	# de más (como se probó primero) tapaba la línea de comida de abajo.
+	if sim.spider.alive:
+		var state_names := {Spider.State.SEARCH: "buscando presas", Spider.State.ATTACK: "atacando",
+			Spider.State.SIEGE: "en la entrada", Spider.State.RETREAT: "huyendo"}
+		_threats.text = "¡Araña %s! (%d%%)" % [
+			state_names.get(sim.spider.state, "cerca"), int(100.0 * sim.spider.hp / maxf(sim.spider.max_hp, 0.01))]
 
 	var econ := sim.econ
 	_buy_btns[0].text = "[7] Huevo: %.0f" % econ.egg_cost()

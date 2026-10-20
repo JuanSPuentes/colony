@@ -162,6 +162,9 @@ extends Resource
 @export var spider_first_population := 20
 @export var spider_interval_s := 150.0
 @export var spider_strength_growth := 0.25
+## Modo incremental: dispara igual que `spider_first_population`, pero con su propio umbral
+## porque ese modo arranca y crece con colonias mucho más chicas (ver README sección 9b).
+@export var inc_spider_first_population := 15
 
 @export_group("Fase 1: eras")
 @export var era2_population := 20

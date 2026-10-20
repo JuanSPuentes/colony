@@ -110,8 +110,13 @@ no para jugar. Las funciones siguen existiendo (`Simulation.cmd_force_rain`/`cmd
 - **Plantas:** rebrotan de día (`inc_plant_regrow_per_s`) hasta su máximo, así el juego no se queda
   sin hojas. La colonia recuerda las plantas de las que ya sacó hojas y las obreras en la superficie
   van directo a la conocida más cercana (ver simplificaciones, sección 9b).
-- **Sin araña ni eras.** La primera lluvia llega al inicio del día 3 (`inc_rain_first_s`) y la reina
-  no se ahoga; el resto de la colonia sí sufre las inundaciones.
+- **Sin eras, pero con araña.** No hay Fundación/Colonia joven/madura como en el modo clásico; la
+  araña aparece por población sola (`cfg.inc_spider_first_population`, más baja que
+  `spider_first_population` porque este modo arranca y crece con colonias chicas), mismo
+  comportamiento que en el modo clásico (caza obreras sueltas, asedia la entrada, la reina puede
+  morir si nadie la para con soldados). Sigue sin condición de victoria propia (ver sección 9c).
+  La primera lluvia llega al inicio del día 3 (`inc_rain_first_s`) y la reina no se ahoga; el resto
+  de la colonia sí sufre las inundaciones.
 
 ### Modo clásico (Fases 1-2; lo usan las pruebas de esas fases)
 
@@ -416,8 +421,10 @@ verdad:
   todavía** — igual que el resto del balance del proyecto (ver sección 10). Ajustarlo es cambiar un
   número en `SimConfig`, no lógica.
 - **Solo la colonia con reina (`Modo infinito` en el menú de hoy) puede ganar.** El modo de
-  comida/compra (`Juego normal`) no tiene condición de derrota tampoco, así que agregarle una
-  victoria sin una amenaza real que la haga sentir ganada quedó fuera de esta fase a propósito.
+  comida/compra (`Juego normal`) ya tiene una amenaza real (la araña, agregada después de esta
+  fase — ver sección 3) y la reina ya podía morir antes de eso (de hambre/sed prolongadas, igual
+  que en el modo clásico), pero sigue sin condición de victoria propia. Queda pendiente a
+  propósito: agregarla es la continuación obvia ahora que hay una amenaza, no se hizo todavía.
 - **El cronómetro de victoria no se reinicia si la población baja de Colonia madura.** Una vez que
   la colonia llega ahí por primera vez (`Simulation._mature_since_s`), el reloj corre aunque
   mueran hormigas después; bajar de era no existe hoy (las eras solo suben), así que esto no se

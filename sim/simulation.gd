@@ -206,17 +206,19 @@ func tick() -> void:
 	ants.tick()
 	# Todo lo que sigue solo existe si hay una colonia completa (ver nota en la cabecera).
 	if incremental:
-		# Fase 3: sin araña ni eras; la economía es solo comida.
+		# Fase 3: sin eras (la araña ya sí aparece, con su propio umbral de población).
 		econ.tick(dt)
 		econ.regrow_plants(dt)
 		brood.tick(dt)
+		if tick_count % 3 == 0:
+			_update_spider(dt * 3.0, cfg.inc_spider_first_population)
 		_check_game_over()
 	elif queen_id >= 0:
 		colony.tick(self, dt)
 		brood.tick(dt)
 		_update_era()
-		if tick_count % 3 == 0:
-			_update_spider(dt * 3.0)
+		if tick_count % 3 == 0 and era == Era.MATURE:
+			_update_spider(dt * 3.0, cfg.spider_first_population)
 		_check_game_over()
 		_check_victory()
 
@@ -252,13 +254,15 @@ func _update_era() -> void:
 					_mature_since_s = time_s()
 
 
-func _update_spider(step_dt: float) -> void:
-	if era != Era.MATURE:
-		return
+## `first_population`: a partir de cuántas hormigas vivas puede aparecer la primera araña. El modo
+## clásico la pasa solo al llegar a Colonia madura (`cfg.spider_first_population`); el incremental
+## no tiene eras, así que usa su propio umbral (`cfg.inc_spider_first_population`) sin esperar nada
+## más — ver dónde se llama esta función en `tick()`.
+func _update_spider(step_dt: float, first_population: int) -> void:
 	if spider.alive:
 		spider.step(step_dt)
 		return
-	if spiders_spawned == 0 and ants.alive_count >= cfg.spider_first_population:
+	if spiders_spawned == 0 and ants.alive_count >= first_population:
 		spider.spawn(1.0)
 		spiders_spawned += 1
 		spider_next_s = cfg.spider_interval_s
@@ -420,7 +424,7 @@ func is_night() -> bool:
 
 
 func cmd_force_spider() -> void:
-	if queen_id >= 0 and not incremental and not spider.alive:
+	if queen_id >= 0 and not spider.alive:
 		spider.spawn(1.0 + cfg.spider_strength_growth * spiders_spawned)
 		spiders_spawned += 1
 		spider_next_s = cfg.spider_interval_s  # si no, la siguiente se agenda casi de inmediato

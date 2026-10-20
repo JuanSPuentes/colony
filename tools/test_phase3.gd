@@ -1,6 +1,6 @@
 extends SceneTree
 ## Pruebas de la Fase 3: modo incremental (colonia mínima, todo en comida, compra de hormigas,
-## auto-compra, plantas que rebrotan, día y noche, sin araña).
+## auto-compra, plantas que rebrotan, día y noche, sin eras, con araña por población).
 ## Uso: godot --headless --path . --script tools/test_phase3.gd      (código de salida 1 si algo falla)
 
 var _pass := 0
@@ -9,7 +9,7 @@ var _fail := 0
 
 func _initialize() -> void:
 	_t_start_colony()
-	_t_no_spider_no_eras()
+	_t_no_eras_but_spider_appears()
 	_t_day_night()
 	_t_leaves_become_food()
 	_t_buy_costs_food_and_scales()
@@ -71,14 +71,25 @@ func _t_start_colony() -> void:
 	_check("sin spawn_incremental_start la simulación sigue en modo clásico", not plain.incremental and plain.ants.alive_count == cfg.initial_ants)
 
 
-func _t_no_spider_no_eras() -> void:
+## Las eras siguen sin existir en este modo (no hay Fundación/joven/madura), pero la araña sí
+## aparece ahora — con su propio umbral de población (`inc_spider_first_population`, más bajo que
+## el del modo clásico) en vez de esperar a una era que este modo nunca tiene.
+func _t_no_eras_but_spider_appears() -> void:
 	var cfg := _cfg()
-	var sim := _inc(cfg)
-	sim.cmd_add_ants(cfg.spider_first_population + cfg.era3_population)  # población de sobra para araña y eras
-	sim.cmd_force_spider()
-	_run(sim, 30.0)
-	_check("nunca aparece la araña (ni forzándola)", not sim.spider.alive and sim.spiders_spawned == 0)
-	_check("las eras no avanzan", sim.era == Simulation.Era.FOUNDATION)
+	var below := _inc(cfg)
+	below.cmd_add_ants(cfg.inc_spider_first_population - below.ants.alive_count - 1)
+	_run(below, 10.0)
+	_check("sin población suficiente no aparece sola", not below.spider.alive and below.spiders_spawned == 0)
+
+	var at_threshold := _inc(cfg)
+	at_threshold.cmd_add_ants(cfg.inc_spider_first_population - at_threshold.ants.alive_count)
+	_run(at_threshold, 10.0)
+	_check("al llegar al umbral de población aparece sola", at_threshold.spider.alive, "hormigas=%d" % at_threshold.ants.alive_count)
+	_check("las eras no avanzan (este modo no las tiene)", at_threshold.era == Simulation.Era.FOUNDATION)
+
+	var forced := _inc(cfg)
+	forced.cmd_force_spider()
+	_check("también se puede forzar con cmd_force_spider", forced.spider.alive)
 
 
 func _t_day_night() -> void:
