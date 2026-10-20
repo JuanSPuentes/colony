@@ -138,6 +138,13 @@ sigue existiendo tal cual para avisos del jugador sin amenaza real detrás); el 
 alcanza donde está parado, consistente con que sigue siendo la casta "liviana". Una colonia sin
 soldados ya no es presa fácil: un grupo de obreras puede espantar o matar a la araña entre todas.
 
+**Saqueo de cadáveres** (`sim/core/corpse.gd`): cualquier hormiga o amenaza (araña, y lo que se
+sume después) deja restos recolectables al morir, en el lugar exacto donde murió. Una obrera los
+recoge igual que recoge una hoja (mismo pickup, mismo viaje a casa) y se vuelven comida al llegar,
+pero valen más (`cfg.corpse_food_value`, el de la araña más todavía:
+`cfg.corpse_food_value_spider`). Un cadáver se agota de un solo viaje (no hay "varias partes" por
+cuerpo) y desaparece solo si nadie lo recoge antes de `cfg.corpse_decay_s`.
+
 **Mover a la reina (tecla 5):** no decide ni camina sola — el jugador la manda a una celda cavada y
 conectada al nido (clic derecho cancela la orden en curso) para alejarla de la araña o acercarla a
 una cámara nueva. Camina más lento que el resto (`CasteDefs.SPEED_MULT`) y sigue poniendo huevos
@@ -317,7 +324,7 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | Comando | Qué comprueba |
 |---|---|
 | `Godot --headless --path . --script tools/test_phase0.gd` | Regresión de la Fase 0: determinismo, forrajeo, feromonas, excavación, lluvia/drenaje, huida/muerte, rendimiento. **34 pruebas.** |
-| `Godot --headless --path . --script tools/test_phase1.gd` | Criterios de la Fase 1: reina y puesta de huevos, zánganos (acelerar puesta, cargar huevos a la Guardería), las 4 etapas de cría, reparto de castas, cámaras (válidas/inválidas), hojas que se vuelven comida al llegar, Peligro/Evacuar, la araña (caza, la espantan, defensa de toda la colonia sin soldados), movimiento de la reina, eras, derrota, determinismo con colonia completa, rendimiento. **38 pruebas.** |
+| `Godot --headless --path . --script tools/test_phase1.gd` | Criterios de la Fase 1: reina y puesta de huevos, zánganos (acelerar puesta, cargar huevos a la Guardería), las 4 etapas de cría, reparto de castas, cámaras (válidas/inválidas), hojas que se vuelven comida al llegar, Peligro/Evacuar, la araña (caza, la espantan, defensa de toda la colonia sin soldados), saqueo de cadáveres, movimiento de la reina, eras, derrota, determinismo con colonia completa, rendimiento. **44 pruebas.** |
 | `Godot --headless --path . --script tools/ui_test.gd` | La escena real con eventos inyectados: arranque con reina+nodrizas, pausa, compras 7/8/9 y botones, panel de estado plegable (I), herramientas, cámara, las funciones de depuración (lluvia forzada, capas, agregar hormigas, ya sin tecla propia), reinicio. **26 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase2.gd` | Guardado y carga: la huella no cambia al guardar y cargar (en memoria y desde un archivo real), la partida sigue igual tras cargar como si nunca se hubiera guardado, un archivo inexistente no revienta, funciona con y sin reina, las cámaras y la lluvia en curso sobreviven, la posición del huevo y quién lo está cargando sobreviven. **12 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase3.gd` | Modo incremental: colonia inicial exacta, sin araña ni eras, día y noche, hojas → comida, compras y precios crecientes, el huevo comprado nace de esa casta, auto-compra con reserva, rebrote solo de día, la colonia crece sola 6 min con lluvia sin morir, guardado y carga (también por JSON), determinismo. **28 pruebas.** |
@@ -326,7 +333,7 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
 **Última ejecución verificada (2026-10-20, Godot 4.7.2):** las siete suites en 34/34 (Fase 0),
-38/38 (Fase 1), 12/12 (Fase 2), 30/30 (Fase 3), 7/7 (Fase 4), 26/26 (ui_test) y 11/11 (menú).
+44/44 (Fase 1), 12/12 (Fase 2), 30/30 (Fase 3), 7/7 (Fase 4), 26/26 (ui_test) y 11/11 (menú).
 
 ### Notas para escribir pruebas
 - Si tallas túneles a mano con un helper tipo `_carve()`, llama también a
@@ -411,6 +418,14 @@ verdad:
   subir los topes de comida y agua. El agua de inundación ya no tiene una forma activa de drenarse,
   solo evapora sola con el tiempo — una colonia que se inunda a fondo depende de que pase, no de
   que el jugador construya algo para apurarlo.
+- **Un cadáver vale un valor fijo, no varias "partes" recolectables por separado.** La primera
+  obrera que llega se lo lleva entero de un viaje; es la misma simplificación que ya tenían las
+  hojas (sin tarea de "cargar de a poco"). Tampoco importa qué mató a la hormiga (ahogo, araña,
+  hambre): siempre deja el mismo valor (`cfg.corpse_food_value`), salvo la araña, que deja más
+  (`cfg.corpse_food_value_spider`) por ser más grande.
+- **`AntSystem._kill()` es el único lugar donde una hormiga deja restos**, y `Spider.take_damage()`
+  el de la araña: cuando se sumen más amenazas, ahí es donde hay que agregar la llamada a
+  `Simulation.spawn_corpse()`, no en ningún otro lado.
 
 ## 9. Simplificaciones deliberadas del guardado (Fase 2)
 

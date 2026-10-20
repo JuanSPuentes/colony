@@ -24,6 +24,7 @@ static func to_dict(sim: Simulation) -> Dictionary:
 	d["rng_state"] = str(sim.rng.state)
 	d["tick_count"] = sim.tick_count
 	d["leaves_stored"] = sim.leaves_stored
+	d["corpse_parts_stored"] = sim.corpse_parts_stored
 	d["delivered"] = sim.delivered
 	d["deaths"] = sim.deaths
 	d["dug"] = sim.dug
@@ -108,7 +109,8 @@ static func to_dict(sim: Simulation) -> Dictionary:
 		"next_think": Array(ants.next_think), "last_think": Array(ants.last_think),
 		"trip_steps": Array(ants.trip_steps), "job": Array(ants.job),
 		"last_cell": Array(ants.last_cell), "ignore_until": Array(ants.ignore_until),
-		"alive": Array(ants.alive), "carry": Array(ants.carry), "carry_egg": Array(ants.carry_egg),
+		"alive": Array(ants.alive), "carry": Array(ants.carry), "carry_kind": Array(ants.carry_kind),
+		"carry_egg": Array(ants.carry_egg),
 		"hp": Array(ants.hp), "timer": Array(ants.timer),
 		"stuck_t": Array(ants.stuck_t), "check_acc": Array(ants.check_acc),
 		"max_stuck_seen": ants.max_stuck_seen,
@@ -118,6 +120,11 @@ static func to_dict(sim: Simulation) -> Dictionary:
 	for p in sim.plants:
 		plants.append({"cell": [p.cell.x, p.cell.y], "leaves": p.leaves, "max_leaves": p.max_leaves, "regrow_acc": p.regrow_acc})
 	d["plants"] = plants
+
+	var corpses := []
+	for c in sim.corpses:
+		corpses.append({"pos": _v2(c.pos), "food_value": c.food_value, "age": c.age})
+	d["corpses"] = corpses
 	return d
 
 
@@ -143,6 +150,7 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	sim.rng.state = String(d["rng_state"]).to_int() if d["rng_state"] is String else int(d["rng_state"])
 	sim.tick_count = int(d["tick_count"])
 	sim.leaves_stored = int(d["leaves_stored"])
+	sim.corpse_parts_stored = int(d.get("corpse_parts_stored", 0))
 	sim.delivered = int(d["delivered"])
 	sim.deaths = int(d["deaths"])
 	sim.dug = int(d["dug"])
@@ -262,6 +270,10 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	ants.ignore_until = PackedInt32Array(ad["ignore_until"])
 	ants.alive = PackedByteArray(ad["alive"])
 	ants.carry = PackedByteArray(ad["carry"])
+	var carry_kind_in: Array = ad.get("carry_kind", [])
+	ants.carry_kind = PackedByteArray(carry_kind_in) if carry_kind_in.size() == ants.count else PackedByteArray()
+	if ants.carry_kind.size() != ants.count:
+		ants.carry_kind.resize(ants.count)  # 0 por defecto: hoja, igual que antes de que esto existiera
 	var carry_egg_in: Array = ad.get("carry_egg", [])
 	ants.carry_egg = PackedInt32Array(carry_egg_in) if carry_egg_in.size() == ants.count else PackedInt32Array()
 	if ants.carry_egg.size() != ants.count:
@@ -280,6 +292,12 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 		p.leaves = int(pd["leaves"])
 		p.regrow_acc = float(pd.get("regrow_acc", 0.0))
 		sim.plants.append(p)
+
+	sim.corpses.clear()
+	for corpse_d in d.get("corpses", []):
+		var c := Corpse.new(_to_v2(corpse_d["pos"]), float(corpse_d["food_value"]))
+		c.age = float(corpse_d.get("age", 0.0))
+		sim.corpses.append(c)
 
 	# Los campos de distancia y las cámaras son derivados: se recalculan en vez de guardarse.
 	sim.fields.recompute_terrain()

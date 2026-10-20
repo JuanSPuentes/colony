@@ -52,6 +52,9 @@ var last_cell := PackedInt32Array()
 var ignore_until := PackedInt32Array()
 var alive := PackedByteArray()
 var carry := PackedByteArray()
+## Qué está cargando mientras `carry[i] == 1`: 0 = hoja, 1 = restos de un cadáver (Punto 4, valen
+## más comida al entregarse). Solo importa en el momento de `_deliver()`.
+var carry_kind := PackedByteArray()
 ## Solo lo usa el Zángano: índice en `BroodSystem` del huevo que está cargando ahora, -1 si
 ## ninguno (ver `_think_drone`).
 var carry_egg := PackedInt32Array()
@@ -92,6 +95,7 @@ func _grow(n: int) -> void:
 	ignore_until.resize(total)
 	alive.resize(total)
 	carry.resize(total)
+	carry_kind.resize(total)
 	carry_egg.resize(total)
 	hp.resize(total)
 	timer.resize(total)
@@ -128,6 +132,7 @@ func add_ant_at(cell: Vector2i, ant_caste: int = CasteDefs.Caste.WORKER) -> int:
 	ignore_until[i] = 0
 	alive[i] = 1
 	carry[i] = 0
+	carry_kind[i] = 0
 	carry_egg[i] = -1
 	hp[i] = (cfg.queen_hp_base if ant_caste == CasteDefs.Caste.QUEEN else cfg.ant_hp) * CasteDefs.HP_MULT[ant_caste]
 	timer[i] = sim.rng.randf_range(0.0, cfg.rest_seconds_max)
@@ -226,6 +231,10 @@ func _kill(i: int, drowned: bool) -> void:
 	if drowned:
 		sim.deaths += 1
 	carry[i] = 0
+	if carry_egg[i] >= 0:
+		sim.brood.claimed[carry_egg[i]] = -1  # el zángano murió a mitad de camino: el huevo queda libre
+		carry_egg[i] = -1
+	sim.spawn_corpse(pos[i], sim.cfg.corpse_food_value)  # Punto 4: deja restos recolectables
 
 
 func _release_job(i: int) -> void:
@@ -296,7 +305,11 @@ func _on_enter(i: int, ci: int) -> void:
 
 
 func _deliver(i: int) -> void:
-	sim.leaves_stored += 1
+	if carry_kind[i] == 1:
+		sim.corpse_parts_stored += 1
+	else:
+		sim.leaves_stored += 1
+	carry_kind[i] = 0
 	sim.delivered += 1
 	carry[i] = 0
 	state[i] = State.IDLE
@@ -409,6 +422,43 @@ func _think_idle(i: int, cx: int, cy: int, ci: int, think_dt: float) -> void:
 		timer[i] = 4.0  # sin trabajo: seguir descansando
 
 
+## Punto 4: igual que `_plant_near`, pero sobre `sim.corpses` en vez de `sim.plants`.
+func _corpse_near(i: int) -> Corpse:
+	var cfg := sim.cfg
+	var best: Corpse = null
+	var best_d := cfg.sight_cells * cfg.cell_px
+	var p := pos[i]
+	for c in sim.corpses:
+		if c.food_value <= 0.0:
+			continue
+		var d := p.distance_to(c.pos)
+		if d < best_d:
+			best_d = d
+			best = c
+	return best
+
+
+## Intenta recoger restos de un cadáver o acercarse a uno visible. Devuelve true si decidió algo;
+## mismo espíritu que `_plant_logic`, un viaje se lleva todo el valor del cadáver (no hay "varias
+## partes" por cuerpo, simplificación deliberada).
+func _corpse_logic(i: int, cx: int, cy: int, ci: int) -> bool:
+	var cfg := sim.cfg
+	var c := _corpse_near(i)
+	if c == null:
+		return false
+	if pos[i].distance_to(c.pos) <= cfg.pickup_cells * cfg.cell_px:
+		c.food_value = 0.0
+		carry[i] = 1
+		carry_kind[i] = 1
+		trip_steps[i] = 0
+		state[i] = State.CARRY_HOME
+		_step(i, cx, cy, ci, Mode.NEST, null)
+		return true
+	state[i] = State.GO_TO_FOOD
+	_step(i, cx, cy, ci, Mode.PLANT, c.pos)
+	return true
+
+
 func _plant_near(i: int) -> Plant:
 	var cfg := sim.cfg
 	var best: Plant = null
@@ -481,7 +531,7 @@ func _food_here_max(cx: int, cy: int, ci: int) -> float:
 
 func _think_explore(i: int, cx: int, cy: int, ci: int) -> void:
 	var cfg := sim.cfg
-	if _plant_logic(i, cx, cy, ci) or _remembered_plant(i, cx, cy, ci):
+	if _corpse_logic(i, cx, cy, ci) or _plant_logic(i, cx, cy, ci) or _remembered_plant(i, cx, cy, ci):
 		return
 	if sim.total_leaves_left <= 0 and sim.world.marked_count == 0:
 		state[i] = State.IDLE
@@ -496,7 +546,7 @@ func _think_explore(i: int, cx: int, cy: int, ci: int) -> void:
 
 func _think_food(i: int, cx: int, cy: int, ci: int) -> void:
 	var cfg := sim.cfg
-	if _plant_logic(i, cx, cy, ci) or _remembered_plant(i, cx, cy, ci):
+	if _corpse_logic(i, cx, cy, ci) or _plant_logic(i, cx, cy, ci) or _remembered_plant(i, cx, cy, ci):
 		return
 	var here := sim.food.data[ci]
 	var best := 0.0

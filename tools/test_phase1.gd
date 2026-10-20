@@ -19,6 +19,7 @@ func _initialize() -> void:
 	_t_danger_and_evacuate()
 	_t_spider()
 	_t_colony_wide_defense_by_caste()
+	_t_corpse_looting()
 	_t_eras()
 	_t_queen_death_ends_game()
 	_t_queen_move()
@@ -315,6 +316,37 @@ func _t_colony_wide_defense_by_caste() -> void:
 	var hp2 := with_nurse.spider.hp
 	_run(with_nurse, 3.0)
 	_check("la nodriza no pelea (se queda cuidando la cría)", with_nurse.spider.hp == hp2, "vida araña %.1f -> %.1f" % [hp2, with_nurse.spider.hp])
+
+
+## Punto 4: al morir, una hormiga (o la araña) deja restos recolectables; una obrera los trae al
+## nido igual que trae una hoja, y valen más comida al llegar.
+func _t_corpse_looting() -> void:
+	var sim := _colony(_cfg(0), 33)
+	var w := sim.ants.add_ant_at(Vector2i(sim.cfg.nest_x, sim.cfg.surface_y + sim.cfg.shaft_depth), CasteDefs.Caste.WORKER)
+	var death_pos := sim.ants.pos[w]
+	sim.ants._kill(w, true)
+	_check("al morir deja un cadáver en su posición", sim.corpses.size() == 1 and sim.corpses[0].pos == death_pos)
+	_check("el cadáver vale la comida de una hormiga", sim.corpses[0].food_value == sim.cfg.corpse_food_value)
+
+	var forager := sim.ants.add_ant_at(Vector2i(sim.cfg.nest_x, sim.cfg.surface_y + sim.cfg.shaft_depth), CasteDefs.Caste.WORKER)
+	sim.ants.pos[forager] = death_pos
+	sim.colony.food = 0.0
+	_run(sim, 20.0)
+	_check("la obrera lo recoge y lo entrega (se vuelve comida)", sim.colony.food > 0.0, "comida=%.1f" % sim.colony.food)
+	_check("el cadáver ya no está (se agotó de un viaje)", sim.corpses.is_empty() or sim.corpses[0].food_value <= 0.0)
+
+	# La araña también deja restos, y más valiosos que los de una hormiga.
+	var with_spider := _colony(_cfg(0), 34)
+	with_spider.cmd_force_spider()
+	with_spider.spider.take_damage(with_spider.spider.hp + 1.0)
+	_check("la araña muerta también deja restos, más valiosos", with_spider.corpses.size() == 1 and with_spider.corpses[0].food_value == with_spider.cfg.corpse_food_value_spider)
+
+	# Sin nadie que lo recoja, desaparece solo pasado un tiempo.
+	var stale := _colony(_cfg(0), 35)
+	var w2 := stale.ants.add_ant_at(Vector2i(stale.cfg.nest_x + 30, stale.cfg.surface_y - 1), CasteDefs.Caste.WORKER)
+	stale.ants._kill(w2, true)
+	_run(stale, stale.cfg.corpse_decay_s + 5.0)
+	_check("si nadie lo recoge a tiempo, desaparece solo", stale.corpses.is_empty())
 
 
 # --- Eras, derrota y determinismo ------------------------------------------------------------------

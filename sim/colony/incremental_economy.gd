@@ -74,6 +74,13 @@ func tick(dt: float) -> void:
 		food_earned += gain
 		_income_acc += gain
 		colony.food = minf(colony.food_cap, colony.food + gain)
+	# Punto 4: restos de hormigas/amenazas muertas, igual que las hojas pero valen más.
+	if sim.corpse_parts_stored > 0:
+		var gain_c := sim.corpse_parts_stored * cfg.corpse_food_value
+		sim.corpse_parts_stored = 0
+		food_earned += gain_c
+		_income_acc += gain_c
+		colony.food = minf(colony.food_cap, colony.food + gain_c)
 	# Consumo: solo comida (el agua no es un recurso en este modo).
 	var consumed := 0.0
 	var ants := sim.ants

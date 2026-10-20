@@ -41,6 +41,7 @@ func take_damage(amount: float) -> void:
 	if hp <= 0.0:
 		alive = false
 		state = State.GONE
+		sim.spawn_corpse(pos, sim.cfg.corpse_food_value_spider)  # Punto 4: muerta, no huida
 
 
 func step(dt: float) -> void:

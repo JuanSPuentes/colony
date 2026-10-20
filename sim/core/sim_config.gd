@@ -104,6 +104,12 @@ extends Resource
 ## propio `inc_food_per_leaf`). Reemplaza al Jardín de hongos: ya no hay conversión con ritmo
 ## propio, la hoja se vuelve comida apenas llega.
 @export var leaf_food_value := 1.0
+## Punto 4 (saqueo de cadáveres): una obrera puede traer los restos de una hormiga o de una
+## amenaza muerta, igual que trae una hoja, y valen más comida que una hoja al llegar. Se agotan
+## de un solo viaje y desaparecen solos si nadie los recoge antes de `corpse_decay_s`.
+@export var corpse_food_value := 6.0
+@export var corpse_food_value_spider := 15.0
+@export var corpse_decay_s := 90.0
 @export var storage_food_per_cell := 15.0
 @export var storage_water_per_cell := 15.0
 ## Simplificación de la Fase 1: el agua entra despacio mientras haya charcos tras la lluvia

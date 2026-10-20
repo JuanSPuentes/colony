@@ -108,6 +108,12 @@ func tick(sim: Simulation, dt: float) -> void:
 		if convert > 0.0:
 			sim.leaves_stored -= int(ceil(convert / cfg.leaf_food_value))
 			food = minf(food_cap, food + convert)
+	# Punto 4: restos de hormigas/amenazas muertas, igual que las hojas pero valen más.
+	if sim.corpse_parts_stored > 0:
+		var convert_c := minf(float(sim.corpse_parts_stored) * cfg.corpse_food_value, maxf(food_cap - food, 0.0))
+		if convert_c > 0.0:
+			sim.corpse_parts_stored -= int(ceil(convert_c / cfg.corpse_food_value))
+			food = minf(food_cap, food + convert_c)
 	# Agua: entra despacio mientras haya charcos tras la lluvia (simplificación de la Fase 1;
 	# no hay una tarea dedicada de "traer agua").
 	var gain := cfg.water_regen_wet if sim.water.volume > 0.0 else cfg.water_regen_dry

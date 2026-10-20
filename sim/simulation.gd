@@ -31,6 +31,9 @@ var water: WaterSim
 var fields: NestDistanceField
 var ants: AntSystem
 var plants: Array[Plant] = []
+## Punto 4: restos de hormigas y amenazas muertas, recolectables por obreras (ver `AntSystem`).
+var corpses: Array[Corpse] = []
+var corpse_parts_stored := 0
 var rooms: RoomSystem
 var colony: Colony
 var brood: BroodSystem
@@ -202,6 +205,7 @@ func tick() -> void:
 		_dig_dirty = false
 		fields.recompute_dig()
 	rooms.maybe_recompute()
+	_update_corpses(dt)
 	ants.tick()
 	# Todo lo que sigue solo existe si hay una colonia completa (ver nota en la cabecera).
 	if incremental:
@@ -220,6 +224,25 @@ func tick() -> void:
 			_update_spider(dt * 3.0, cfg.spider_first_population)
 		_check_game_over()
 		_check_victory()
+
+
+## Punto 4: cualquier hormiga o amenaza puede dejar restos al morir (ver `AntSystem._kill` y
+## `Spider.take_damage`). Único punto de entrada para que ambos no dupliquen la lógica de creación.
+func spawn_corpse(p: Vector2, value: float) -> void:
+	corpses.append(Corpse.new(p, value))
+
+
+## Un cadáver desaparece solo si nadie lo recoge a tiempo (`corpse_decay_s`); una obrera ya lo deja
+## en `food_value <= 0.0` al recogerlo, así que ese caso se limpia acá también, no hace falta que
+## `AntSystem` sepa nada de esta lista más allá de leerla.
+func _update_corpses(step_dt: float) -> void:
+	if corpses.is_empty():
+		return
+	for i in range(corpses.size() - 1, -1, -1):
+		var c := corpses[i]
+		c.age += step_dt
+		if c.food_value <= 0.0 or c.age >= cfg.corpse_decay_s:
+			corpses.remove_at(i)
 
 
 func _update_era() -> void:
@@ -423,7 +446,7 @@ func checksum() -> int:
 	for i in ants.count:
 		if ants.alive[i] == 1:
 			h = (h * 31 + int(ants.pos[i].x * 16.0) + int(ants.pos[i].y * 16.0) * 7 + ants.state[i]) & 0x7fffffff
-	h = (h * 31 + leaves_stored * 13 + dug * 101 + deaths * 977) & 0x7fffffff
+	h = (h * 31 + leaves_stored * 13 + corpse_parts_stored * 19 + dug * 101 + deaths * 977) & 0x7fffffff
 	h = (h * 31 + int(water.volume * 1000.0)) & 0x7fffffff
 	if queen_id >= 0:
 		h = (h * 31 + int(colony.food * 10.0) + int(colony.water * 10.0) + brood.hatched * 7 + brood.died * 13) & 0x7fffffff
