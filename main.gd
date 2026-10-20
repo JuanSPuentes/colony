@@ -160,11 +160,13 @@ func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> v
 		game_mode = mode
 	if loaded_sim != null:
 		sim = loaded_sim
-		game_mode = "incremental" if loaded_sim.incremental else "historia"
+		game_mode = "test" if loaded_sim.test_mode else ("incremental" if loaded_sim.incremental else "historia")
 	else:
 		sim = Simulation.new(cfg, seed_value)
 		if game_mode == "historia":
 			sim.spawn_colony_court()
+		elif game_mode == "test":
+			sim.spawn_test_start()
 		else:
 			sim.spawn_incremental_start()
 	terrain_view.setup(sim)

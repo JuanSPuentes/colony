@@ -233,3 +233,10 @@ extends Resource
 ## Valor inicial sin playtesting real todavía (ver README sección 9c): 3 minutos de simulación
 ## después de llegar a Colonia madura, encima de los 10-15 minutos que ya toma llegar ahí.
 @export var victory_survive_s := 180.0
+
+## Fase 6: composición fija del modo Test (sandbox, sin victoria/derrota), cada vez que se
+## reinicia desde el panel de pruebas. La reina se agrega aparte, siempre es 1.
+@export_group("Fase 6: modo Test")
+@export var test_start_workers := 20
+@export var test_start_soldiers := 20
+@export var test_start_drones := 9

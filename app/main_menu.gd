@@ -12,6 +12,8 @@ extends CanvasLayer
 
 signal play_normal
 signal play_infinite
+## Fase 6: sandbox para probar amenazas y castas sin que una partida real se corte.
+signal play_test
 signal open_options
 signal quit_requested
 
@@ -69,11 +71,15 @@ func _ready() -> void:
 
 	_option(box, "Juego normal", "Crece sin límite: compra obreras y soldados con comida.", play_normal.emit)
 	_option(box, "Modo infinito", "Reina, cámaras, araña: la colonia completa de la Fase 1.", play_infinite.emit)
+	_option(box, "Test", "Entorno de pruebas: hormigas y amenazas a voluntad, sin victoria ni derrota.", play_test.emit)
 	_option(box, "Opciones", "Controles, volumen y brillo.", open_options.emit)
 	_option(box, "Salir", "Cierra el juego.", quit_requested.emit)
 
 
-func _option(parent: Control, label: String, hint: String, cb: Callable) -> void:
+## `hint` queda sin usarse por ahora (el usuario pidió sacar las descripciones del menú el
+## 2026-10-20); se deja el parámetro para no tener que tocar cada `_option(...)` cuando se
+## reactiven.
+func _option(parent: Control, label: String, _hint: String, cb: Callable) -> void:
 	var btn := Button.new()
 	btn.text = label
 	btn.custom_minimum_size = Vector2(280, 46)
@@ -92,13 +98,3 @@ func _option(parent: Control, label: String, hint: String, cb: Callable) -> void
 	btn.add_theme_stylebox_override("pressed", hover)
 	btn.pressed.connect(cb)
 	parent.add_child(btn)
-
-	var hint_label := Label.new()
-	hint_label.text = hint
-	hint_label.add_theme_font_size_override("font_size", 12)
-	hint_label.add_theme_color_override("font_color", Color(0.78, 0.78, 0.8))
-	hint_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	hint_label.add_theme_constant_override("outline_size", 2)
-	hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	parent.add_child(hint_label)

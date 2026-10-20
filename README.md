@@ -36,6 +36,7 @@ convención de una prueba por fase. Existe justo para que el proyecto no se vuel
 10. [Hoja de ruta: qué falta de la Fase 2](#10-hoja-de-ruta-qué-falta-de-la-fase-2)
 11. [Fase 4: condición de victoria](#11-fase-4-condición-de-victoria)
 12. [Fase 5: el ciempiés](#12-fase-5-el-ciempiés)
+13. [Fase 6: el modo Test](#13-fase-6-el-modo-test)
 
 ---
 
@@ -331,7 +332,8 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | `Godot --headless --path . --script tools/test_phase3.gd` | Modo incremental: colonia inicial exacta, sin araña ni eras, día y noche, hojas → comida, compras y precios crecientes, el huevo comprado nace de esa casta, auto-compra con reserva, rebrote solo de día, la colonia crece sola 6 min con lluvia sin morir, guardado y carga (también por JSON), determinismo. **28 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase4.gd` | Condición de victoria de la colonia con reina (sección 11): gana al sobrevivir `victory_survive_s` en Colonia madura con la reina viva, no gana antes de tiempo, morir la reina antes del umbral sigue siendo derrota (no victoria), el modo incremental nunca la dispara, guardar/cargar conserva el progreso hacia la victoria. **7 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase5.gd` | El ciempiés, segunda amenaza (sección 12): no aparece antes del umbral de población, aparece al cruzarlo, encuentra y daña una hormiga bajo tierra (no solo en superficie, a diferencia de la araña), toda la colonia lo ataca igual que a la araña, muere y deja cadáver recolectable, huye y desaparece con poca vida, el modo incremental nunca lo dispara, guardar/cargar conserva su estado. |
-| `Godot --headless --path . --script tools/test_app_menu.gd` | El menú (`app/`): arranca mostrando el menú, Opciones desde el menú vuelve al menú, Opciones desde la tuerca en partida vuelve a la partida (pausada) y no al menú, Juego normal arranca en modo incremental (comida/compra), Modo infinito arranca en modo Historia con la colonia completa, F5 conserva el modo, volumen/brillo se guardan, Salir pide confirmación en vez de cerrar directo. **11 pruebas.** |
+| `Godot --headless --path . --script tools/test_phase6.gd` | El modo Test (sección 13): composición fija de 50 hormigas al arrancar, empieza de día, la reina puede morir sin terminar la partida, los comandos de lluvia/araña/ciempiés del panel de pruebas, agregar hormigas de cualquier casta a voluntad, los otros dos modos no se ven afectados, guardar/cargar conserva `test_mode`. |
+| `Godot --headless --path . --script tools/test_app_menu.gd` | El menú (`app/`): arranca mostrando el menú, Opciones desde el menú vuelve al menú, Opciones desde la tuerca en partida vuelve a la partida (pausada) y no al menú, Juego normal arranca en modo incremental (comida/compra), Modo infinito arranca en modo Historia con la colonia completa, Test arranca el modo sandbox con 50 hormigas, F5 conserva el modo, volumen/brillo se guardan, Salir pide confirmación en vez de cerrar directo. |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
 **Última ejecución verificada (2026-10-20, Godot 4.7.2):** las siete suites en 34/34 (Fase 0),
@@ -557,3 +559,30 @@ distinto, pensado así a propósito para no ser "la araña con otro sprite".
 - **Simplificación deliberada:** los números de balance (`cfg.centipede_*`) son una primera
   estimación sin playtesting, igual que pasó con `victory_survive_s` en la Fase 4 — ajustarlos es
   cambiar un número en `SimConfig`, no lógica.
+
+## 13. Fase 6: el modo Test
+
+Cuarta opción del menú principal: un sandbox para probar funcionalidades (amenazas, castas, clima)
+sin jugar una partida completa cada vez. **No tiene condición de victoria ni derrota**: la reina
+puede morir y la partida sigue (`Simulation.test_mode` envuelve `_check_game_over`/`_check_victory`
+en `tick()`).
+
+- **Composición fija al arrancar** (`Simulation.spawn_test_start()`): 1 reina, 20 obreras, 20
+  guerreras (soldados) y 9 zánganos — 50 hormigas, siempre la misma receta cada vez que se
+  reinicia. Arranca ya a pleno día (mismo truco de reloj que `spawn_incremental_start`). Sin
+  lluvia automática: en este modo solo la dispara el jugador.
+- **Panel de pruebas** (`Hud._build_test_panel`, arriba a la derecha, visible solo con
+  `sim.test_mode`): reiniciar con una colonia nueva, poner/quitar lluvia, hacer aparecer o
+  desaparecer la araña y el ciempiés a demanda, y agregar 5 hormigas de cualquier casta
+  (obrera/guerrera/zángano/nodriza) de una.
+- **Comandos nuevos, todos en `simulation.gd`:** `cmd_stop_rain()` (lo contrario de
+  `cmd_force_rain`), `cmd_remove_spider()`/`cmd_remove_centipede()` (las hacen desaparecer sin
+  dejar cadáver — es una acción de depuración, no un evento de juego real), y
+  `cmd_add_caste_ants(caste, n)` (cualquier casta menos la reina, que ya tiene la suya).
+- **Simplificación deliberada:** araña y ciempiés siguen siendo una sola instancia a la vez por
+  tipo, igual que en el resto del juego (no se agregó soporte para "2 arañas a la vez" de verdad,
+  que habría significado convertirlas a listas y tocar `AntSystem._nearest_threat`, el guardado,
+  las vistas y las pruebas de las Fases 1/4/5). El botón "Aparecer araña" no hace nada si ya hay
+  una viva, igual que la tecla F10 de siempre.
+- **Guardado:** `d["test_mode"]` con `d.get(..., false)`, igual patrón que `incremental` en la
+  Fase 3.

@@ -27,6 +27,7 @@ func _ready() -> void:
 	# castas y araña (antes "Juego normal"). `_start_game(incremental)` no cambió de significado.
 	menu.play_normal.connect(func() -> void: _start_game(true))
 	menu.play_infinite.connect(func() -> void: _start_game(false))
+	menu.play_test.connect(_start_test_game)
 	menu.open_options.connect(func() -> void: _open_options("menu"))
 	menu.quit_requested.connect(_ask_quit)
 
@@ -55,6 +56,19 @@ func _start_game(incremental: bool) -> void:
 	game.set_brightness(settings.brightness)
 	game.menu_requested.connect(func() -> void: _open_options("game"))
 	game.start(game.cfg.world_seed, null, "incremental" if incremental else "historia")
+
+
+## Fase 6: igual que `_start_game`, pero en el modo Test (sandbox, sin victoria/derrota). Función
+## hermana en vez de un tercer caso en `_start_game` para no arriesgar el flujo ya probado de
+## "Juego normal"/"Modo infinito" (ver tools/test_app_menu.gd).
+func _start_test_game() -> void:
+	menu.visible = false
+	game = load(MAIN_SCENE).instantiate()
+	game.auto_start = false
+	add_child(game)
+	game.set_brightness(settings.brightness)
+	game.menu_requested.connect(func() -> void: _open_options("game"))
+	game.start(game.cfg.world_seed, null, "test")
 
 
 func _open_options(return_to: String) -> void:

@@ -88,6 +88,8 @@ var _pause_panel: PanelContainer
 var _phero_badge: PanelContainer
 var _phero_swatch: ColorRect
 var _phero_label: Label
+## Fase 6: panel del modo Test (sandbox), visible solo con `sim.test_mode`.
+var _test_panel: PanelContainer
 
 
 func _ready() -> void:
@@ -185,6 +187,7 @@ func _ready() -> void:
 	root.add_child(_defeat)
 
 	_build_pause_panel(root)
+	_build_test_panel(root)
 
 	_tooltip = Label.new()
 	_tooltip.add_theme_font_size_override("font_size", PANEL_FONT)
@@ -304,6 +307,58 @@ func _build_pause_panel(root: Control) -> void:
 	quit.text = "Salir"
 	quit.pressed.connect(func() -> void: gear_pressed.emit())
 	box.add_child(quit)
+
+
+## Fase 6: panel del modo Test (sandbox) — reiniciar, poner/quitar amenazas, agregar hormigas de
+## cualquier casta. Arriba a la derecha; `update_info` lo reposiciona cada vez según su tamaño real
+## (mismo truco que `_pause_panel`/`_phero_badge`, no hace falta saber el ancho de antemano) y solo
+## lo deja visible con `sim.test_mode`.
+func _build_test_panel(root: Control) -> void:
+	var panel := PanelContainer.new()
+	var style := _panel_style()
+	style.content_margin_left = 6.0 * S
+	style.content_margin_right = 6.0 * S
+	style.content_margin_top = 5.0 * S
+	style.content_margin_bottom = 5.0 * S
+	panel.add_theme_stylebox_override("panel", style)
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.visible = false
+	root.add_child(panel)
+	_test_panel = panel
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", int(3 * S))
+	box.custom_minimum_size = Vector2(90.0, 0) * S
+	panel.add_child(box)
+
+	var title := Label.new()
+	title.text = "PRUEBAS"
+	title.add_theme_font_size_override("font_size", PANEL_FONT)
+	title.add_theme_color_override("font_color", HEADER_COLOR)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+
+	_test_btn(box, "Reiniciar prueba", func() -> void:
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		_m.start(rng.randi() % 1000000))
+	_test_btn(box, "Lluvia ahora", func() -> void: _m.sim.cmd_force_rain())
+	_test_btn(box, "Detener lluvia", func() -> void: _m.sim.cmd_stop_rain())
+	_test_btn(box, "Aparecer araña", func() -> void: _m.sim.cmd_force_spider())
+	_test_btn(box, "Quitar araña", func() -> void: _m.sim.cmd_remove_spider())
+	_test_btn(box, "Aparecer ciempiés", func() -> void: _m.sim.cmd_force_centipede())
+	_test_btn(box, "Quitar ciempiés", func() -> void: _m.sim.cmd_remove_centipede())
+	_test_btn(box, "+5 Obreras", func() -> void: _m.sim.cmd_add_caste_ants(CasteDefs.Caste.WORKER, 5))
+	_test_btn(box, "+5 Guerreras", func() -> void: _m.sim.cmd_add_caste_ants(CasteDefs.Caste.SOLDIER, 5))
+	_test_btn(box, "+5 Zánganos", func() -> void: _m.sim.cmd_add_caste_ants(CasteDefs.Caste.DRONE, 5))
+	_test_btn(box, "+5 Nodrizas", func() -> void: _m.sim.cmd_add_caste_ants(CasteDefs.Caste.NURSE, 5))
+
+
+func _test_btn(parent: Control, text: String, cb: Callable) -> void:
+	var b := _buy_button()
+	b.text = text
+	b.pressed.connect(cb)
+	parent.add_child(b)
 
 
 ## Botón de compra: recuadro con borde (a diferencia de los de plegar, que son solo texto) para que
@@ -613,6 +668,10 @@ func update_info(m: Node) -> void:
 	_pause_panel.visible = m.paused and not sim.game_over
 	if _pause_panel.visible:
 		_pause_panel.position = (get_viewport().get_visible_rect().size - _pause_panel.size) * 0.5
+	_test_panel.visible = sim.test_mode
+	if _test_panel.visible:
+		var vp_size := get_viewport().get_visible_rect().size
+		_test_panel.position = Vector2(vp_size.x - _test_panel.size.x - 10.0 * S, 10.0 * S)
 	_threat_header.text = "CRÍA" if sim.incremental else "AMENAZAS"
 	if sim.incremental:
 		_update_incremental(m, sim)

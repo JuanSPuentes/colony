@@ -46,6 +46,9 @@ var spider: Spider
 var centipede: Centipede
 ## Fase 3: false salvo que se llame a `spawn_incremental_start()`.
 var incremental := false
+## Fase 6: false salvo que se llame a `spawn_test_start()`. Sandbox sin victoria/derrota (ver
+## `tick()`), para probar amenazas y castas a voluntad sin que una partida real se corte.
+var test_mode := false
 var econ: IncrementalEconomy
 
 var leaves_stored := 0
@@ -163,6 +166,25 @@ func spawn_incremental_start() -> void:
 	ants._recount()
 
 
+## Fase 6: arranque del modo Test (sandbox, sin victoria/derrota — ver `test_mode` en `tick()`).
+## Reina + 20 obreras + 20 soldados + 9 zánganos (50 en total), igual composición fija cada vez
+## que se reinicia. Mismo truco de reloj que `spawn_incremental_start()` para arrancar ya a pleno
+## día. Sin lluvia automática a propósito: en este modo solo la dispara el panel de pruebas.
+func spawn_test_start() -> void:
+	test_mode = true
+	tick_count = int(DayNight.FADE * cfg.day_length_s / dt)
+	ants = AntSystem.new(self)
+	var cell := Vector2i(cfg.nest_x, cfg.surface_y + cfg.shaft_depth + 1)
+	queen_id = ants.add_ant_at(cell, CasteDefs.Caste.QUEEN)
+	for k in cfg.test_start_workers:
+		ants.add_ant_at(_random_nest_cell(), CasteDefs.Caste.WORKER)
+	for k in cfg.test_start_soldiers:
+		ants.add_ant_at(_random_nest_cell(), CasteDefs.Caste.SOLDIER)
+	for k in cfg.test_start_drones:
+		ants.add_ant_at(_random_nest_cell(), CasteDefs.Caste.DRONE)
+	ants._recount()
+
+
 func _random_nest_cell() -> Vector2i:
 	var c: int = world.nest_cells[rng.randi() % world.nest_cells.size()]
 	return Vector2i(c % world.w, c / world.w)
@@ -232,8 +254,10 @@ func tick() -> void:
 		if tick_count % 3 == 0 and era == Era.MATURE:
 			_update_spider(dt * 3.0, cfg.spider_first_population)
 			_update_centipede(dt * 3.0)
-		_check_game_over()
-		_check_victory()
+		# Fase 6: el modo Test es un sandbox, nunca termina (ver `spawn_test_start`).
+		if not test_mode:
+			_check_game_over()
+			_check_victory()
 
 
 ## Punto 4: cualquier hormiga o amenaza puede dejar restos al morir (ver `AntSystem._kill` y
@@ -423,8 +447,24 @@ func cmd_force_rain() -> void:
 		_begin_rain()
 
 
+## Fase 6: para el panel de pruebas, lo contrario de `cmd_force_rain` (sin reprogramar la próxima:
+## en este modo la lluvia solo la dispara el jugador, nunca `cfg.rain_auto`).
+func cmd_stop_rain() -> void:
+	if weather == Weather.RAINING:
+		water.raining = false
+	weather = Weather.CLEAR
+	rain_start_tick = -1
+
+
 func cmd_add_ants(n: int) -> void:
 	ants.add_ants(n)
+
+
+## Fase 6: para el panel de pruebas, agregar cualquier casta a voluntad (la reina ya tiene la
+## suya propia y no pasa por acá).
+func cmd_add_caste_ants(caste: int, n: int) -> void:
+	for k in n:
+		ants.add_ant_at(_random_nest_cell(), caste)
 
 
 ## Fase 3: compra un huevo con comida; qué sale al nacer (obrera o soldado) es al azar.
@@ -460,6 +500,18 @@ func cmd_force_centipede() -> void:
 		centipedes_spawned += 1
 		centipede_next_s = cfg.centipede_interval_s
 		notify("¡Un ciempiés se metió por los túneles!")
+
+
+## Fase 6: para el panel de pruebas, hace desaparecer la amenaza sin dejar cadáver (es una acción
+## de depuración, no un evento de juego real como morir o huir).
+func cmd_remove_spider() -> void:
+	spider.alive = false
+	spider.state = Spider.State.GONE
+
+
+func cmd_remove_centipede() -> void:
+	centipede.alive = false
+	centipede.state = Centipede.State.GONE
 
 
 ## Resumen numérico del estado: sirve para comprobar la reproducibilidad.

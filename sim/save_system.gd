@@ -46,6 +46,8 @@ static func to_dict(sim: Simulation) -> Dictionary:
 	d["notifications"] = sim.notifications.duplicate()
 	# Fase 3: modo incremental.
 	d["incremental"] = sim.incremental
+	# Fase 6: modo Test (sandbox, sin victoria/derrota).
+	d["test_mode"] = sim.test_mode
 	d["econ"] = {
 		"bought_eggs": sim.econ.bought_eggs,
 		"auto_mode": sim.econ.auto_mode,
@@ -188,6 +190,8 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 		sim.notifications.append(String(n))
 	# Fase 3. Un guardado de antes de la Fase 3 no trae estas llaves: queda en modo clásico.
 	sim.incremental = bool(d.get("incremental", false))
+	# Fase 6. Ausente en guardados de antes de esta fase: no es un guardado de un entorno de pruebas.
+	sim.test_mode = bool(d.get("test_mode", false))
 	if d.has("econ"):
 		var ed: Dictionary = d["econ"]
 		sim.econ.bought_eggs = int(ed.get("bought_eggs", 0))

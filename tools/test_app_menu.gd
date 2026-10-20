@@ -88,6 +88,17 @@ func _run() -> void:
 	var expected_historia: int = _app.game.cfg.initial_ants + 1 + _app.game.cfg.initial_nurses
 	_check("la colonia de Historia arranca con obreras+reina+nodrizas", _app.game.sim.ants.alive_count == expected_historia, "esperado=%d real=%d" % [expected_historia, _app.game.sim.ants.alive_count])
 
+	# Fase 6: Test arranca el sandbox con la composición fija (50 hormigas), nunca con victoria/derrota.
+	_app.game.queue_free()
+	await _frames(1)
+	_app = load("res://app/app.tscn").instantiate()
+	root.add_child(_app)
+	await _frames(2)
+	_app.menu.play_test.emit()
+	await _frames(3)
+	_check("Test arranca el modo sandbox (sim.test_mode)", _app.game.sim.test_mode)
+	_check("la colonia de Test arranca con 50 hormigas", _app.game.sim.ants.alive_count == 50, "real=%d" % _app.game.sim.ants.alive_count)
+
 	# Salir: el botón debe pedir confirmación, no cerrar directo.
 	var closed := false
 	auto_accept_quit = false
