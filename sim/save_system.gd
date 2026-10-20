@@ -88,6 +88,7 @@ static func to_dict(sim: Simulation) -> Dictionary:
 	d["brood"] = {
 		"stage": Array(sim.brood.stage), "timer": Array(sim.brood.timer),
 		"caste": Array(sim.brood.caste), "alive": Array(sim.brood.alive),
+		"pos": _v2_arr(sim.brood.pos), "claimed": Array(sim.brood.claimed),
 		"hatched": sim.brood.hatched, "died": sim.brood.died,
 	}
 
@@ -107,7 +108,7 @@ static func to_dict(sim: Simulation) -> Dictionary:
 		"next_think": Array(ants.next_think), "last_think": Array(ants.last_think),
 		"trip_steps": Array(ants.trip_steps), "job": Array(ants.job),
 		"last_cell": Array(ants.last_cell), "ignore_until": Array(ants.ignore_until),
-		"alive": Array(ants.alive), "carry": Array(ants.carry),
+		"alive": Array(ants.alive), "carry": Array(ants.carry), "carry_egg": Array(ants.carry_egg),
 		"hp": Array(ants.hp), "timer": Array(ants.timer),
 		"stuck_t": Array(ants.stuck_t), "check_acc": Array(ants.check_acc),
 		"max_stuck_seen": ants.max_stuck_seen,
@@ -220,6 +221,16 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	sim.brood.timer = _to_typed_float(bd["timer"])
 	sim.brood.caste = _to_typed_int(bd["caste"])
 	sim.brood.alive = _to_typed_bool(bd["alive"])
+	# `d.get(..., default)`: un guardado de antes de esta función no trae estas dos llaves (sin
+	# versionado de compatibilidad todavía, ver README sección 9).
+	sim.brood.pos = _to_v2_arr(bd.get("pos", []))
+	if sim.brood.pos.size() != sim.brood.stage.size():
+		sim.brood.pos.resize(sim.brood.stage.size())  # guardado viejo: posiciones en (0,0)
+	var claimed_in: Array = bd.get("claimed", [])
+	sim.brood.claimed = _to_typed_int(claimed_in) if claimed_in.size() == sim.brood.stage.size() else []
+	if sim.brood.claimed.size() != sim.brood.stage.size():
+		sim.brood.claimed.resize(sim.brood.stage.size())
+		sim.brood.claimed.fill(-1)
 	sim.brood.hatched = int(bd["hatched"])
 	sim.brood.died = int(bd["died"])
 
@@ -251,6 +262,11 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	ants.ignore_until = PackedInt32Array(ad["ignore_until"])
 	ants.alive = PackedByteArray(ad["alive"])
 	ants.carry = PackedByteArray(ad["carry"])
+	var carry_egg_in: Array = ad.get("carry_egg", [])
+	ants.carry_egg = PackedInt32Array(carry_egg_in) if carry_egg_in.size() == ants.count else PackedInt32Array()
+	if ants.carry_egg.size() != ants.count:
+		ants.carry_egg.resize(ants.count)
+		ants.carry_egg.fill(-1)
 	ants.hp = PackedFloat32Array(ad["hp"])
 	ants.timer = PackedFloat32Array(ad["timer"])
 	ants.stuck_t = PackedFloat32Array(ad["stuck_t"])

@@ -1,8 +1,11 @@
 class_name BroodSystem
 extends RefCounted
 ## Cría: huevo -> larva -> pupa -> adulta (Fase 1).
-## Simplificación del MVP: la cría no tiene posición física propia ni la cargan las nodrizas;
-## vive conceptualmente en el nido. Lo que sí importa de verdad para el jugador:
+## El huevo sí tiene posición física (`pos`, `claimed`): nace donde esté parada la reina y el
+## Zángano lo puede cargar hasta una celda de Guardería (ver `AntSystem._think_drone`). Larva y
+## pupa no se mueven solas una vez que el huevo llegó a destino (o no): la velocidad de desarrollo
+## sigue siendo la misma de siempre, por colonia, no por posición individual — eso no cambió, para
+## no reabrir el balance ya ajustado. Lo que sí importa de verdad para el jugador:
 ##  - sin nodrizas vivas la larva se desarrolla mucho más despacio;
 ##  - sin Guardería válida se desarrolla más despacio y puede morir si el nido se inunda a fondo;
 ##  - sin comida, la larva se detiene (no muere de hambre en este MVP, solo se estanca).
@@ -14,6 +17,11 @@ var stage: Array[int] = []
 var timer: Array[float] = []
 var caste: Array[int] = []
 var alive: Array[bool] = []
+var pos := PackedVector2Array()
+## Índice de la hormiga (zángano) que está cargando este huevo ahora mismo, -1 si ninguna. Solo
+## tiene sentido mientras `stage[i] == Stage.EGG`; una vez que pasa a larva, si seguía cargado
+## queda suelto donde estuviera (ver `AntSystem._think_drone`).
+var claimed: Array[int] = []
 var counts_by_stage: Array[int] = [0, 0, 0]
 var hatched := 0
 var died := 0
@@ -23,11 +31,13 @@ func _init(s: Simulation) -> void:
 	sim = s
 
 
-func lay_egg(target_caste: int) -> void:
+func lay_egg(target_caste: int, p: Vector2) -> void:
 	stage.append(Stage.EGG)
 	timer.append(sim.cfg.egg_time_s)
 	caste.append(target_caste)
 	alive.append(true)
+	pos.append(p)
+	claimed.append(-1)
 
 
 func total_alive() -> int:
@@ -92,6 +102,7 @@ func _advance(i: int) -> void:
 		Stage.EGG:
 			stage[i] = Stage.LARVA
 			timer[i] = sim.cfg.larva_time_s
+			claimed[i] = -1  # si un zángano lo tenía en upa, lo suelta donde esté (ver _think_drone)
 		Stage.LARVA:
 			stage[i] = Stage.PUPA
 			timer[i] = sim.cfg.pupa_time_s

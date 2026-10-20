@@ -55,7 +55,7 @@ func buy_egg() -> bool:
 	sim.colony.food -= egg_cost()
 	bought_eggs += 1
 	var caste := CasteDefs.Caste.SOLDIER if sim.rng.randf() < sim.cfg.inc_egg_soldier_chance else CasteDefs.Caste.WORKER
-	sim.brood.lay_egg(caste)
+	sim.brood.lay_egg(caste, sim.ants.pos[sim.queen_id])
 	return true
 
 

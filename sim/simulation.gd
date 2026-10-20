@@ -141,7 +141,7 @@ func spawn_incremental_start() -> void:
 	for k in cfg.inc_start_soldiers:
 		ants.add_ant_at(_random_nest_cell(), CasteDefs.Caste.SOLDIER)
 	for k in cfg.inc_start_larvae:
-		brood.lay_egg(CasteDefs.Caste.WORKER)
+		brood.lay_egg(CasteDefs.Caste.WORKER, ants.pos[queen_id])
 		brood.stage[brood.stage.size() - 1] = BroodSystem.Stage.LARVA
 		brood.timer[brood.timer.size() - 1] = cfg.larva_time_s
 	colony.food = cfg.inc_start_food

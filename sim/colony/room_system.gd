@@ -10,6 +10,10 @@ var fields: NestDistanceField
 var cfg: SimConfig
 var counts: Array[int] = [0, 0, 0, 0]
 var valid: Array[bool] = [false, false, false, false]
+## Una celda cualquiera de Guardería válida (índice plano en `world.room`, -1 si no hay ninguna):
+## adonde el Zángano lleva un huevo (ver `AntSystem._think_drone`). No importa cuál en particular,
+## solo que exista una.
+var nursery_cell := -1
 var _seen_rooms_version := -1
 var _seen_terrain_recomputes := -1
 
@@ -45,6 +49,7 @@ func maybe_recompute() -> void:
 	_seen_terrain_recomputes = fields.recomputes
 	for k in 4:
 		counts[k] = 0
+	nursery_cell = -1
 	for i in world.room.size():
 		var r := world.room[i]
 		if r == WorldGrid.Room.NONE:
@@ -54,5 +59,9 @@ func maybe_recompute() -> void:
 		if fields.nest_dist[i] >= NestDistanceField.FAR:
 			continue
 		counts[r] += 1
+		if r == WorldGrid.Room.NURSERY and nursery_cell < 0:
+			nursery_cell = i
 	for r in 4:
 		valid[r] = counts[r] >= min_size(r)
+	if not valid[WorldGrid.Room.NURSERY]:
+		nursery_cell = -1

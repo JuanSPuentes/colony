@@ -125,9 +125,9 @@ cámara Real válida en algún lado; su muerte termina la partida — se ve bien
 y de un tono marfil "puro", distinto del ámbar de la Obrera), Obrera (explora, corta hojas, carga,
 cava), Nodriza (acelera el desarrollo de la cría cerca del nido, no pelea), Soldado (ronda libre
 por el nido y la superficie, no se queda plantado; responde a la feromona de Ataque, el mayor daño
-cuerpo a cuerpo), Zángano (morado, con alas — no explora ni decide nada, se queda donde nació, pero
-mientras esté vivo acelera la puesta de huevos de la reina: `cfg.drone_egg_speed_bonus` por cada
-uno, sin tope, liviano a propósito).
+cuerpo a cuerpo), Zángano (morado, con alas — no explora ni pelea activo, pero sí camina para
+cargar huevos hasta la Guardería, su única tarea; mientras esté vivo también acelera la puesta de
+huevos de la reina: `cfg.drone_egg_speed_bonus` por cada uno, sin tope).
 
 **Defensa de la colmena:** ante una amenaza real (araña, y lo que se sume después) toda la colonia
 pelea, no solo el Soldado — cada casta con su propio daño cuerpo a cuerpo
@@ -144,9 +144,11 @@ una cámara nueva. Camina más lento que el resto (`CasteDefs.SPEED_MULT`) y sig
 igual mientras viaja: dónde esté parada no afecta la cría, a propósito (ver sección 8).
 
 **Cría** (`sim/colony/brood_system.gd`): huevo → larva → pupa → adulta. Al poner un huevo, la reina le asigna
-la casta que más lejos esté del reparto objetivo del jugador (ajustable con 7/8/9). Sin nodrizas cerca
-la larva se desarrolla mucho más despacio; sin Guardería válida, algo más despacio y puede morir si el
-nido se inunda a fondo.
+la casta que más lejos esté del reparto objetivo del jugador (ajustable con 7/8/9), y nace en la
+posición donde ella esté parada. El Zángano lo puede cargar hasta una celda de Guardería (ver
+sección de castas, arriba); una vez que pasa a larva ya no se mueve más, quede donde quede. Sin
+nodrizas cerca la larva se desarrolla mucho más despacio; sin Guardería válida en algún lado, algo
+más despacio y puede morir si el nido se inunda a fondo.
 
 **Cámaras** (`sim/colony/room_system.gd`): el jugador las designa pintando sobre túneles ya excavados. Cada
 tipo necesita un tamaño mínimo y estar conectado al nido para activarse:
@@ -315,16 +317,16 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | Comando | Qué comprueba |
 |---|---|
 | `Godot --headless --path . --script tools/test_phase0.gd` | Regresión de la Fase 0: determinismo, forrajeo, feromonas, excavación, lluvia/drenaje, huida/muerte, rendimiento. **34 pruebas.** |
-| `Godot --headless --path . --script tools/test_phase1.gd` | Criterios de la Fase 1: reina y puesta de huevos, zánganos, las 4 etapas de cría, reparto de castas, cámaras (válidas/inválidas), hojas que se vuelven comida al llegar, Peligro/Evacuar, la araña (caza, la espantan, defensa de toda la colonia sin soldados), movimiento de la reina, eras, derrota, determinismo con colonia completa, rendimiento. **33 pruebas.** |
+| `Godot --headless --path . --script tools/test_phase1.gd` | Criterios de la Fase 1: reina y puesta de huevos, zánganos (acelerar puesta, cargar huevos a la Guardería), las 4 etapas de cría, reparto de castas, cámaras (válidas/inválidas), hojas que se vuelven comida al llegar, Peligro/Evacuar, la araña (caza, la espantan, defensa de toda la colonia sin soldados), movimiento de la reina, eras, derrota, determinismo con colonia completa, rendimiento. **38 pruebas.** |
 | `Godot --headless --path . --script tools/ui_test.gd` | La escena real con eventos inyectados: arranque con reina+nodrizas, pausa, compras 7/8/9 y botones, panel de estado plegable (I), herramientas, cámara, las funciones de depuración (lluvia forzada, capas, agregar hormigas, ya sin tecla propia), reinicio. **26 pruebas.** |
-| `Godot --headless --path . --script tools/test_phase2.gd` | Guardado y carga: la huella no cambia al guardar y cargar (en memoria y desde un archivo real), la partida sigue igual tras cargar como si nunca se hubiera guardado, un archivo inexistente no revienta, funciona con y sin reina, las cámaras y la lluvia en curso sobreviven. **10 pruebas.** |
+| `Godot --headless --path . --script tools/test_phase2.gd` | Guardado y carga: la huella no cambia al guardar y cargar (en memoria y desde un archivo real), la partida sigue igual tras cargar como si nunca se hubiera guardado, un archivo inexistente no revienta, funciona con y sin reina, las cámaras y la lluvia en curso sobreviven, la posición del huevo y quién lo está cargando sobreviven. **12 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase3.gd` | Modo incremental: colonia inicial exacta, sin araña ni eras, día y noche, hojas → comida, compras y precios crecientes, el huevo comprado nace de esa casta, auto-compra con reserva, rebrote solo de día, la colonia crece sola 6 min con lluvia sin morir, guardado y carga (también por JSON), determinismo. **28 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase4.gd` | Condición de victoria de la colonia con reina (sección 11): gana al sobrevivir `victory_survive_s` en Colonia madura con la reina viva, no gana antes de tiempo, morir la reina antes del umbral sigue siendo derrota (no victoria), el modo incremental nunca la dispara, guardar/cargar conserva el progreso hacia la victoria. **7 pruebas.** |
 | `Godot --headless --path . --script tools/test_app_menu.gd` | El menú (`app/`): arranca mostrando el menú, Opciones desde el menú vuelve al menú, Opciones desde la tuerca en partida vuelve a la partida (pausada) y no al menú, Juego normal arranca en modo incremental (comida/compra), Modo infinito arranca en modo Historia con la colonia completa, F5 conserva el modo, volumen/brillo se guardan, Salir pide confirmación en vez de cerrar directo. **11 pruebas.** |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
 **Última ejecución verificada (2026-10-20, Godot 4.7.2):** las siete suites en 34/34 (Fase 0),
-33/33 (Fase 1), 10/10 (Fase 2), 30/30 (Fase 3), 7/7 (Fase 4), 26/26 (ui_test) y 11/11 (menú).
+38/38 (Fase 1), 12/12 (Fase 2), 30/30 (Fase 3), 7/7 (Fase 4), 26/26 (ui_test) y 11/11 (menú).
 
 ### Notas para escribir pruebas
 - Si tallas túneles a mano con un helper tipo `_carve()`, llama también a
@@ -365,8 +367,16 @@ verdad:
   mientras haya charcos tras la lluvia. No hay una obrera que cargue una gota físicamente.
 - **El hambre y la sed no dañan a la obrera**, solo a reina, nodrizas y soldados. Así el
   comportamiento de obrera de la Fase 0 queda intacto byte a byte, sin importar la economía.
-- **La cría no tiene posición física ni la cargan las nodrizas.** Vive conceptualmente en el nido;
-  lo que sí importa (nodrizas presentes, Guardería válida, inundación) tiene efecto real.
+- **El huevo sí tiene posición física; larva y pupa no se mueven más después de eso.** Nace donde
+  esté parada la reina (`BroodSystem.pos`) y el Zángano lo puede cargar hasta una celda de
+  Guardería (`AntSystem._think_drone`, ver más abajo). Una vez que pasa a larva, la posición queda
+  fija donde haya quedado — no hay una tarea de "reacomodar" larvas ya nacidas. La velocidad de
+  desarrollo sigue siendo global por colonia (nodrizas presentes, Guardería válida en algún lado),
+  no por la posición de cada huevo en particular: cargarlo hasta la Guardería no lo hace
+  desarrollarse más rápido por sí solo, es una tarea del Zángano, no un requisito de balance.
+- **El Zángano carga como mucho un huevo a la vez y va al primero libre más cercano**, no al que
+  más lo necesite ni en ningún orden particular. Sin Guardería designada se queda esperando junto
+  al huevo en vez de insistir o volver a dejarlo donde estaba.
 - **La araña no encuentra camino real por los túneles.** Si nadie la detiene en la entrada por un
   tiempo, se modela como un golpe directo a la reina ("asedio"), no como una invasión celda por celda.
 - **El reparto de castas se ajusta con tres teclas (7/8/9)**, no con controles deslizantes en

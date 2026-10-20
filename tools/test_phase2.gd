@@ -14,6 +14,7 @@ func _initialize() -> void:
 	_t_missing_file_returns_null()
 	_t_works_without_colony()
 	_t_rooms_and_rain_survive()
+	_t_egg_position_and_carry_survive()
 	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -110,3 +111,17 @@ func _t_rooms_and_rain_survive() -> void:
 	var loaded := SaveSystem.from_dict(SaveSystem.to_dict(sim), sim.cfg)
 	_check("las cámaras designadas sobreviven al guardado", loaded.rooms.counts[WorldGrid.Room.STORAGE] == sim.rooms.counts[WorldGrid.Room.STORAGE], "%d / %d" % [sim.rooms.counts[WorldGrid.Room.STORAGE], loaded.rooms.counts[WorldGrid.Room.STORAGE]])
 	_check("la lluvia en curso sobrevive al guardado", loaded.weather == sim.weather and absf(loaded.water.volume - sim.water.volume) < 0.01)
+
+
+## Punto 2 de la sesión: el huevo tiene posición física y el zángano lo puede estar cargando a
+## mitad de camino cuando se guarda la partida.
+func _t_egg_position_and_carry_survive() -> void:
+	var sim := _colony(_cfg(0), 6)
+	var egg_pos := sim.ants.pos[sim.queen_id] + Vector2(3.0, -2.0)
+	sim.brood.lay_egg(CasteDefs.Caste.WORKER, egg_pos)
+	var d := sim.ants.add_ant_at(Vector2i(sim.cfg.nest_x, sim.cfg.surface_y + sim.cfg.shaft_depth), CasteDefs.Caste.DRONE)
+	sim.brood.claimed[0] = d
+	sim.ants.carry_egg[d] = 0
+	var loaded := SaveSystem.from_dict(SaveSystem.to_dict(sim), sim.cfg)
+	_check("la posición del huevo sobrevive al guardado", loaded.brood.pos[0] == sim.brood.pos[0], "%s / %s" % [sim.brood.pos[0], loaded.brood.pos[0]])
+	_check("quién lo está cargando sobrevive al guardado", loaded.brood.claimed[0] == d and loaded.ants.carry_egg[d] == 0)

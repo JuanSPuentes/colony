@@ -9,7 +9,7 @@ extends RefCounted
 ## su propio `_think_*`. Los estados nuevos (FLEE_DANGER, EVACUATE, NURSE, GUARD, ATTACK) son
 ## aditivos: si nada pinta esas feromonas (como en la Fase 0) nunca se activan.
 
-enum State { EXPLORE, GO_TO_FOOD, CARRY_HOME, DIG, FLEE_WATER, IDLE, FLEE_DANGER, EVACUATE, NURSE, GUARD, ATTACK }
+enum State { EXPLORE, GO_TO_FOOD, CARRY_HOME, DIG, FLEE_WATER, IDLE, FLEE_DANGER, EVACUATE, NURSE, GUARD, ATTACK, CARRY_EGG }
 enum Mode { EXPLORE, FOOD, NEST, DIG, FLEE, PLANT, TOWARD, AWAY }
 
 const STATE_COLORS: Array[Color] = [
@@ -22,11 +22,12 @@ const STATE_COLORS: Array[Color] = [
 	Color("ff2fb0"),  # FLEE_DANGER
 	Color("ffffff"),  # EVACUATE
 	Color("4fd4e0"),  # NURSE
-	Color("ff8040"),  # GUARD
+	Color("ff8040"),  # GUARDIA
 	Color("ff0000"),  # ATTACK
+	Color("9b59b6"),  # CARRY_EGG (mismo morado del Zángano)
 ]
 const STATE_NAMES: Array[String] = ["EXPLORAR", "IR A COMIDA", "LLEVAR A CASA", "CAVAR", "HUIR DEL AGUA", "DESCANSO",
-	"HUIR DEL PELIGRO", "EVACUAR", "CUIDAR CRÍA", "GUARDIA", "ATACAR"]
+	"HUIR DEL PELIGRO", "EVACUAR", "CUIDAR CRÍA", "GUARDIA", "ATACAR", "CARGAR HUEVO"]
 const DX: Array[int] = [1, 1, 0, -1, -1, -1, 0, 1]
 const DY: Array[int] = [0, 1, 1, 1, 0, -1, -1, -1]
 const FAR := NestDistanceField.FAR
@@ -51,6 +52,9 @@ var last_cell := PackedInt32Array()
 var ignore_until := PackedInt32Array()
 var alive := PackedByteArray()
 var carry := PackedByteArray()
+## Solo lo usa el Zángano: índice en `BroodSystem` del huevo que está cargando ahora, -1 si
+## ninguno (ver `_think_drone`).
+var carry_egg := PackedInt32Array()
 var hp := PackedFloat32Array()
 var timer := PackedFloat32Array()
 var stuck_t := PackedFloat32Array()
@@ -88,6 +92,7 @@ func _grow(n: int) -> void:
 	ignore_until.resize(total)
 	alive.resize(total)
 	carry.resize(total)
+	carry_egg.resize(total)
 	hp.resize(total)
 	timer.resize(total)
 	stuck_t.resize(total)
@@ -123,6 +128,7 @@ func add_ant_at(cell: Vector2i, ant_caste: int = CasteDefs.Caste.WORKER) -> int:
 	ignore_until[i] = 0
 	alive[i] = 1
 	carry[i] = 0
+	carry_egg[i] = -1
 	hp[i] = (cfg.queen_hp_base if ant_caste == CasteDefs.Caste.QUEEN else cfg.ant_hp) * CasteDefs.HP_MULT[ant_caste]
 	timer[i] = sim.rng.randf_range(0.0, cfg.rest_seconds_max)
 	stuck_t[i] = 0.0
@@ -178,11 +184,20 @@ func tick() -> void:
 				_move(i, dt, lv)
 			continue
 		if caste[i] == CasteDefs.Caste.DRONE:
-			# Liviano a propósito: no explora, no decide, no se mueve a buscar pelea. Pero si una
-			# amenaza lo alcanza donde está parado, sí devuelve el golpe (defensa pasiva).
+			# Sigue sin pelear activo (no abandona la tarea por una amenaza, solo devuelve el golpe
+			# si lo alcanzan donde está: defensa pasiva, igual que siempre). Pero ya no es del todo
+			# inmóvil: su única tarea es cargar huevos hasta la Guardería (ver `_think_drone`).
 			var threat := _nearest_threat(p, cfg.soldier_melee_range_px)
 			if threat != null:
 				threat.take_damage(CasteDefs.DAMAGE_PER_S[CasteDefs.Caste.DRONE] * dt)
+			if now >= next_think[i]:
+				_think_drone(i, cx, cy, ci)
+			_move(i, dt, lv)
+			if carry_egg[i] >= 0:
+				sim.brood.pos[carry_egg[i]] = pos[i]  # el huevo "viaja" pegado al zángano
+			check_acc[i] += dt
+			if check_acc[i] >= 0.5:
+				_stuck_check(i, ci)
 			continue
 		if state[i] == State.DIG and job[i] >= 0:
 			_dig_progress(i, dt)
@@ -527,6 +542,62 @@ func _think_dig(i: int, cx: int, cy: int, ci: int) -> void:
 		timer[i] = 0.0
 		return
 	_step(i, cx, cy, ci, Mode.DIG, null)
+
+
+# --- Zángano: carga huevos a la Guardería -------------------------------------------------------
+
+## El zángano no pasa por `_think()` (no pelea activo, no explora): lleva su propia cuenta de
+## cuándo le toca pensar, igual que hace `_think()` para el resto.
+func _think_drone(i: int, cx: int, cy: int, ci: int) -> void:
+	var now := sim.tick_count
+	last_think[i] = now
+	next_think[i] = now + sim.rng.randi_range(sim.cfg.think_ticks_min, sim.cfg.think_ticks_max)
+	var brood := sim.brood
+	var idx := carry_egg[i]
+	if idx >= 0:
+		if not brood.alive[idx] or brood.stage[idx] != BroodSystem.Stage.EGG:
+			# Ya nació, murió, o avanzó a larva por su cuenta mientras lo cargaba: lo suelta donde esté.
+			carry_egg[i] = -1
+			state[i] = State.IDLE
+			target[i] = pos[i]
+			return
+		var nursery_cell := sim.rooms.nursery_cell
+		if nursery_cell < 0:
+			# No hay Guardería (todavía): se queda esperando junto al huevo, no insiste con nada.
+			state[i] = State.CARRY_EGG
+			target[i] = pos[i]
+			return
+		var dest := _center(nursery_cell % sim.world.w, nursery_cell / sim.world.w)
+		state[i] = State.CARRY_EGG
+		if pos[i].distance_to(dest) <= sim.cfg.soldier_melee_range_px:
+			brood.pos[idx] = dest
+			brood.claimed[idx] = -1
+			carry_egg[i] = -1
+			target[i] = pos[i]
+		else:
+			target[i] = dest
+		return
+	# Sin huevo en upa: busca el más cercano que nadie esté cargando y que no esté ya en una
+	# Guardería (si ya llegó, no hace falta tocarlo de nuevo).
+	var best := -1
+	var best_d := INF
+	for b in brood.stage.size():
+		if not brood.alive[b] or brood.stage[b] != BroodSystem.Stage.EGG or brood.claimed[b] >= 0:
+			continue
+		if sim.rooms.nursery_cell >= 0 and _cell_index(brood.pos[b]) == sim.rooms.nursery_cell:
+			continue  # ya está en la Guardería (o en la celda que hoy representa a la Guardería)
+		var d := pos[i].distance_to(brood.pos[b])
+		if d < best_d:
+			best_d = d
+			best = b
+	if best < 0:
+		state[i] = State.IDLE
+		target[i] = pos[i]
+		return
+	brood.claimed[best] = i
+	carry_egg[i] = best
+	state[i] = State.CARRY_EGG
+	target[i] = brood.pos[best]
 
 
 # --- Nodrizas y soldados (Fase 1) --------------------------------------------------------------

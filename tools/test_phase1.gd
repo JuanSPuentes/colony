@@ -11,6 +11,7 @@ var _fail := 0
 func _initialize() -> void:
 	_t_queen_lays_eggs()
 	_t_drone_speeds_up_egg_laying()
+	_t_drone_carries_egg_to_nursery()
 	_t_brood_stages()
 	_t_caste_ratio_changes_composition()
 	_t_rooms_have_effect()
@@ -83,6 +84,32 @@ func _t_queen_lays_eggs() -> void:
 
 ## El zángano no hace nada por sí mismo (no explora, no decide, se queda donde nació), pero
 ## mientras esté vivo acelera la puesta de huevos de la reina (liviano a propósito, ver README).
+## Punto 2 de la sesión: el huevo tiene posición física (nace donde está la reina) y el zángano lo
+## carga hasta una celda de Guardería válida.
+func _t_drone_carries_egg_to_nursery() -> void:
+	var sim := _colony(_cfg(0), 40)
+	var nx := sim.cfg.nest_x
+	var y0 := _below_nest(sim)
+	_carve(sim, nx + 3, y0, nx + 10, y0 + 1)  # arranca en el borde de la cámara inicial para que quede conectado
+	_assign(sim, nx + 4, y0, nx + 9, y0 + 1, WorldGrid.Room.NURSERY)  # 12 celdas: de sobra, lejos de la reina
+	sim.rooms.maybe_recompute()
+	_check("la Guardería queda válida y lejos de la reina", sim.rooms.valid[WorldGrid.Room.NURSERY])
+
+	var queen_pos := sim.ants.pos[sim.queen_id]
+	sim.brood.lay_egg(CasteDefs.Caste.WORKER, queen_pos)
+	_check("el huevo nace en la posición de la reina", sim.brood.pos[0] == queen_pos)
+
+	var d := sim.ants.add_ant_at(Vector2i(nx, y0), CasteDefs.Caste.DRONE)
+	_run(sim, 20.0)
+	_check("el zángano reclamó el huevo en algún momento (ya lo soltó o lo sigue cargando)",
+		sim.ants.carry_egg[d] == 0 or sim.brood.pos[0] != queen_pos)
+
+	var nursery_center := sim.ants._cell_index(sim.brood.pos[0])
+	_check("el huevo terminó en una celda de Guardería", sim.world.room[nursery_center] == WorldGrid.Room.NURSERY,
+		"posición final=%s" % sim.brood.pos[0])
+	_check("el zángano lo soltó al llegar (ya no lo carga)", sim.ants.carry_egg[d] == -1)
+
+
 func _t_drone_speeds_up_egg_laying() -> void:
 	var baseline := _colony(_cfg(0), 6)
 	baseline.colony.food = 1000.0
@@ -94,18 +121,24 @@ func _t_drone_speeds_up_egg_laying() -> void:
 	var drone_idx := with_drones.ants.add_ant_at(Vector2i(with_drones.cfg.nest_x, _below_nest(with_drones) - 1), CasteDefs.Caste.DRONE)
 	for k in 2:
 		with_drones.ants.add_ant_at(Vector2i(with_drones.cfg.nest_x, _below_nest(with_drones) - 1), CasteDefs.Caste.DRONE)
-	var start_pos := with_drones.ants.pos[drone_idx]
 	_run(with_drones, with_drones.cfg.egg_interval_s * 3.0)
 	var eggs_with_drones := with_drones.brood.stage.size()
 	_check("con zánganos vivos nacen más huevos en el mismo tiempo", eggs_with_drones > eggs_baseline,
 		"sin zánganos=%d, con 3 zánganos=%d" % [eggs_baseline, eggs_with_drones])
-	_check("el zángano no se mueve ni decide por su cuenta", with_drones.ants.pos[drone_idx] == start_pos)
+	# Cambio intencional (Punto 2 de la sesión): el zángano ya no es del todo inmóvil, su única
+	# tarea es cargar huevos. Sin Guardería designada acá, no tiene adónde llevarlo, pero sí debería
+	# haber ido a buscarlo y quedarse cargándolo (CARRY_EGG) en vez de ignorarlo.
+	var any_carrying := false
+	for i in with_drones.ants.count:
+		if with_drones.ants.caste[i] == CasteDefs.Caste.DRONE and with_drones.ants.carry_egg[i] >= 0:
+			any_carrying = true
+	_check("al menos un zángano termina cargando un huevo", any_carrying, "índice de muestra=%d" % drone_idx)
 
 
 func _t_brood_stages() -> void:
 	var sim := _colony(_cfg(10), 2)
 	sim.colony.food = 500.0
-	sim.brood.lay_egg(CasteDefs.Caste.WORKER)
+	sim.brood.lay_egg(CasteDefs.Caste.WORKER, sim.ants.pos[sim.queen_id])
 	_run(sim, sim.cfg.egg_time_s + 1.0)
 	_check("el huevo pasa a larva", sim.brood.stage[0] == BroodSystem.Stage.LARVA)
 	var before := sim.ants.count
@@ -120,7 +153,7 @@ func _t_brood_stages() -> void:
 		if lonely.ants.caste[a] == CasteDefs.Caste.NURSE:
 			lonely.ants._kill(a, false)
 	lonely.colony.food = 500.0
-	lonely.brood.lay_egg(CasteDefs.Caste.WORKER)
+	lonely.brood.lay_egg(CasteDefs.Caste.WORKER, lonely.ants.pos[lonely.queen_id])
 	_run(lonely, lonely.cfg.egg_time_s + lonely.cfg.larva_time_s * 0.5)
 	_check("sin nodrizas la larva se desarrolla más despacio", lonely.brood.stage[0] == BroodSystem.Stage.LARVA and lonely.brood.timer[0] > sim.cfg.larva_time_s * 0.3)
 
@@ -265,6 +298,7 @@ func _t_colony_wide_defense_by_caste() -> void:
 	_check("la obrera también pelea cuerpo a cuerpo", with_worker.spider.hp < hp0, "vida araña %.1f -> %.1f" % [hp0, with_worker.spider.hp])
 
 	var with_drone := _colony(cfg, 31)
+	with_drone.colony.food = 0.0  # que no ponga un huevo nuevo: aislar el combate pasivo de cargar huevos
 	var d := with_drone.ants.add_ant_at(Vector2i(with_drone.cfg.nest_x, with_drone.cfg.surface_y - 1), CasteDefs.Caste.DRONE)
 	with_drone.cmd_force_spider()
 	with_drone.spider.pos = with_drone.ants.pos[d]

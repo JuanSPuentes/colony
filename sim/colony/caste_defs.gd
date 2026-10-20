@@ -5,17 +5,17 @@ extends RefCounted
 ## Los multiplicadores de la Obrera son 1.0 a propósito: así el comportamiento de la Fase 0
 ## (donde todas las hormigas son obreras) no cambia ni un bit.
 ##
-## Zángano (liviano a propósito, ver README): no explora, no caza, no cava — se queda donde nace
-## (igual que la reina sin orden de moverse) y mientras esté vivo acelera la puesta de huevos
-## (`Colony.tick`, `cfg.drone_egg_speed_bonus`). Sin vuelo nupcial ni otras colonias con las que
-## cruzarse todavía, así que su única función hoy es esa, no la reproducción real de la especie.
+## Zángano: no explora, no caza, no cava, no pelea activo — su única tarea es cargar huevos hasta
+## la Guardería (`AntSystem._think_drone`) y, mientras esté vivo, acelera la puesta de huevos de la
+## reina (`Colony.tick`, `cfg.drone_egg_speed_bonus`, sin tope). Sin vuelo nupcial ni otras colonias
+## con las que cruzarse todavía, así que no hay reproducción real de la especie.
 
 enum Caste { QUEEN, WORKER, NURSE, SOLDIER, DRONE }
 
 const NAMES: Array[String] = ["Reina", "Obrera", "Nodriza", "Soldado", "Zángano"]
-## La reina era 0.0 porque nunca se movía sola; ahora puede caminar cuando el jugador la manda
-## (`cmd_move_queen`), más lenta que el resto por ser la más grande/pesada de las 5 castas.
-const SPEED_MULT: Array[float] = [0.5, 1.0, 0.9, 0.95, 0.0]
+## La reina y el zángano eran 0.0 porque no se movían solos; ahora la reina camina cuando el
+## jugador la manda (`cmd_move_queen`) y el zángano camina solo para cargar huevos.
+const SPEED_MULT: Array[float] = [0.5, 1.0, 0.9, 0.95, 0.7]
 const HP_MULT: Array[float] = [3.0, 1.0, 1.0, 1.8, 0.8]
 ## Comida y agua que consume cada adulta por segundo.
 const FOOD_PER_S: Array[float] = [0.045, 0.018, 0.018, 0.024, 0.02]
