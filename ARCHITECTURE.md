@@ -105,6 +105,7 @@ tools/
   test_phase4.gd   Condición de victoria de la colonia con reina (README sección 11).
   test_phase5.gd   Segunda amenaza: el ciempiés (README sección 12).
   test_phase6.gd   Modo Test: sandbox sin victoria/derrota (README sección 13).
+  test_phase7.gd   Tercera amenaza: la mantis (README sección 14).
   test_phaseN.gd   (la que corresponda cuando llegue)
   test_app_menu.gd Flujo del menú (app/): qué pantalla se ve tras cada botón, que la tuerca
                    durante la partida vuelva al juego (no al menú), que Salir pida confirmación.

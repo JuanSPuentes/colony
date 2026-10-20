@@ -44,6 +44,8 @@ var brood: BroodSystem
 var spider: Spider
 ## Fase 5: segunda amenaza, solo en la colonia con reina (no en el modo incremental, ver `tick()`).
 var centipede: Centipede
+## Fase 7: tercera amenaza, misma condición que `centipede`.
+var mantis: Mantis
 ## Fase 3: false salvo que se llame a `spawn_incremental_start()`.
 var incremental := false
 ## Fase 6: false salvo que se llame a `spawn_test_start()`. Sandbox sin victoria/derrota (ver
@@ -87,6 +89,8 @@ var spiders_spawned := 0
 var spider_next_s := 0.0
 var centipedes_spawned := 0
 var centipede_next_s := 0.0
+var mantises_spawned := 0
+var mantis_next_s := 0.0
 var notifications: Array[String] = []
 const MAX_NOTIFICATIONS := 5
 
@@ -123,6 +127,7 @@ func _init(config: SimConfig, seed_value: int = -1) -> void:
 	brood = BroodSystem.new(self)
 	spider = Spider.new(self)
 	centipede = Centipede.new(self)
+	mantis = Mantis.new(self)
 	econ = IncrementalEconomy.new(self)
 	ants = AntSystem.new(self)
 	ants.add_ants(cfg.initial_ants)
@@ -254,6 +259,7 @@ func tick() -> void:
 		if tick_count % 3 == 0 and era == Era.MATURE:
 			_update_spider(dt * 3.0, cfg.spider_first_population)
 			_update_centipede(dt * 3.0)
+			_update_mantis(dt * 3.0)
 		# Fase 6: el modo Test es un sandbox, nunca termina (ver `spawn_test_start`).
 		if not test_mode:
 			_check_game_over()
@@ -331,6 +337,29 @@ func _update_centipede(step_dt: float) -> void:
 			notify("¡Otro ciempiés se metió por los túneles!")
 	elif centipede_next_s <= 0.0:
 		centipede_next_s = cfg.centipede_interval_s
+
+
+## Fase 7: igual forma que `_update_spider`/`_update_centipede`. `cfg.mantis_first_population`
+## queda entre las otras dos para que la amenaza de superficie escale antes que el ciempiés.
+func _update_mantis(step_dt: float) -> void:
+	if mantis.alive:
+		mantis.step(step_dt)
+		return
+	if mantises_spawned == 0 and ants.alive_count >= cfg.mantis_first_population:
+		mantis.spawn(1.0)
+		mantises_spawned += 1
+		mantis_next_s = cfg.mantis_interval_s
+		notify("¡Una mantis acecha camuflada en la superficie!")
+		return
+	if mantises_spawned > 0:
+		mantis_next_s -= step_dt
+		if mantis_next_s <= 0.0:
+			mantis.spawn(1.0 + cfg.mantis_strength_growth * mantises_spawned)
+			mantises_spawned += 1
+			mantis_next_s = cfg.mantis_interval_s
+			notify("¡Otra mantis acecha camuflada en la superficie!")
+	elif mantis_next_s <= 0.0:
+		mantis_next_s = cfg.mantis_interval_s
 
 
 func _check_game_over() -> void:
@@ -502,6 +531,15 @@ func cmd_force_centipede() -> void:
 		notify("¡Un ciempiés se metió por los túneles!")
 
 
+## Fase 7: para pruebas, igual que `cmd_force_spider`/`cmd_force_centipede`.
+func cmd_force_mantis() -> void:
+	if queen_id >= 0 and not mantis.alive:
+		mantis.spawn(1.0 + cfg.mantis_strength_growth * mantises_spawned)
+		mantises_spawned += 1
+		mantis_next_s = cfg.mantis_interval_s
+		notify("¡Una mantis acecha camuflada en la superficie!")
+
+
 ## Fase 6: para el panel de pruebas, hace desaparecer la amenaza sin dejar cadáver (es una acción
 ## de depuración, no un evento de juego real como morir o huir).
 func cmd_remove_spider() -> void:
@@ -512,6 +550,11 @@ func cmd_remove_spider() -> void:
 func cmd_remove_centipede() -> void:
 	centipede.alive = false
 	centipede.state = Centipede.State.GONE
+
+
+func cmd_remove_mantis() -> void:
+	mantis.alive = false
+	mantis.state = Mantis.State.GONE
 
 
 ## Resumen numérico del estado: sirve para comprobar la reproducibilidad.

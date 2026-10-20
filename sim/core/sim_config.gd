@@ -110,6 +110,7 @@ extends Resource
 @export var corpse_food_value := 6.0
 @export var corpse_food_value_spider := 15.0
 @export var corpse_food_value_centipede := 20.0
+@export var corpse_food_value_mantis := 18.0
 @export var corpse_decay_s := 90.0
 @export var storage_food_per_cell := 15.0
 @export var storage_water_per_cell := 15.0
@@ -189,6 +190,24 @@ extends Resource
 @export var centipede_first_population := 45
 @export var centipede_interval_s := 180.0
 @export var centipede_strength_growth := 0.25
+
+## Fase 7: tercera amenaza. A diferencia de la araña (caza activa en superficie) y el ciempiés
+## (persigue por los túneles), la mantis se queda quieta y camuflada en un punto fijo: nunca
+## persigue, pero si algo se acerca le pega mucho más fuerte. Números sin playtesting todavía.
+@export_group("Fase 7: mantis")
+@export var mantis_hp := 45.0
+## Notablemente más alto que `spider_damage_per_s`/`centipede_damage_per_s`: el golpe de una
+## emboscada que no persigue tiene que doler.
+@export var mantis_damage_per_s := 16.0
+## Corto a propósito: la mantis no "ve" de lejos como la araña, solo reacciona a lo que ya está
+## encima suyo.
+@export var mantis_strike_range_px := 7.0
+@export var mantis_flee_hp_pct := 0.3
+## Entre `spider_first_population` y `centipede_first_population`: un peligro de superficie que
+## aparece antes de que la colonia cave tan hondo como para toparse con el ciempiés.
+@export var mantis_first_population := 32
+@export var mantis_interval_s := 165.0
+@export var mantis_strength_growth := 0.25
 
 @export_group("Fase 1: eras")
 @export var era2_population := 20

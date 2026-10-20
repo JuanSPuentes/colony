@@ -113,6 +113,15 @@ static func to_dict(sim: Simulation) -> Dictionary:
 	d["centipedes_spawned"] = sim.centipedes_spawned
 	d["centipede_next_s"] = sim.centipede_next_s
 
+	# Fase 7: tercera amenaza. Nunca se mueve sola (sin pathing, sin caché que guardar).
+	d["mantis"] = {
+		"pos": _v2(sim.mantis.pos), "state": sim.mantis.state,
+		"hp": sim.mantis.hp, "max_hp": sim.mantis.max_hp,
+		"target_ant": sim.mantis.target_ant, "alive": sim.mantis.alive,
+	}
+	d["mantises_spawned"] = sim.mantises_spawned
+	d["mantis_next_s"] = sim.mantis_next_s
+
 	var ants := sim.ants
 	d["ants"] = {
 		"count": ants.count, "alive_count": ants.alive_count,
@@ -278,6 +287,18 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 		sim.centipede.max_hp = float(ccd["max_hp"])
 		sim.centipede.target_ant = int(ccd["target_ant"])
 		sim.centipede.alive = ccd["alive"]
+
+	# Fase 7: ausente en guardados de antes de esta fase; igual patrón que el ciempiés arriba.
+	sim.mantises_spawned = int(d.get("mantises_spawned", 0))
+	sim.mantis_next_s = float(d.get("mantis_next_s", 0.0))
+	if d.has("mantis"):
+		var mnd: Dictionary = d["mantis"]
+		sim.mantis.pos = _to_v2(mnd["pos"])
+		sim.mantis.state = int(mnd["state"])
+		sim.mantis.hp = float(mnd["hp"])
+		sim.mantis.max_hp = float(mnd["max_hp"])
+		sim.mantis.target_ant = int(mnd["target_ant"])
+		sim.mantis.alive = mnd["alive"]
 
 	var ad: Dictionary = d["ants"]
 	var ants := sim.ants

@@ -49,6 +49,7 @@ var overlay: OverlayView
 var ant_renderer: AntRenderer
 var spider_view: SpiderView
 var centipede_view: CentipedeView
+var mantis_view: MantisView
 var day_night_view: DayNightView
 var hud: Hud
 var tutorial: TutorialView
@@ -122,8 +123,9 @@ func _ready() -> void:
 	ant_renderer = AntRenderer.new()
 	spider_view = SpiderView.new()
 	centipede_view = CentipedeView.new()
+	mantis_view = MantisView.new()
 	day_night_view = DayNightView.new()
-	for n in [terrain_view, plant_view, corpse_view, overlay, ant_renderer, spider_view, centipede_view, day_night_view]:
+	for n in [terrain_view, plant_view, corpse_view, overlay, ant_renderer, spider_view, centipede_view, mantis_view, day_night_view]:
 		world_vp.add_child(n)
 	camera = Camera2D.new()
 	world_vp.add_child(camera)
@@ -177,6 +179,7 @@ func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> v
 	ant_renderer.setup(sim)
 	spider_view.setup(sim)
 	centipede_view.setup(sim)
+	mantis_view.setup(sim)
 	_acc = 0.0
 	_painting = false
 	if sim.queen_id >= 0 and sim.ants.alive[sim.queen_id] == 1:

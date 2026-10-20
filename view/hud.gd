@@ -348,6 +348,8 @@ func _build_test_panel(root: Control) -> void:
 	_test_btn(box, "Quitar araña", func() -> void: _m.sim.cmd_remove_spider())
 	_test_btn(box, "Aparecer ciempiés", func() -> void: _m.sim.cmd_force_centipede())
 	_test_btn(box, "Quitar ciempiés", func() -> void: _m.sim.cmd_remove_centipede())
+	_test_btn(box, "Aparecer mantis", func() -> void: _m.sim.cmd_force_mantis())
+	_test_btn(box, "Quitar mantis", func() -> void: _m.sim.cmd_remove_mantis())
 	_test_btn(box, "+5 Obreras", func() -> void: _m.sim.cmd_add_caste_ants(CasteDefs.Caste.WORKER, 5))
 	_test_btn(box, "+5 Guerreras", func() -> void: _m.sim.cmd_add_caste_ants(CasteDefs.Caste.SOLDIER, 5))
 	_test_btn(box, "+5 Zánganos", func() -> void: _m.sim.cmd_add_caste_ants(CasteDefs.Caste.DRONE, 5))
@@ -625,6 +627,11 @@ func update_info(m: Node) -> void:
 				Centipede.State.ATTACK: "atacando", Centipede.State.RETREAT: "huyendo"}
 			threat_parts.append("Ciempiés %s (%d%%)" % [cent_states.get(sim.centipede.state, "cerca"),
 				int(100.0 * sim.centipede.hp / maxf(sim.centipede.max_hp, 0.01))])
+		if sim.mantis.alive:
+			var mantis_states := {Mantis.State.HIDDEN: "camuflada", Mantis.State.ATTACK: "atacando",
+				Mantis.State.RETREAT: "huyendo"}
+			threat_parts.append("Mantis %s (%d%%)" % [mantis_states.get(sim.mantis.state, "cerca"),
+				int(100.0 * sim.mantis.hp / maxf(sim.mantis.max_hp, 0.01))])
 		_threats.text = " · ".join(threat_parts) if not threat_parts.is_empty() else "Ninguna a la vista"
 
 	if sim.queen_id >= 0:

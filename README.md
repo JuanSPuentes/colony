@@ -37,6 +37,7 @@ convención de una prueba por fase. Existe justo para que el proyecto no se vuel
 11. [Fase 4: condición de victoria](#11-fase-4-condición-de-victoria)
 12. [Fase 5: el ciempiés](#12-fase-5-el-ciempiés)
 13. [Fase 6: el modo Test](#13-fase-6-el-modo-test)
+14. [Fase 7: la mantis](#14-fase-7-la-mantis)
 
 ---
 
@@ -333,6 +334,7 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | `Godot --headless --path . --script tools/test_phase4.gd` | Condición de victoria de la colonia con reina (sección 11): gana al sobrevivir `victory_survive_s` en Colonia madura con la reina viva, no gana antes de tiempo, morir la reina antes del umbral sigue siendo derrota (no victoria), el modo incremental nunca la dispara, guardar/cargar conserva el progreso hacia la victoria. **7 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase5.gd` | El ciempiés, segunda amenaza (sección 12): no aparece antes del umbral de población, aparece al cruzarlo, encuentra y daña una hormiga bajo tierra (no solo en superficie, a diferencia de la araña), toda la colonia lo ataca igual que a la araña, muere y deja cadáver recolectable, huye y desaparece con poca vida, el modo incremental nunca lo dispara, guardar/cargar conserva su estado. |
 | `Godot --headless --path . --script tools/test_phase6.gd` | El modo Test (sección 13): composición fija de 50 hormigas al arrancar, empieza de día, la reina puede morir sin terminar la partida, los comandos de lluvia/araña/ciempiés del panel de pruebas, agregar hormigas de cualquier casta a voluntad, los otros dos modos no se ven afectados, guardar/cargar conserva `test_mode`. |
+| `Godot --headless --path . --script tools/test_phase7.gd` | La mantis, tercera amenaza (sección 14): no aparece antes del umbral, aparece al cruzarlo, nunca se mueve, no reacciona a una hormiga lejos pero sí a una que entra en `mantis_strike_range_px`, pega más fuerte que la araña, toda la colonia la ataca igual, muere y deja cadáver, huye con poca vida, el modo incremental nunca la dispara, guardar/cargar conserva su estado. |
 | `Godot --headless --path . --script tools/test_app_menu.gd` | El menú (`app/`): arranca mostrando el menú, Opciones desde el menú vuelve al menú, Opciones desde la tuerca en partida vuelve a la partida (pausada) y no al menú, Juego normal arranca en modo incremental (comida/compra), Modo infinito arranca en modo Historia con la colonia completa, Test arranca el modo sandbox con 50 hormigas, F5 conserva el modo, volumen/brillo se guardan, Salir pide confirmación en vez de cerrar directo. |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
@@ -586,3 +588,29 @@ en `tick()`).
   una viva, igual que la tecla F10 de siempre.
 - **Guardado:** `d["test_mode"]` con `d.get(..., false)`, igual patrón que `incremental` en la
   Fase 3.
+
+## 14. Fase 7: la mantis
+
+Tercera amenaza de la colonia con reina (`sim/threats/mantis.gd`). A diferencia de la araña (caza
+activa en superficie) y el ciempiés (persigue por los túneles), la mantis **se queda quieta y
+camuflada** en un punto fijo de la superficie — nunca se mueve, nunca persigue — y si una hormiga
+pasa lo bastante cerca, pega mucho más fuerte que las otras dos (`cfg.mantis_damage_per_s`).
+
+- **Aparición:** mismo mecanismo que la araña y el ciempiés (`cfg.mantis_first_population`,
+  `cfg.mantis_interval_s`, `cfg.mantis_strength_growth`), con un umbral entre el de la araña y el
+  del ciempiés: un peligro de superficie que aparece antes de que la colonia cave tan hondo. Solo
+  en la colonia con reina, igual que las otras dos.
+- **Sin pathing de ningún tipo:** `spawn()` elige una celda de superficie fija cerca del nido
+  (mismo rango que usa `_place_plants()` para las plantas) una sola vez; mientras está `HIDDEN` o
+  `ATTACK` nunca cambia de posición. Solo reacciona (`_find_prey`) a una obrera que entra en
+  `cfg.mantis_strike_range_px` — corto a propósito, no "ve" de lejos como la araña.
+- **Huida:** si la hieren hasta bajar de `cfg.mantis_flee_hp_pct`, sí puede escapar — reusa la
+  misma huida simple de `Spider.State.RETREAT` (camina hacia el borde del mapa y desaparece). No
+  persigue nunca, pero tampoco se queda a morir si la descubren.
+- **Defensa de la colmena y saqueo, gratis:** `AntSystem._nearest_threat()` ahora compara las tres
+  amenazas (`cfg.corpse_food_value_mantis` para el cadáver); nada más se tocó.
+- **HUD:** la línea de "Amenazas" puede mostrar las tres a la vez, separadas por " · ".
+- **Guardado:** `d["mantis"]` análogo a `d["spider"]`/`d["centipede"]`.
+- **Simplificación deliberada:** números de balance sin playtesting todavía, igual que las otras
+  dos amenazas. Sigue sin soporte para "2 mantis a la vez" (una instancia por tipo, ver sección
+  13).

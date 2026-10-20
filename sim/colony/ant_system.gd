@@ -635,15 +635,15 @@ func _think_nurse(i: int, cx: int, cy: int, ci: int) -> void:
 
 
 ## La amenaza activa más cercana dentro de `max_range`, o null si no hay ninguna al alcance.
-## Fase 5: ya hay dos (araña, ciempiés) y esto sigue siendo lo único que hace falta tocar para que
-## toda la colonia (y el soldado) reaccione a una amenaza nueva — el resto de
+## Fase 7: ya hay tres (araña, ciempiés, mantis) y esto sigue siendo lo único que hace falta tocar
+## para que toda la colonia (y el soldado) reaccione a una amenaza nueva — el resto de
 ## `_think_defend`/`_think_soldier` ya es genérico (solo necesita `.pos`, `.alive`, `.take_damage()`).
-## Sin tipar el retorno a propósito: cada amenaza es una clase distinta (`Spider`, `Centipede`) que
-## no comparte una clase base, solo la misma forma (duck typing).
+## Sin tipar el retorno a propósito: cada amenaza es una clase distinta (`Spider`, `Centipede`,
+## `Mantis`) que no comparte una clase base, solo la misma forma (duck typing).
 func _nearest_threat(p: Vector2, max_range: float):
 	var best = null
 	var best_d := max_range
-	for t in [sim.spider, sim.centipede]:
+	for t in [sim.spider, sim.centipede, sim.mantis]:
 		if t != null and t.alive:
 			var d: float = p.distance_to(t.pos)
 			if d <= best_d:
