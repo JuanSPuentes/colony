@@ -555,13 +555,22 @@ func update_info(m: Node) -> void:
 				weather = "Sin novedades (lluvia en %d s)" % int(eta)
 	_weather.text = weather
 
-	# --- Amenazas: quién anda rondando la colonia (hoy solo la araña).
-	if sim.queen_id >= 0 and sim.spider.alive:
-		var state_names := {Spider.State.SEARCH: "buscando presas", Spider.State.ATTACK: "atacando",
-			Spider.State.SIEGE: "en la entrada", Spider.State.RETREAT: "huyendo"}
-		_threats.text = "Araña %s (%d%%)" % [state_names.get(sim.spider.state, "cerca"), int(100.0 * sim.spider.hp / maxf(sim.spider.max_hp, 0.01))]
-	else:
-		_threats.text = "Ninguna a la vista"
+	# --- Amenazas: quién anda rondando la colonia. Fase 5: ya puede haber dos a la vez (araña y
+	# ciempiés), se listan juntas en la misma línea en vez de sumar una línea por amenaza (mismo
+	# espíritu que la nota de arriba sobre no concatenar secciones nuevas sin pensar el layout).
+	if sim.queen_id >= 0:
+		var threat_parts: Array[String] = []
+		if sim.spider.alive:
+			var spider_states := {Spider.State.SEARCH: "buscando presas", Spider.State.ATTACK: "atacando",
+				Spider.State.SIEGE: "en la entrada", Spider.State.RETREAT: "huyendo"}
+			threat_parts.append("Araña %s (%d%%)" % [spider_states.get(sim.spider.state, "cerca"),
+				int(100.0 * sim.spider.hp / maxf(sim.spider.max_hp, 0.01))])
+		if sim.centipede.alive:
+			var cent_states := {Centipede.State.SEARCH: "buscando presas", Centipede.State.CHASE: "persiguiendo",
+				Centipede.State.ATTACK: "atacando", Centipede.State.RETREAT: "huyendo"}
+			threat_parts.append("Ciempiés %s (%d%%)" % [cent_states.get(sim.centipede.state, "cerca"),
+				int(100.0 * sim.centipede.hp / maxf(sim.centipede.max_hp, 0.01))])
+		_threats.text = " · ".join(threat_parts) if not threat_parts.is_empty() else "Ninguna a la vista"
 
 	if sim.queen_id >= 0:
 		var c := sim.ants.count_by_caste([CasteDefs.Caste.WORKER, CasteDefs.Caste.NURSE, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE])

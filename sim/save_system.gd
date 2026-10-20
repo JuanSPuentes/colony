@@ -100,6 +100,17 @@ static func to_dict(sim: Simulation) -> Dictionary:
 		"alive": sim.spider.alive,
 	}
 
+	# Fase 5: segunda amenaza. `_path_dist`/`_path_target_cell`/`_retarget_at` no se guardan: son
+	# caché de pathing, se recalculan solos en el primer tick tras cargar (igual que los campos de
+	# distancia del mundo, más abajo).
+	d["centipede"] = {
+		"pos": _v2(sim.centipede.pos), "state": sim.centipede.state,
+		"hp": sim.centipede.hp, "max_hp": sim.centipede.max_hp,
+		"target_ant": sim.centipede.target_ant, "alive": sim.centipede.alive,
+	}
+	d["centipedes_spawned"] = sim.centipedes_spawned
+	d["centipede_next_s"] = sim.centipede_next_s
+
 	var ants := sim.ants
 	d["ants"] = {
 		"count": ants.count, "alive_count": ants.alive_count,
@@ -250,6 +261,19 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	sim.spider.target_ant = int(sd["target_ant"])
 	sim.spider.siege_t = float(sd["siege_t"])
 	sim.spider.alive = sd["alive"]
+
+	# Fase 5: ausente en guardados de antes de esta fase; el ciempiés queda "nunca apareció",
+	# igual que si la partida nunca hubiera tenido esta amenaza (ver README sección 5/9).
+	sim.centipedes_spawned = int(d.get("centipedes_spawned", 0))
+	sim.centipede_next_s = float(d.get("centipede_next_s", 0.0))
+	if d.has("centipede"):
+		var ccd: Dictionary = d["centipede"]
+		sim.centipede.pos = _to_v2(ccd["pos"])
+		sim.centipede.state = int(ccd["state"])
+		sim.centipede.hp = float(ccd["hp"])
+		sim.centipede.max_hp = float(ccd["max_hp"])
+		sim.centipede.target_ant = int(ccd["target_ant"])
+		sim.centipede.alive = ccd["alive"]
 
 	var ad: Dictionary = d["ants"]
 	var ants := sim.ants

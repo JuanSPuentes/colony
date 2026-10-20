@@ -195,7 +195,7 @@ func tick() -> void:
 			# Sigue sin pelear activo (no abandona la tarea por una amenaza, solo devuelve el golpe
 			# si lo alcanzan donde está: defensa pasiva, igual que siempre). Pero ya no es del todo
 			# inmóvil: su única tarea es cargar huevos hasta la Guardería (ver `_think_drone`).
-			var threat := _nearest_threat(p, cfg.soldier_melee_range_px)
+			var threat = _nearest_threat(p, cfg.soldier_melee_range_px)
 			if threat != null:
 				threat.take_damage(CasteDefs.DAMAGE_PER_S[CasteDefs.Caste.DRONE] * dt)
 			if now >= next_think[i]:
@@ -353,7 +353,7 @@ func _think(i: int, cx: int, cy: int, ci: int) -> void:
 	# del jugador sin amenaza real detrás) pero no sobre ahogarse. La Nodriza se queda cuidando la
 	# cría; el Soldado sigue con su propio `_think_soldier` (ya reacciona a esto de siempre).
 	if caste[i] != CasteDefs.Caste.NURSE and caste[i] != CasteDefs.Caste.SOLDIER and state[i] != State.FLEE_WATER:
-		var threat := _nearest_threat(pos[i], cfg.soldier_sight_px)
+		var threat = _nearest_threat(pos[i], cfg.soldier_sight_px)
 		if threat != null:
 			if state[i] != State.ATTACK:
 				_release_job(i)
@@ -634,21 +634,29 @@ func _think_nurse(i: int, cx: int, cy: int, ci: int) -> void:
 	AntCasteAI.think_nurse(self, i, cx, cy, ci)
 
 
-## La amenaza activa más cercana dentro de `max_range`, o null si no hay ninguna al alcance. Hoy
-## solo existe la araña; cuando se sumen más insectos (ciempiés, mantis...) esto es lo único que
-## hay que tocar para que toda la colonia (y el soldado) también reaccione a ellos — el resto de
+## La amenaza activa más cercana dentro de `max_range`, o null si no hay ninguna al alcance.
+## Fase 5: ya hay dos (araña, ciempiés) y esto sigue siendo lo único que hace falta tocar para que
+## toda la colonia (y el soldado) reaccione a una amenaza nueva — el resto de
 ## `_think_defend`/`_think_soldier` ya es genérico (solo necesita `.pos`, `.alive`, `.take_damage()`).
-func _nearest_threat(p: Vector2, max_range: float) -> Spider:
-	var s := sim.spider
-	if s != null and s.alive and p.distance_to(s.pos) <= max_range:
-		return s
-	return null
+## Sin tipar el retorno a propósito: cada amenaza es una clase distinta (`Spider`, `Centipede`) que
+## no comparte una clase base, solo la misma forma (duck typing).
+func _nearest_threat(p: Vector2, max_range: float):
+	var best = null
+	var best_d := max_range
+	for t in [sim.spider, sim.centipede]:
+		if t != null and t.alive:
+			var d: float = p.distance_to(t.pos)
+			if d <= best_d:
+				best_d = d
+				best = t
+	return best
 
 
 ## Obrera y Zángano (en combate activo; el Zángano además pelea pasivo si lo alcanzan, ver
 ## `tick()`) defendiendo la colmena: igual de simple que el Soldado (acercarse y pegar), pero con
 ## el daño de su propia casta (`CasteDefs.DAMAGE_PER_S`), bastante menor. Decisión en `AntCasteAI`.
-func _think_defend(i: int, cx: int, cy: int, ci: int, threat: Spider, think_dt: float) -> void:
+## `threat` sin tipar: puede ser `Spider` o `Centipede` (ver `_nearest_threat`).
+func _think_defend(i: int, cx: int, cy: int, ci: int, threat, think_dt: float) -> void:
 	AntCasteAI.think_defend(self, i, cx, cy, ci, threat, think_dt)
 
 

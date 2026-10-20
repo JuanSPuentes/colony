@@ -42,6 +42,8 @@ var rooms: RoomSystem
 var colony: Colony
 var brood: BroodSystem
 var spider: Spider
+## Fase 5: segunda amenaza, solo en la colonia con reina (no en el modo incremental, ver `tick()`).
+var centipede: Centipede
 ## Fase 3: false salvo que se llame a `spawn_incremental_start()`.
 var incremental := false
 var econ: IncrementalEconomy
@@ -80,6 +82,8 @@ var game_over_reason := ""
 var victory := false
 var spiders_spawned := 0
 var spider_next_s := 0.0
+var centipedes_spawned := 0
+var centipede_next_s := 0.0
 var notifications: Array[String] = []
 const MAX_NOTIFICATIONS := 5
 
@@ -115,6 +119,7 @@ func _init(config: SimConfig, seed_value: int = -1) -> void:
 	colony = Colony.new(cfg)
 	brood = BroodSystem.new(self)
 	spider = Spider.new(self)
+	centipede = Centipede.new(self)
 	econ = IncrementalEconomy.new(self)
 	ants = AntSystem.new(self)
 	ants.add_ants(cfg.initial_ants)
@@ -226,6 +231,7 @@ func tick() -> void:
 		_update_era()
 		if tick_count % 3 == 0 and era == Era.MATURE:
 			_update_spider(dt * 3.0, cfg.spider_first_population)
+			_update_centipede(dt * 3.0)
 		_check_game_over()
 		_check_victory()
 
@@ -277,6 +283,30 @@ func _update_spider(step_dt: float, first_population: int) -> void:
 			notify("¡Otra araña acecha en la superficie!")
 	elif spider_next_s <= 0.0:
 		spider_next_s = cfg.spider_interval_s
+
+
+## Fase 5: igual forma que `_update_spider`, solo para la colonia con reina (no en incremental,
+## igual que la condición de victoria — ver `tick()`): el ciempiés aparece después
+## (`cfg.centipede_first_population` > `cfg.spider_first_population`) para que la amenaza escale.
+func _update_centipede(step_dt: float) -> void:
+	if centipede.alive:
+		centipede.step(step_dt)
+		return
+	if centipedes_spawned == 0 and ants.alive_count >= cfg.centipede_first_population:
+		centipede.spawn(1.0)
+		centipedes_spawned += 1
+		centipede_next_s = cfg.centipede_interval_s
+		notify("¡Un ciempiés se metió por los túneles!")
+		return
+	if centipedes_spawned > 0:
+		centipede_next_s -= step_dt
+		if centipede_next_s <= 0.0:
+			centipede.spawn(1.0 + cfg.centipede_strength_growth * centipedes_spawned)
+			centipedes_spawned += 1
+			centipede_next_s = cfg.centipede_interval_s
+			notify("¡Otro ciempiés se metió por los túneles!")
+	elif centipede_next_s <= 0.0:
+		centipede_next_s = cfg.centipede_interval_s
 
 
 func _check_game_over() -> void:
@@ -421,6 +451,15 @@ func cmd_force_spider() -> void:
 		spiders_spawned += 1
 		spider_next_s = cfg.spider_interval_s  # si no, la siguiente se agenda casi de inmediato
 		notify("¡Una araña acecha en la superficie!")
+
+
+## Fase 5: para pruebas, igual que `cmd_force_spider`.
+func cmd_force_centipede() -> void:
+	if queen_id >= 0 and not centipede.alive:
+		centipede.spawn(1.0 + cfg.centipede_strength_growth * centipedes_spawned)
+		centipedes_spawned += 1
+		centipede_next_s = cfg.centipede_interval_s
+		notify("¡Un ciempiés se metió por los túneles!")
 
 
 ## Resumen numérico del estado: sirve para comprobar la reproducibilidad.

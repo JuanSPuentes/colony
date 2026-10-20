@@ -109,6 +109,7 @@ extends Resource
 ## de un solo viaje y desaparecen solos si nadie los recoge antes de `corpse_decay_s`.
 @export var corpse_food_value := 6.0
 @export var corpse_food_value_spider := 15.0
+@export var corpse_food_value_centipede := 20.0
 @export var corpse_decay_s := 90.0
 @export var storage_food_per_cell := 15.0
 @export var storage_water_per_cell := 15.0
@@ -169,6 +170,25 @@ extends Resource
 ## Modo incremental: dispara igual que `spider_first_population`, pero con su propio umbral
 ## porque ese modo arranca y crece con colonias mucho más chicas (ver README sección 9b).
 @export var inc_spider_first_population := 15
+
+## Fase 5: segunda amenaza, entra por los túneles ya cavados (a diferencia de la araña, que solo
+## caza en superficie). Números sin playtesting todavía, primera estimación (ver README sección
+## de simplificaciones deliberadas de esta fase).
+@export_group("Fase 5: ciempiés")
+@export var centipede_hp := 55.0
+@export var centipede_speed := 2.2
+@export var centipede_damage_per_s := 9.0
+@export var centipede_bite_range := 6.0
+## A diferencia de `spider_sight_px`, esto ve hormigas bajo tierra también, no solo en superficie.
+@export var centipede_sight_px := 110.0
+@export var centipede_flee_hp_pct := 0.3
+## Cada cuántos ticks recalcula el camino (BFS de grilla completa) hacia la presa actual, en vez de
+## cada tick: el mismo mecanismo que `cmd_move_queen`, pero perseguido en vez de pedido una vez.
+@export var centipede_retarget_ticks := 10
+## Aparece después que la araña (umbral mayor) para que la amenaza escale con el tiempo.
+@export var centipede_first_population := 45
+@export var centipede_interval_s := 180.0
+@export var centipede_strength_growth := 0.25
 
 @export_group("Fase 1: eras")
 @export var era2_population := 20

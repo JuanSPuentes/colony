@@ -14,8 +14,14 @@ sim/
               simples (como la Fase 0) seguiría funcionando.
   colony/     La colonia como organismo: castas, hormigas, cría, cámaras, economía. Depende de
               `core/`, nunca al revés.
-  threats/    Amenazas externas a la colonia (hoy la araña). Cada una es una clase independiente
-              con su propio `step()`; no comparten código entre sí más allá de leer `core/`.
+  threats/    Amenazas externas a la colonia (araña, ciempiés). Cada una es una clase independiente
+              con su propio `step()`; no comparten código entre sí más allá de leer `core/`. Para
+              que toda la colonia reaccione a una amenaza nueva basta sumarla a
+              `AntSystem._nearest_threat()` (duck typing: solo necesita `.pos`/`.alive`/
+              `.take_damage()`), ver Fase 5. Si la amenaza persigue de verdad (no solo ronda la
+              entrada como la araña), reusa `NestDistanceField.bfs_from()` para el camino, cacheado
+              y recalculado cada N ticks (no cada tick: es un BFS de grilla completa) — ver
+              `sim/threats/centipede.gd`, mismo mecanismo que usa `cmd_move_queen`.
   simulation.gd   El único archivo que conoce TODOS los dominios: los crea, fija el orden del
               tick y expone los `cmd_*` que llama la UI. No le pongas reglas de juego aquí:
               `tick()` debe seguir leyéndose como una lista de pasos, no como lógica.
@@ -97,6 +103,7 @@ tools/
   test_phase3.gd   Modo incremental (`spawn_incremental_start`): economía de comida, compras,
                    auto-compra, día y noche, sin araña.
   test_phase4.gd   Condición de victoria de la colonia con reina (README sección 11).
+  test_phase5.gd   Segunda amenaza: el ciempiés (README sección 12).
   test_phaseN.gd   (la que corresponda cuando llegue)
   test_app_menu.gd Flujo del menú (app/): qué pantalla se ve tras cada botón, que la tuerca
                    durante la partida vuelva al juego (no al menú), que Salir pida confirmación.

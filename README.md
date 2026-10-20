@@ -35,6 +35,7 @@ convención de una prueba por fase. Existe justo para que el proyecto no se vuel
 9. [Simplificaciones deliberadas del guardado (Fase 2)](#9-simplificaciones-deliberadas-del-guardado-fase-2)
 10. [Hoja de ruta: qué falta de la Fase 2](#10-hoja-de-ruta-qué-falta-de-la-fase-2)
 11. [Fase 4: condición de victoria](#11-fase-4-condición-de-victoria)
+12. [Fase 5: el ciempiés](#12-fase-5-el-ciempiés)
 
 ---
 
@@ -230,7 +231,7 @@ main.gd              Arma la vista, el HUD, crea/reinicia la Simulation; bootabl
 sim/                  SIMULACIÓN. Sin dibujo, sin UI, sin clases Node (solo RefCounted)
   core/                 Terreno, feromonas, agua, campos de distancia, configuración
   colony/               Castas, hormigas, cría, cámaras, economía (clásica e incremental)
-  threats/              Enemigos (hoy, la araña)
+  threats/              Enemigos (araña, ciempiés)
   simulation.gd         El orquestador: conoce todos los dominios, fija el orden del tick
   save_system.gd        Guardado/carga (Fase 2): convierte la Simulation a/desde JSON
 view/                 Render, HUD y entrada de mouse
@@ -329,6 +330,7 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | `Godot --headless --path . --script tools/test_phase2.gd` | Guardado y carga: la huella no cambia al guardar y cargar (en memoria y desde un archivo real), la partida sigue igual tras cargar como si nunca se hubiera guardado, un archivo inexistente no revienta, funciona con y sin reina, las cámaras y la lluvia en curso sobreviven, la posición del huevo y quién lo está cargando sobreviven. **12 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase3.gd` | Modo incremental: colonia inicial exacta, sin araña ni eras, día y noche, hojas → comida, compras y precios crecientes, el huevo comprado nace de esa casta, auto-compra con reserva, rebrote solo de día, la colonia crece sola 6 min con lluvia sin morir, guardado y carga (también por JSON), determinismo. **28 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase4.gd` | Condición de victoria de la colonia con reina (sección 11): gana al sobrevivir `victory_survive_s` en Colonia madura con la reina viva, no gana antes de tiempo, morir la reina antes del umbral sigue siendo derrota (no victoria), el modo incremental nunca la dispara, guardar/cargar conserva el progreso hacia la victoria. **7 pruebas.** |
+| `Godot --headless --path . --script tools/test_phase5.gd` | El ciempiés, segunda amenaza (sección 12): no aparece antes del umbral de población, aparece al cruzarlo, encuentra y daña una hormiga bajo tierra (no solo en superficie, a diferencia de la araña), toda la colonia lo ataca igual que a la araña, muere y deja cadáver recolectable, huye y desaparece con poca vida, el modo incremental nunca lo dispara, guardar/cargar conserva su estado. |
 | `Godot --headless --path . --script tools/test_app_menu.gd` | El menú (`app/`): arranca mostrando el menú, Opciones desde el menú vuelve al menú, Opciones desde la tuerca en partida vuelve a la partida (pausada) y no al menú, Juego normal arranca en modo incremental (comida/compra), Modo infinito arranca en modo Historia con la colonia completa, F5 conserva el modo, volumen/brillo se guardan, Salir pide confirmación en vez de cerrar directo. **11 pruebas.** |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
@@ -523,3 +525,35 @@ y nunca se construyó porque la Fase 3 real terminó siendo el modo incremental.
   nunca ganó).
 
 Ver sección 9c para lo que se dejó deliberadamente simplificado.
+
+## 12. Fase 5: el ciempiés
+
+Segunda amenaza de la colonia con reina (`sim/threats/centipede.gd`). A diferencia de la araña
+(`Spider`, que solo caza en la superficie y asedia la entrada desde afuera), el ciempiés **entra
+por los túneles ya cavados** y puede alcanzar hormigas bajo tierra — es su único rasgo realmente
+distinto, pensado así a propósito para no ser "la araña con otro sprite".
+
+- **Aparición:** igual mecanismo que la araña (`cfg.centipede_first_population`,
+  `cfg.centipede_interval_s`, `cfg.centipede_strength_growth`), con un umbral de población mayor
+  para que aparezca después y la amenaza escale con el tiempo. Solo en la colonia con reina (no en
+  el modo incremental, igual que la condición de victoria de la Fase 4): `Simulation.tick()` llama
+  `_update_centipede()` en la misma rama `elif queen_id >= 0:`.
+- **Persecución:** reusa `NestDistanceField.bfs_from()` (el mismo BFS que ya usaba
+  `cmd_move_queen`/`AntCasteAI.think_queen` para que la reina camine hasta donde la manda el
+  jugador) para encontrar un camino real por los túneles hasta la hormiga más cercana. Se recalcula
+  cada `cfg.centipede_retarget_ticks` ticks, no cada tick (es un BFS de grilla completa).
+- **Huida:** cuando su vida baja de `cfg.centipede_flee_hp_pct`, sigue `sim.fields.surface_dist` (ya
+  mantenido solo, sin BFS propio) de vuelta a la superficie y desaparece al llegar — sin estado de
+  asedio como la araña, porque ya entró, no necesita quedarse rondando la entrada.
+- **Defensa de la colmena, gratis:** `AntSystem._nearest_threat()` (el único punto que hacía falta
+  tocar, como ya preveía el comentario de esa función) ahora compara la araña y el ciempiés y
+  devuelve la más cercana; el resto del combate (`_think_defend`, `_think_soldier`) no se tocó, ya
+  era genérico. El saqueo de cadáveres tampoco (`cfg.corpse_food_value_centipede`, reusa
+  `spawn_corpse`).
+- **HUD:** la línea de "Amenazas" ahora puede mostrar las dos a la vez, separadas por " · ".
+- **Guardado:** `d["centipede"]` análogo a `d["spider"]`; `d.get(..., default)` para que un
+  guardado de antes de esta fase cargue con el ciempiés en "nunca apareció", igual que si la
+  partida nunca hubiera tenido esta amenaza.
+- **Simplificación deliberada:** los números de balance (`cfg.centipede_*`) son una primera
+  estimación sin playtesting, igual que pasó con `victory_survive_s` en la Fase 4 — ajustarlos es
+  cambiar un número en `SimConfig`, no lógica.

@@ -85,7 +85,9 @@ static func think_nurse(ants, i: int, cx: int, cy: int, ci: int) -> void:
 ## Obrera y Zángano (en combate activo; el Zángano además pelea pasivo si lo alcanzan, ver
 ## `AntSystem.tick()`) defendiendo la colmena: igual de simple que el Soldado (acercarse y pegar),
 ## pero con el daño de su propia casta (`CasteDefs.DAMAGE_PER_S`), bastante menor.
-static func think_defend(ants, i: int, cx: int, cy: int, ci: int, threat: Spider, think_dt: float) -> void:
+## `threat` no se tipa: puede ser `Spider` o `Centipede` (ver `AntSystem._nearest_threat`), que no
+## comparten clase base, solo la misma forma (`.pos`, `.take_damage()`).
+static func think_defend(ants, i: int, cx: int, cy: int, ci: int, threat, think_dt: float) -> void:
 	var sim: Simulation = ants.sim
 	var cfg := sim.cfg
 	var d: float = ants.pos[i].distance_to(threat.pos)
@@ -100,16 +102,16 @@ static func think_defend(ants, i: int, cx: int, cy: int, ci: int, threat: Spider
 static func think_soldier(ants, i: int, cx: int, cy: int, ci: int, think_dt: float) -> void:
 	var sim: Simulation = ants.sim
 	var cfg := sim.cfg
-	var sim_spider: Spider = ants._nearest_threat(ants.pos[i], cfg.soldier_sight_px)
-	if sim_spider != null:
-		var d: float = ants.pos[i].distance_to(sim_spider.pos)
+	var threat = ants._nearest_threat(ants.pos[i], cfg.soldier_sight_px)
+	if threat != null:
+		var d: float = ants.pos[i].distance_to(threat.pos)
 		if d <= cfg.soldier_melee_range_px:
 			ants.state[i] = AntSystem.State.ATTACK
 			ants.target[i] = ants.pos[i]
-			sim_spider.take_damage(CasteDefs.DAMAGE_PER_S[CasteDefs.Caste.SOLDIER] * think_dt)
+			threat.take_damage(CasteDefs.DAMAGE_PER_S[CasteDefs.Caste.SOLDIER] * think_dt)
 			return
 		ants.state[i] = AntSystem.State.ATTACK
-		ants._step(i, cx, cy, ci, AntSystem.Mode.PLANT, sim_spider.pos)
+		ants._step(i, cx, cy, ci, AntSystem.Mode.PLANT, threat.pos)
 		return
 	var here: float = sim.attack.data[ci]
 	var best := here
