@@ -448,6 +448,10 @@ func checksum() -> int:
 			h = (h * 31 + int(ants.pos[i].x * 16.0) + int(ants.pos[i].y * 16.0) * 7 + ants.state[i]) & 0x7fffffff
 	h = (h * 31 + leaves_stored * 13 + corpse_parts_stored * 19 + dug * 101 + deaths * 977) & 0x7fffffff
 	h = (h * 31 + int(water.volume * 1000.0)) & 0x7fffffff
+	# Punto 4: sin esto, dos partidas con cadáveres tirados en distinta posición/valor/edad daban la
+	# misma huella (las pruebas de guardado/determinismo usan `checksum()` como única comprobación).
+	for c in corpses:
+		h = (h * 31 + int(c.pos.x * 16.0) + int(c.pos.y * 16.0) * 7 + int(c.food_value * 10.0)) & 0x7fffffff
 	if queen_id >= 0:
 		h = (h * 31 + int(colony.food * 10.0) + int(colony.water * 10.0) + brood.hatched * 7 + brood.died * 13) & 0x7fffffff
 	if incremental:

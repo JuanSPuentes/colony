@@ -231,6 +231,7 @@ func _kill(i: int, drowned: bool) -> void:
 	if drowned:
 		sim.deaths += 1
 	carry[i] = 0
+	carry_kind[i] = 0
 	if carry_egg[i] >= 0:
 		sim.brood.claimed[carry_egg[i]] = -1  # el zángano murió a mitad de camino: el huevo queda libre
 		carry_egg[i] = -1
@@ -416,13 +417,19 @@ func _think_idle(i: int, cx: int, cy: int, ci: int, think_dt: float) -> void:
 	if sim.world.marked_count > 0 and diggers < mini(sim.world.marked_count, max_diggers) and sim.fields.dig_dist[ci] < FAR:
 		state[i] = State.DIG
 		state_counts[State.DIG] += 1
-	elif sim.total_leaves_left > 0:
+	elif sim.total_leaves_left > 0 or not sim.corpses.is_empty():
+		# Punto 4: hay que salir a EXPLORE también si solo quedan cadáveres por recoger (sin hojas),
+		# si no, `_corpse_logic` (que solo se llama desde EXPLORE/GO_TO_FOOD) nunca se evalúa y la
+		# colonia deja de recoger restos para siempre en cuanto se agotan las hojas.
 		state[i] = State.EXPLORE
 	else:
 		timer[i] = 4.0  # sin trabajo: seguir descansando
 
 
-## Punto 4: igual que `_plant_near`, pero sobre `sim.corpses` en vez de `sim.plants`.
+## Punto 4: igual que `_plant_near`, pero sobre `sim.corpses` en vez de `sim.plants`. Ignora un
+## cadáver que hoy está bajo agua profunda: `_step(Mode.PLANT, ...)` ya evita cruzar esas celdas
+## (ver más abajo), así que perseguirlo sería perseguir algo inalcanzable hasta que el agua baje;
+## mejor dejar que una obrera siga buscando hojas mientras tanto y lo intente más tarde.
 func _corpse_near(i: int) -> Corpse:
 	var cfg := sim.cfg
 	var best: Corpse = null
@@ -430,6 +437,8 @@ func _corpse_near(i: int) -> Corpse:
 	var p := pos[i]
 	for c in sim.corpses:
 		if c.food_value <= 0.0:
+			continue
+		if sim.water.level[_cell_index(c.pos)] >= cfg.flee_level:
 			continue
 		var d := p.distance_to(c.pos)
 		if d < best_d:

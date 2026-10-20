@@ -74,9 +74,12 @@ func tick(dt: float) -> void:
 		food_earned += gain
 		_income_acc += gain
 		colony.food = minf(colony.food_cap, colony.food + gain)
-	# Punto 4: restos de hormigas/amenazas muertas, igual que las hojas pero valen más.
+	# Punto 4: restos de hormigas/amenazas muertas, igual que las hojas pero valen más. Mismo factor
+	# que hay entre `inc_food_per_leaf` y `leaf_food_value` (la hoja vale 4x más en este modo): sin
+	# esto, un cadáver vale solo 1.5 hojas acá contra las 6 hojas que vale en el modo clásico.
 	if sim.corpse_parts_stored > 0:
-		var gain_c := sim.corpse_parts_stored * cfg.corpse_food_value
+		var inc_scale := cfg.inc_food_per_leaf / cfg.leaf_food_value
+		var gain_c := sim.corpse_parts_stored * cfg.corpse_food_value * inc_scale
 		sim.corpse_parts_stored = 0
 		food_earned += gain_c
 		_income_acc += gain_c
