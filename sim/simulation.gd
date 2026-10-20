@@ -17,6 +17,10 @@ extends RefCounted
 enum Weather { CLEAR, WARNING, RAINING }
 enum Era { FOUNDATION, YOUNG, MATURE }
 
+## `preload` (no `class_name`) para evitar el ciclo de resolución: este archivo se referencia a
+## sí mismo como tipo (`Simulation.Era`) dentro de `era_system.gd`.
+const EraSystem = preload("res://sim/colony/era_system.gd")
+
 var cfg: SimConfig
 var rng := RandomNumberGenerator.new()
 var tick_count := 0
@@ -245,22 +249,9 @@ func _update_corpses(step_dt: float) -> void:
 			corpses.remove_at(i)
 
 
+## Regla en `EraSystem` (sim/colony/): esto solo orquesta.
 func _update_era() -> void:
-	var pop := ants.alive_count
-	var new_era := Era.FOUNDATION
-	if pop >= cfg.era3_population:
-		new_era = Era.MATURE
-	elif pop >= cfg.era2_population:
-		new_era = Era.YOUNG
-	if new_era != era:
-		era = new_era
-		match era:
-			Era.YOUNG:
-				notify("Nueva era: Colonia joven. Soldados disponibles.")
-			Era.MATURE:
-				notify("Nueva era: Colonia madura. Peligro, Ataque, Evacuar y la araña.")
-				if _mature_since_s < 0.0:
-					_mature_since_s = time_s()
+	EraSystem.update_era(self)
 
 
 ## `first_population`: a partir de cuántas hormigas vivas puede aparecer la primera araña. El modo
@@ -294,18 +285,10 @@ func _check_game_over() -> void:
 		game_over_reason = "La reina murió."
 
 
-## Fase 4: condición de victoria que el plan original dejaba pendiente (prompt_fase3_godot.md,
-## sección 4.1: "sobrevivir hasta el final del día 10 con la reina viva"), adaptada a que este modo
-## no tiene día/noche: en vez de un día de calendario, sobrevivir `cfg.victory_survive_s` segundos
-## de simulación DESPUÉS de llegar a Colonia madura, con la reina viva. Solo aplica a la colonia
-## con reina (nunca al modo incremental, que no entra a esta rama de `tick()`).
+## Regla en `EraSystem` (sim/colony/): esto solo orquesta. Ver ahí la nota de Fase 4 sobre de
+## dónde sale `victory_survive_s`.
 func _check_victory() -> void:
-	if game_over or _mature_since_s < 0.0:
-		return
-	if time_s() - _mature_since_s >= cfg.victory_survive_s:
-		game_over = true
-		victory = true
-		game_over_reason = "La colonia prosperó."
+	EraSystem.check_victory(self)
 
 
 # --- Clima --------------------------------------------------------------------------------------

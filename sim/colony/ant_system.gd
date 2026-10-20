@@ -31,6 +31,9 @@ const STATE_NAMES: Array[String] = ["EXPLORAR", "IR A COMIDA", "LLEVAR A CASA", 
 const DX: Array[int] = [1, 1, 0, -1, -1, -1, 0, 1]
 const DY: Array[int] = [0, 1, 1, 1, 0, -1, -1, -1]
 const FAR := NestDistanceField.FAR
+## `preload` (no el `class_name` global) para evitar el ciclo de resolución de tipos: este
+## archivo se referencia a sí mismo como tipo dentro de `ant_caste_ai.gd`.
+const AntCasteAI = preload("res://sim/colony/ant_caste_ai.gd")
 
 var sim: Simulation
 var count := 0
@@ -222,6 +225,19 @@ func _recount() -> void:
 	for i in count:
 		if alive[i] == 1:
 			state_counts[state[i]] += 1
+
+
+## Hormigas vivas por casta, solo para las castas pedidas (las demás no entran en el resultado).
+## Antes esto estaba duplicado en `hud.gd` (una vez para el modo incremental, otra para el modo
+## con reina), cada copia iterando `count` por su cuenta.
+func count_by_caste(castes: Array) -> Dictionary:
+	var counts := {}
+	for c in castes:
+		counts[c] = 0
+	for i in count:
+		if alive[i] == 1 and counts.has(caste[i]):
+			counts[caste[i]] += 1
+	return counts
 
 
 func _kill(i: int, drowned: bool) -> void:
@@ -606,70 +622,16 @@ func _think_dig(i: int, cx: int, cy: int, ci: int) -> void:
 # --- Zángano: carga huevos a la Guardería -------------------------------------------------------
 
 ## El zángano no pasa por `_think()` (no pelea activo, no explora): lleva su propia cuenta de
-## cuándo le toca pensar, igual que hace `_think()` para el resto.
+## cuándo le toca pensar, igual que hace `_think()` para el resto. La decisión en sí vive en
+## `AntCasteAI` (ver sección "Decisiones por casta" más abajo).
 func _think_drone(i: int, cx: int, cy: int, ci: int) -> void:
-	var now := sim.tick_count
-	last_think[i] = now
-	next_think[i] = now + sim.rng.randi_range(sim.cfg.think_ticks_min, sim.cfg.think_ticks_max)
-	var brood := sim.brood
-	var idx := carry_egg[i]
-	if idx >= 0:
-		if not brood.alive[idx] or brood.stage[idx] != BroodSystem.Stage.EGG:
-			# Ya nació, murió, o avanzó a larva por su cuenta mientras lo cargaba: lo suelta donde esté.
-			carry_egg[i] = -1
-			state[i] = State.IDLE
-			target[i] = pos[i]
-			return
-		var nursery_cell := sim.rooms.nursery_cell
-		if nursery_cell < 0:
-			# No hay Guardería (todavía): se queda esperando junto al huevo, no insiste con nada.
-			state[i] = State.CARRY_EGG
-			target[i] = pos[i]
-			return
-		var dest := _center(nursery_cell % sim.world.w, nursery_cell / sim.world.w)
-		state[i] = State.CARRY_EGG
-		if pos[i].distance_to(dest) <= sim.cfg.soldier_melee_range_px:
-			brood.pos[idx] = dest
-			brood.claimed[idx] = -1
-			carry_egg[i] = -1
-			target[i] = pos[i]
-		else:
-			target[i] = dest
-		return
-	# Sin huevo en upa: busca el más cercano que nadie esté cargando y que no esté ya en una
-	# Guardería (si ya llegó, no hace falta tocarlo de nuevo).
-	var best := -1
-	var best_d := INF
-	for b in brood.stage.size():
-		if not brood.alive[b] or brood.stage[b] != BroodSystem.Stage.EGG or brood.claimed[b] >= 0:
-			continue
-		if sim.rooms.nursery_cell >= 0 and _cell_index(brood.pos[b]) == sim.rooms.nursery_cell:
-			continue  # ya está en la Guardería (o en la celda que hoy representa a la Guardería)
-		var d := pos[i].distance_to(brood.pos[b])
-		if d < best_d:
-			best_d = d
-			best = b
-	if best < 0:
-		state[i] = State.IDLE
-		target[i] = pos[i]
-		return
-	brood.claimed[best] = i
-	carry_egg[i] = best
-	state[i] = State.CARRY_EGG
-	target[i] = brood.pos[best]
+	AntCasteAI.think_drone(self, i, cx, cy, ci)
 
 
 # --- Nodrizas y soldados (Fase 1) --------------------------------------------------------------
 
 func _think_nurse(i: int, cx: int, cy: int, ci: int) -> void:
-	var cfg := sim.cfg
-	var nd := sim.fields.nest_dist[ci]
-	if nd > cfg.nurse_range and nd < FAR:
-		state[i] = State.NURSE
-		_step(i, cx, cy, ci, Mode.NEST, null)
-	else:
-		state[i] = State.NURSE
-		target[i] = pos[i]  # se queda cuidando la cría cerca del nido
+	AntCasteAI.think_nurse(self, i, cx, cy, ci)
 
 
 ## La amenaza activa más cercana dentro de `max_range`, o null si no hay ninguna al alcance. Hoy
@@ -685,44 +647,13 @@ func _nearest_threat(p: Vector2, max_range: float) -> Spider:
 
 ## Obrera y Zángano (en combate activo; el Zángano además pelea pasivo si lo alcanzan, ver
 ## `tick()`) defendiendo la colmena: igual de simple que el Soldado (acercarse y pegar), pero con
-## el daño de su propia casta (`CasteDefs.DAMAGE_PER_S`), bastante menor.
+## el daño de su propia casta (`CasteDefs.DAMAGE_PER_S`), bastante menor. Decisión en `AntCasteAI`.
 func _think_defend(i: int, cx: int, cy: int, ci: int, threat: Spider, think_dt: float) -> void:
-	var cfg := sim.cfg
-	var d := pos[i].distance_to(threat.pos)
-	state[i] = State.ATTACK
-	if d <= cfg.soldier_melee_range_px:
-		target[i] = pos[i]
-		threat.take_damage(CasteDefs.DAMAGE_PER_S[caste[i]] * think_dt)
-	else:
-		_step(i, cx, cy, ci, Mode.PLANT, threat.pos)
+	AntCasteAI.think_defend(self, i, cx, cy, ci, threat, think_dt)
 
 
 func _think_soldier(i: int, cx: int, cy: int, ci: int, think_dt: float) -> void:
-	var cfg := sim.cfg
-	var sim_spider := _nearest_threat(pos[i], cfg.soldier_sight_px)
-	if sim_spider != null:
-		var d := pos[i].distance_to(sim_spider.pos)
-		if d <= cfg.soldier_melee_range_px:
-			state[i] = State.ATTACK
-			target[i] = pos[i]
-			sim_spider.take_damage(CasteDefs.DAMAGE_PER_S[CasteDefs.Caste.SOLDIER] * think_dt)
-			return
-		state[i] = State.ATTACK
-		_step(i, cx, cy, ci, Mode.PLANT, sim_spider.pos)
-		return
-	var here := sim.attack.data[ci]
-	var best := here
-	for k in 8:
-		best = maxf(best, sim.attack.get_v(cx + DX[k], cy + DY[k]))
-	if best > 0.02:
-		state[i] = State.ATTACK
-		_step(i, cx, cy, ci, Mode.TOWARD, sim.attack)
-		return
-	# Sin amenaza, el soldado patrulla libre en vez de volver a pararse junto al nido: se mueve
-	# igual que una obrera explorando (misma puntuación de `Mode.EXPLORE`), solo que sin cortar
-	# hojas ni cavar. Pedido explícito: antes quedaba plantado cerca de la entrada.
-	state[i] = State.GUARD
-	_step(i, cx, cy, ci, Mode.EXPLORE, null)
+	AntCasteAI.think_soldier(self, i, cx, cy, ci, think_dt)
 
 
 ## Elige la mejor celda vecina según el modo y fija el objetivo de movimiento.
@@ -809,34 +740,9 @@ func _step(i: int, cx: int, cy: int, ci: int, mode: int, extra: Variant) -> void
 ## Sigue la BFS de `sim.queen_goal_dist` (calculada una sola vez en `cmd_move_queen`) celda a celda,
 ## igual de greedy que `Mode.NEST` con `nest_dist`. Se llama todo tick mientras haya una orden en
 ## curso (no solo cada `next_think`): es una sola hormiga, no vale la pena esperar a que le toque
-## pensar para que la orden del jugador se sienta inmediata.
+## pensar para que la orden del jugador se sienta inmediata. Decisión en `AntCasteAI`.
 func _think_queen(i: int, cx: int, cy: int, ci: int) -> void:
-	if ci == sim.queen_goal_cell:
-		sim.queen_goal_cell = -1
-		target[i] = pos[i]
-		return
-	var world := sim.world
-	var w := world.w
-	var dist := sim.queen_goal_dist
-	var best_k := -1
-	var best_d: int = NestDistanceField.FAR
-	for k in 8:
-		var nx := cx + DX[k]
-		var ny := cy + DY[k]
-		if not world.is_passable(nx, ny):
-			continue
-		if DX[k] != 0 and DY[k] != 0:
-			if not world.is_passable(cx + DX[k], cy) or not world.is_passable(cx, cy + DY[k]):
-				continue  # nada de cortar esquinas de tierra, igual que `_step`
-		var nd: int = dist[ny * w + nx]
-		if nd < best_d:
-			best_d = nd
-			best_k = k
-	if best_k < 0 or best_d >= NestDistanceField.FAR:
-		sim.queen_goal_cell = -1  # sin camino posible (p.ej. alguien tapó el túnel): cancela la orden
-		target[i] = pos[i]
-		return
-	target[i] = _center(cx + DX[best_k], cy + DY[best_k])
+	AntCasteAI.think_queen(self, i, cx, cy, ci)
 
 
 ## Busca la celda seca más cercana (BFS acotado) y se dirige a su primer paso.

@@ -439,10 +439,7 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 		sim.day_number(), "Noche" if night else "Día", sim.ants.alive_count,
 		"PAUSA" if m.paused else "x%d" % m.speed, Engine.get_frames_per_second()]
 
-	var c := {CasteDefs.Caste.WORKER: 0, CasteDefs.Caste.SOLDIER: 0}
-	for i in sim.ants.count:
-		if sim.ants.alive[i] == 1 and c.has(sim.ants.caste[i]):
-			c[sim.ants.caste[i]] += 1
+	var c := sim.ants.count_by_caste([CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER])
 	var queen_alive := sim.ants.alive[sim.queen_id] == 1
 	var queen_hp := sim.ants.hp[sim.queen_id] if queen_alive else 0.0
 	var queen_hp_max := cfg.queen_hp_base * CasteDefs.HP_MULT[CasteDefs.Caste.QUEEN]
@@ -567,10 +564,7 @@ func update_info(m: Node) -> void:
 		_threats.text = "Ninguna a la vista"
 
 	if sim.queen_id >= 0:
-		var c := {CasteDefs.Caste.WORKER: 0, CasteDefs.Caste.NURSE: 0, CasteDefs.Caste.SOLDIER: 0, CasteDefs.Caste.DRONE: 0}
-		for i in sim.ants.count:
-			if sim.ants.alive[i] == 1 and sim.ants.caste[i] != CasteDefs.Caste.QUEEN:
-				c[sim.ants.caste[i]] += 1
+		var c := sim.ants.count_by_caste([CasteDefs.Caste.WORKER, CasteDefs.Caste.NURSE, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE])
 		var queen_alive := sim.ants.alive[sim.queen_id] == 1
 		var queen_hp := sim.ants.hp[sim.queen_id] if queen_alive else 0.0
 		var queen_hp_max := sim.cfg.queen_hp_base * CasteDefs.HP_MULT[CasteDefs.Caste.QUEEN]

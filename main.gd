@@ -19,6 +19,8 @@ const ZOOM_LEVELS: Array[float] = [0.5, 1.0, 2.0, 3.0, 4.0]
 const MAX_TICKS_PER_FRAME := 40
 const OVERLAY_HZ := 5.0
 const WORLD_SIZE := Vector2(480.0, 270.0)
+## Traduce clics/trazos a los `cmd_*` de `sim` según la herramienta activa (ver ese archivo).
+const InputTools = preload("res://main_input_tools.gd")
 
 ## Subtipos de feromona que recorre Q/E con la herramienta 2 (coincide con PHERO_NAMES del HUD).
 const PHERO_FIELDS := ["food", "home", "danger", "attack", "evacuate"]
@@ -212,17 +214,7 @@ func _resize_world_container() -> void:
 
 
 func _current_phero() -> PheromoneField:
-	match PHERO_FIELDS[phero_index]:
-		"home":
-			return sim.home
-		"danger":
-			return sim.danger
-		"attack":
-			return sim.attack
-		"evacuate":
-			return sim.evacuate
-		_:
-			return sim.food
+	return InputTools.current_phero(self)
 
 
 # --- Bucle ----------------------------------------------------------------------------------------
@@ -455,65 +447,13 @@ func _set_zoom(i: int, anchor_screen_pos: Vector2 = Vector2.INF) -> void:
 
 
 func _apply_line(from: Vector2i, to: Vector2i) -> void:
-	if from.x < 0:
-		_apply_at(to)
-		return
-	var steps := maxi(absi(to.x - from.x), absi(to.y - from.y))
-	for i in range(1, steps + 1):
-		var t := float(i) / steps
-		_apply_at(Vector2i(roundi(lerpf(from.x, to.x, t)), roundi(lerpf(from.y, to.y, t))))
+	InputTools.apply_line(self, from, to)
 
 
 func _apply_at(c: Vector2i) -> void:
-	if c == _last_cell:
-		return
-	_last_cell = c
-	match tool:
-		1:
-			if _erasing:
-				sim.cmd_unmark(c.x, c.y)
-			else:
-				sim.cmd_mark(c.x, c.y)
-		2:
-			var field := _current_phero()
-			if _erasing:
-				for dy in range(-1, 2):
-					for dx in range(-1, 2):
-						var n := _snap(Vector2i(c.x + dx, c.y + dy))
-						if sim.world.in_bounds(n.x, n.y):
-							sim.cmd_erase_phero(field, n.x, n.y)
-			else:
-				# La rampa crece a lo largo del trazo: arrastra desde el nido hacia el objetivo.
-				var value := minf(1.0, cfg.paint_start + cfg.paint_ramp * _stroke_n)
-				var painted := false
-				for dy in range(-1, 2):
-					for dx in range(-1, 2):
-						var n := _snap(Vector2i(c.x + dx, c.y + dy))
-						painted = sim.cmd_paint_phero(field, n.x, n.y, value) or painted
-				if painted:
-					_stroke_n += 1
-		3:
-			if _erasing:
-				sim.cmd_clear_room(c.x, c.y)
-			else:
-				sim.cmd_assign_room(c.x, c.y, ROOM_TYPES[room_index])
-		4:
-			sim.cmd_unmark(c.x, c.y)
-			sim.cmd_clear_room(c.x, c.y)
-			for field_name in PHERO_FIELDS:
-				var f: PheromoneField = sim.get(field_name)
-				sim.cmd_erase_phero(f, c.x, c.y)
-		5:
-			# Clic izquierdo: ordena a la reina caminar hasta ahí. Clic derecho: cancela la orden en
-			# curso (se queda donde esté parada, no vuelve atrás).
-			if _erasing:
-				sim.queen_goal_cell = -1
-			else:
-				sim.cmd_move_queen(c.x, c.y)
+	InputTools.apply_at(self, c)
 
 
 ## Un clic en el cielo pinta sobre la fila del suelo.
 func _snap(c: Vector2i) -> Vector2i:
-	if c.y < cfg.surface_y - cfg.walk_band:
-		return Vector2i(c.x, cfg.surface_y - 1)
-	return c
+	return InputTools.snap(self, c)
