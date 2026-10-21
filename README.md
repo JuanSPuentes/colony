@@ -38,7 +38,8 @@ convención de una prueba por fase. Existe justo para que el proyecto no se vuel
 12. [Fase 5: el ciempiés](#12-fase-5-el-ciempiés)
 13. [Fase 6: el modo Test](#13-fase-6-el-modo-test)
 14. [Fase 7: la mantis](#14-fase-7-la-mantis)
-15. [Fase 8: victoria del modo incremental](#15-fase-8-victoria-del-modo-incremental)
+15. [Fase 8: victoria del modo incremental (retirada)](#15-fase-8-victoria-del-modo-incremental-retirada)
+16. [Fase 9: estaciones, colonia rival y mejoras](#16-fase-9-estaciones-colonia-rival-y-mejoras)
 
 ---
 
@@ -336,7 +337,7 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | `Godot --headless --path . --script tools/test_phase5.gd` | El ciempiés, segunda amenaza (sección 12): no aparece antes del umbral de población, aparece al cruzarlo, encuentra y daña una hormiga bajo tierra (no solo en superficie, a diferencia de la araña), toda la colonia lo ataca igual que a la araña, muere y deja cadáver recolectable, huye y desaparece con poca vida, el modo incremental nunca lo dispara, guardar/cargar conserva su estado. |
 | `Godot --headless --path . --script tools/test_phase6.gd` | El modo Test (sección 13): composición fija de 50 hormigas al arrancar, empieza de día, la reina puede morir sin terminar la partida, los comandos de lluvia/araña/ciempiés del panel de pruebas, agregar hormigas de cualquier casta a voluntad, los otros dos modos no se ven afectados, guardar/cargar conserva `test_mode`. |
 | `Godot --headless --path . --script tools/test_phase7.gd` | La mantis, tercera amenaza (sección 14): no aparece antes del umbral, aparece al cruzarlo, nunca se mueve, no reacciona a una hormiga lejos pero sí a una que entra en `mantis_strike_range_px`, pega más fuerte que la araña, toda la colonia la ataca igual, muere y deja cadáver, huye con poca vida, el modo incremental nunca la dispara, guardar/cargar conserva su estado. |
-| `Godot --headless --path . --script tools/test_phase8.gd` | Victoria del modo incremental (sección 15): gana al sobrevivir `inc_victory_survive_s` desde que aparece la araña con la reina viva, no gana antes de tiempo, no gana si la araña nunca apareció, morir la reina antes del umbral sigue siendo derrota, el modo clásico no se ve afectado (campos de config separados), guardar/cargar conserva el progreso hacia la victoria. |
+| `Godot --headless --path . --script tools/test_phase9.gd` | Estaciones + colonia rival + mejoras (sección 16): hormigas rivales no se pelean entre sí, jugador y rival se dañan entre sí, la oleada aparece justo en el último día de estación, la estación no avanza mientras la batalla siga activa, se gana al morir la reina rival, las 4 estaciones ganan el juego, el modo clásico no se ve afectado, las mejoras suben el daño/HP de hormigas nuevas (no de las ya vivas), guardar/cargar conserva estación/batalla/bando. |
 | `Godot --headless --path . --script tools/test_app_menu.gd` | El menú (`app/`): arranca mostrando el menú, Opciones desde el menú vuelve al menú, Opciones desde la tuerca en partida vuelve a la partida (pausada) y no al menú, Juego normal arranca en modo incremental (comida/compra), Modo infinito arranca en modo Historia con la colonia completa, Test arranca el modo sandbox con 50 hormigas, F5 conserva el modo, volumen/brillo se guardan, Salir pide confirmación en vez de cerrar directo. |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
@@ -615,33 +616,62 @@ pasa lo bastante cerca, pega mucho más fuerte que las otras dos (`cfg.mantis_da
   dos amenazas. Sigue sin soporte para "2 mantis a la vez" (una instancia por tipo, ver sección
   13).
 
-## 15. Fase 8: victoria del modo incremental
+## 15. Fase 8: victoria del modo incremental (retirada)
 
-Hasta esta fase solo la colonia con reina (`Modo infinito`) podía ganar (Fase 4); "Juego normal"
-(el modo incremental, comida/compra) solo podía perderse. Esta fase le agrega su propia condición
-de victoria, mismo espíritu que la Fase 4 (sobrevivir un tiempo con la reina viva) pero adaptada a
-que este modo no tiene eras.
+Por un tiempo breve, "Juego normal" se ganaba sobreviviendo `cfg.inc_victory_survive_s` segundos
+desde que aparecía la primera araña. Se **retiró por completo** (no quedó código muerto: se borró
+`EraSystem.check_incremental_victory()`, `cfg.inc_victory_survive_s`,
+`Simulation._inc_threat_since_s` y `tools/test_phase8.gd`) en favor de la Fase 9, que define el
+rumbo real de victoria de este modo: derrotar a 4 colonias rivales, una por estación. Queda esta
+nota para que quede claro que no es un olvido — fue una decisión de diseño explícita del usuario,
+documentada en el commit de la Fase 9.
 
-- **Condición:** sobrevivir `cfg.inc_victory_survive_s` segundos de simulación (150 s por defecto)
-  DESPUÉS de que aparece la primera araña, con la reina viva. El disparador es la araña (la
-  amenaza real de este modo) en vez de llegar a Colonia madura, que es el equivalente del modo
-  clásico pero este modo no tiene eras.
-- **Dónde vive:** `Simulation._inc_threat_since_s` (cuándo apareció la primera araña por primera
-  vez, -1.0 si nunca) y `EraSystem.check_incremental_victory()`, llamada junto a
-  `_check_game_over()` en la rama `if incremental:` de `tick()` — mismo lugar donde ya vivía
-  `_update_spider()` para este modo. `EraSystem.check_victory()` (Fase 4) sigue siendo la del modo
-  clásico; son dos funciones separadas en el mismo archivo porque ambas son reglas de "cuánto dura
-  viva la colonia", no porque compartan disparador.
-- **Campo de config propio:** `inc_victory_survive_s`, no `victory_survive_s` (el del modo
-  clásico) — los dos modos escalan distinto (colonias de tamaño y ritmo muy diferentes) y conviene
-  poder ajustarlos por separado. `tools/test_phase8.gd` confirma que un modo no usa el campo del
-  otro por accidente.
-- **Guardado:** `d["inc_threat_since_s"]` con `d.get(..., -1.0)`, mismo patrón que
-  `mature_since_s` de la Fase 4.
-- **Cambio intencional en una prueba vieja:** `tools/test_phase4.gd` tenía una prueba
-  (`_t_incremental_mode_never_wins`) que afirmaba literalmente que el modo incremental nunca podía
-  ganar — cierto hasta esta fase, a propósito. Se renombró y adaptó
-  (`_t_incremental_mode_uses_its_own_victory_field`) para seguir probando lo que de verdad importa
-  ahora: que `victory_survive_s` (el campo del modo clásico) no afecta al incremental.
-- **Simplificación deliberada:** `inc_victory_survive_s` es una primera estimación sin
-  playtesting, igual que el resto del balance del proyecto (ver sección 10).
+## 16. Fase 9: estaciones, colonia rival y mejoras
+
+"Juego normal" se divide en 4 estaciones fijas (`SeasonSystem.SEASON_COUNT`). Al llegar al último
+día de cada una, una colonia rival ataca de verdad — hormigas rivales con su propia reina aparecen
+en el mundo y pelean cuerpo a cuerpo contra las tuyas, mismo estilo visual que la araña/ciempiés/
+mantis. La estación **no avanza** hasta derrotarla (matar a su reina); derrotar a las 4 es la
+condición de victoria real de este modo.
+
+- **Bando (`AntSystem.faction`):** la pieza que habilita todo esto. 0 = jugador, 1 = rival, un
+  array más junto a `pos`/`hp`/`caste`. Las hormigas rivales **no son una segunda `AntSystem`**:
+  viven en el mismo array que las del jugador (`add_ant_at(cell, caste, faction)`), heredando
+  gratis el movimiento, la interpolación y el render que ya existían. Tienen su propia IA, mucho
+  más simple (`AntSystem._tick_rival`): no cavan, no forrajean, no cuidan cría — buscan la
+  hormiga del jugador más cercana para pelear y, sin ninguna a la vista, avanzan hacia la reina
+  del jugador.
+- **Combate hormiga-contra-hormiga, sin duplicar código de pelea:** `AntSystem._nearest_threat()`
+  (el mismo punto de extensión que ya usaban araña/ciempiés/mantis) se generalizó para también
+  encontrar la hormiga rival más cercana, envuelta en `AntSystem.AntRef` (una clase interna chica
+  con `.pos`/`.alive`/`.take_damage()`, la misma forma que ya esperaban `_think_defend`/
+  `_think_soldier`). Por eso toda la colonia defiende contra una invasión rival exactamente igual
+  que contra la araña, sin tocar esas dos funciones.
+- **`sim/threats/rival_queen.gd` + `sim/colony/rival_colony.gd`:** la reina rival es un objeto
+  aparte (no está en `AntSystem`: no necesita pathing, solo ser el objetivo a matar), mismo patrón
+  que `Spider`. `RivalColony.start_battle(ant_count, strength)` la hace aparecer junto a su oleada,
+  lejos del nido del jugador; `update()` detecta cuándo muere para terminar la batalla.
+- **`sim/colony/season_system.gd`:** cada tick (solo en modo incremental) decide si hay que
+  arrancar la batalla del último día (`cfg.season_length_days`) o si hay que cerrar la estación
+  porque la batalla ya se ganó. Al cerrar la 4ª: `game_over = true; victory = true`.
+- **Mejoras de colonia (`sim/colony/upgrades.gd`):** se compran con comida, mismo patrón de costo
+  creciente que comprar un huevo (`cmd_buy_upgrade`). Cuatro stats (daño, vida, velocidad de
+  movimiento, velocidad de cavado); **solo afectan a las hormigas nuevas** desde que se compran,
+  no se recalculan las que ya viven. "Población máxima" quedó fuera a propósito: el modo
+  incremental no tiene techo de población hoy, inventar uno nuevo solo para "mejorarlo" después
+  sería una restricción nueva no pedida.
+- **Vista:** las hormigas rivales reusan el mismo sprite que las del jugador
+  (`view/sprites/ant/`), tintadas siempre de rojo oscuro (`AntRenderer.RIVAL_COLOR`) sin importar
+  la capa de color activa, para distinguirlas de un vistazo. La reina rival
+  (`view/rival_queen_view.gd`) reusa el mismo sprite escalado como la reina del jugador, también
+  teñido — sin arte nuevo para esta primera entrega.
+- **Guardado:** `d["season_index"]`, `d["rival_colony"]` (estado de la reina rival y si la batalla
+  sigue activa) y el array `faction` de las hormigas, todos con `d.get(..., default)` para que un
+  guardado de antes de esta fase cargue igual (estación 0, sin batalla, todas de bando jugador).
+- **Simplificación deliberada:** ganar la batalla mata a la reina rival, no hace falta matar a
+  toda su oleada — lo que quede sigue peleando pero ya no bloquea la estación siguiente. Los
+  números de balance (`rival_wave_base_ants`, `rival_queen_hp_base`, costos de mejora) son una
+  primera estimación sin playtesting, igual que el resto del balance del proyecto.
+- **Pendiente para una próxima entrega:** panel del HUD para comprar mejoras y ver el estado de la
+  estación actual a simple vista (hoy se compran con `cmd_buy_upgrade`, sin botón todavía); arte
+  propio para la reina rival en vez de la hormiga reina teñida.

@@ -65,6 +65,9 @@ var hp := PackedFloat32Array()
 var timer := PackedFloat32Array()
 var stuck_t := PackedFloat32Array()
 var check_acc := PackedFloat32Array()
+## Fase 9: bando (0 = jugador, 1 = rival — ver `sim/colony/rival_colony.gd`). Aditivo: todo lo que
+## no pasa `ant_faction` a `add_ant_at` sigue creando hormigas de bando 0, igual que siempre.
+var faction := PackedByteArray()
 
 var max_stuck_seen := 0.0
 var _bfs_q := PackedInt32Array()
@@ -104,6 +107,7 @@ func _grow(n: int) -> void:
 	timer.resize(total)
 	stuck_t.resize(total)
 	check_acc.resize(total)
+	faction.resize(total)
 
 
 func add_ants(n: int) -> void:
@@ -113,8 +117,9 @@ func add_ants(n: int) -> void:
 		add_ant_at(Vector2i(c % sim.world.w, c / sim.world.w))
 
 
-## Crea una hormiga en el centro de la celda dada (con un pequeño desfase aleatorio).
-func add_ant_at(cell: Vector2i, ant_caste: int = CasteDefs.Caste.WORKER) -> int:
+## Crea una hormiga en el centro de la celda dada (con un pequeño desfase aleatorio). `ant_faction`
+## (Fase 9): 0 = jugador (de siempre), 1 = rival — ver `sim/colony/rival_colony.gd`.
+func add_ant_at(cell: Vector2i, ant_caste: int = CasteDefs.Caste.WORKER, ant_faction: int = 0) -> int:
 	_grow(1)
 	var cfg := sim.cfg
 	var i := count
@@ -138,9 +143,13 @@ func add_ant_at(cell: Vector2i, ant_caste: int = CasteDefs.Caste.WORKER) -> int:
 	carry_kind[i] = 0
 	carry_egg[i] = -1
 	hp[i] = (cfg.queen_hp_base if ant_caste == CasteDefs.Caste.QUEEN else cfg.ant_hp) * CasteDefs.HP_MULT[ant_caste]
+	# Fase 9: mejora de vida, solo bando jugador (las rivales no se benefician de tus mejoras).
+	if ant_faction == 0:
+		hp[i] *= sim.upgrades.hp_mult
 	timer[i] = sim.rng.randf_range(0.0, cfg.rest_seconds_max)
 	stuck_t[i] = 0.0
 	check_acc[i] = sim.rng.randf() * 0.5
+	faction[i] = ant_faction
 	count += 1
 	alive_count += 1
 	return i
@@ -183,6 +192,12 @@ func tick() -> void:
 			if hp[i] <= 0.0:
 				_kill(i, true)
 				continue
+		# Fase 9: hormigas rivales (ver `sim/colony/rival_colony.gd`) tienen su propia IA, mucho más
+		# simple que el resto de este archivo (no cavan, no forrajean, no cuidan cría): solo avanzan
+		# hacia la reina del jugador y pelean con lo que se les cruce en el camino.
+		if faction[i] == 1:
+			_tick_rival(i, cx, cy, ci, dt)
+			continue
 		if caste[i] == CasteDefs.Caste.QUEEN:
 			# La reina no decide sola (sin EXPLORE/FOOD/etc.): solo camina cuando el jugador la
 			# manda con `cmd_move_queen` (ver `_think_queen`), y se queda quieta el resto del
@@ -197,7 +212,7 @@ func tick() -> void:
 			# inmóvil: su única tarea es cargar huevos hasta la Guardería (ver `_think_drone`).
 			var threat = _nearest_threat(p, cfg.soldier_melee_range_px)
 			if threat != null:
-				threat.take_damage(CasteDefs.DAMAGE_PER_S[CasteDefs.Caste.DRONE] * dt)
+				threat.take_damage(CasteDefs.DAMAGE_PER_S[CasteDefs.Caste.DRONE] * dt * sim.upgrades.damage_mult)
 			if now >= next_think[i]:
 				_think_drone(i, cx, cy, ci)
 			_move(i, dt, lv)
@@ -271,7 +286,8 @@ func _dig_progress(i: int, dt: float) -> void:
 		state[i] = State.IDLE
 		timer[i] = 0.0
 		return
-	world.job_progress[j] += dt
+	# Fase 9: mejora de velocidad de trabajo (solo cavan hormigas del bando jugador, nunca rivales).
+	world.job_progress[j] += dt * sim.upgrades.work_mult
 	if world.job_progress[j] >= sim.cfg.dig_seconds:
 		var jx := j % world.w
 		var jy := j / world.w
@@ -292,6 +308,8 @@ func _move(i: int, dt: float, lv: float) -> void:
 		return
 	var cfg := sim.cfg
 	var mult := CasteDefs.SPEED_MULT[caste[i]]
+	if faction[i] == 0:  # Fase 9: mejora de velocidad, solo bando jugador.
+		mult *= sim.upgrades.speed_mult
 	if carry[i] == 1:
 		mult *= cfg.carry_speed_mult
 	if lv > 0.0:
@@ -649,7 +667,55 @@ func _nearest_threat(p: Vector2, max_range: float):
 			if d <= best_d:
 				best_d = d
 				best = t
+	# Fase 9: hormigas rivales (si hay una batalla en curso, ver `sim/colony/rival_colony.gd`)
+	# cuentan igual que cualquier otra amenaza — la más cercana dentro de rango gana, sea araña o
+	# una hormiga rival. `AntRef` envuelve un índice de este mismo array con la misma forma
+	# (`.pos`/`.alive`/`.take_damage()`) que ya esperan `_think_defend`/`_think_soldier`.
+	var enemy_idx := _nearest_enemy_index(p, best_d, 1)
+	if enemy_idx >= 0:
+		best = AntRef.new(self, enemy_idx)
 	return best
+
+
+## Índice de la hormiga viva de bando `want_faction` más cercana a `p` dentro de `max_range`, o -1.
+func _nearest_enemy_index(p: Vector2, max_range: float, want_faction: int) -> int:
+	var best := -1
+	var best_d := max_range
+	for j in count:
+		if alive[j] == 0 or faction[j] != want_faction:
+			continue
+		var d := p.distance_to(pos[j])
+		if d < best_d:
+			best_d = d
+			best = j
+	return best
+
+
+## Fase 9: hormigas rivales (bando 1) — mucho más simples que el resto de este archivo: no cavan,
+## no forrajean, no cuidan cría. Buscan la hormiga del jugador más cercana para pelear; sin
+## ninguna a la vista, avanzan hacia la reina del jugador (el objetivo final de la oleada).
+func _tick_rival(i: int, cx: int, cy: int, ci: int, dt: float) -> void:
+	var cfg := sim.cfg
+	var now := sim.tick_count
+	if now >= next_think[i]:
+		var think_dt := float(now - last_think[i]) * sim.dt
+		last_think[i] = now
+		next_think[i] = now + sim.rng.randi_range(cfg.think_ticks_min, cfg.think_ticks_max)
+		var target_idx := _nearest_enemy_index(pos[i], cfg.soldier_sight_px, 0)
+		if target_idx >= 0:
+			state[i] = State.ATTACK
+			if pos[i].distance_to(pos[target_idx]) <= cfg.soldier_melee_range_px:
+				target[i] = pos[i]
+				hp[target_idx] -= CasteDefs.DAMAGE_PER_S[caste[i]] * think_dt
+				if hp[target_idx] <= 0.0:
+					_kill(target_idx, false)
+			else:
+				_step(i, cx, cy, ci, Mode.PLANT, pos[target_idx])
+		else:
+			state[i] = State.EXPLORE
+			var goal := pos[sim.queen_id] if sim.queen_id >= 0 and alive[sim.queen_id] == 1 else pos[i]
+			_step(i, cx, cy, ci, Mode.PLANT, goal)
+	_move(i, dt, sim.water.level[ci])
 
 
 ## Obrera y Zángano (en combate activo; el Zángano además pelea pasivo si lo alcanzan, ver
@@ -843,3 +909,27 @@ func _recover(i: int, ci: int) -> void:
 	else:
 		_step(i, cx, cy, ci, Mode.EXPLORE, null)
 	next_think[i] = sim.tick_count + 1
+
+
+## Fase 9: envuelve un índice de este mismo `AntSystem` con la misma forma que las amenazas de
+## `sim/threats/` (`.pos`/`.alive`/`.take_damage()`), para que `_nearest_threat()` pueda devolver
+## "la hormiga rival más cercana" sin que `_think_defend`/`_think_soldier` necesiten saber que es
+## una hormiga y no una araña. Instancia nueva por llamada a `_nearest_threat` (no se guarda entre
+## ticks), así que `pos`/`alive` quedan congelados al momento de crearla — correcto, porque quien
+## la usa la lee de inmediato en el mismo tick.
+class AntRef:
+	var _ants: AntSystem
+	var _idx: int
+	var pos: Vector2
+	var alive: bool
+
+	func _init(a: AntSystem, i: int) -> void:
+		_ants = a
+		_idx = i
+		pos = a.pos[i]
+		alive = a.alive[i] == 1
+
+	func take_damage(amount: float) -> void:
+		_ants.hp[_idx] -= amount
+		if _ants.hp[_idx] <= 0.0:
+			_ants._kill(_idx, false)

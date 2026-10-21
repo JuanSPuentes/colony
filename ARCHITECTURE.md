@@ -14,7 +14,8 @@ sim/
               simples (como la Fase 0) seguiría funcionando.
   colony/     La colonia como organismo: castas, hormigas, cría, cámaras, economía. Depende de
               `core/`, nunca al revés.
-  threats/    Amenazas externas a la colonia (araña, ciempiés). Cada una es una clase independiente
+  threats/    Amenazas externas a la colonia (araña, ciempiés, mantis, y la reina rival de la
+              Fase 9). Cada una es una clase independiente
               con su propio `step()`; no comparten código entre sí más allá de leer `core/`. Para
               que toda la colonia reaccione a una amenaza nueva basta sumarla a
               `AntSystem._nearest_threat()` (duck typing: solo necesita `.pos`/`.alive`/
@@ -106,7 +107,8 @@ tools/
   test_phase5.gd   Segunda amenaza: el ciempiés (README sección 12).
   test_phase6.gd   Modo Test: sandbox sin victoria/derrota (README sección 13).
   test_phase7.gd   Tercera amenaza: la mantis (README sección 14).
-  test_phase8.gd   Victoria del modo incremental (README sección 15).
+  test_phase9.gd   Estaciones + colonia rival + mejoras (README sección 16). Reemplaza a
+                   test_phase8.gd (Fase 8, victoria del modo incremental), retirada a propósito.
   test_phaseN.gd   (la que corresponda cuando llegue)
   test_app_menu.gd Flujo del menú (app/): qué pantalla se ve tras cada botón, que la tuerca
                    durante la partida vuelva al juego (no al menú), que Salir pida confirmación.

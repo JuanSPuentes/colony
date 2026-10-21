@@ -20,6 +20,8 @@ enum Era { FOUNDATION, YOUNG, MATURE }
 ## `preload` (no `class_name`) para evitar el ciclo de resolución: este archivo se referencia a
 ## sí mismo como tipo (`Simulation.Era`) dentro de `era_system.gd`.
 const EraSystem = preload("res://sim/colony/era_system.gd")
+## Mismo motivo que `EraSystem`: evitar el ciclo de resolución.
+const SeasonSystem = preload("res://sim/colony/season_system.gd")
 
 var cfg: SimConfig
 var rng := RandomNumberGenerator.new()
@@ -52,6 +54,9 @@ var incremental := false
 ## `tick()`), para probar amenazas y castas a voluntad sin que una partida real se corte.
 var test_mode := false
 var econ: IncrementalEconomy
+## Fase 9: mejoras de colonia del modo incremental (siempre existe, como el resto de los sistemas
+## "siempre creados"; solo se puede comprar algo en `sim.incremental`, ver `Upgrades.can_buy`).
+var upgrades: Upgrades
 
 var leaves_stored := 0
 var delivered := 0
@@ -97,9 +102,12 @@ const MAX_NOTIFICATIONS := 5
 ## Fase 4: -1 hasta que la colonia (no incremental) llega a Colonia madura por primera vez; desde
 ## ahí mide cuánto tiempo de simulación lleva viva en esa era para la condición de victoria.
 var _mature_since_s := -1.0
-## Fase 8: -1 hasta que aparece la primera araña en el modo incremental (equivalente a
-## `_mature_since_s`, pero ese modo no tiene eras — ver `EraSystem.check_incremental_victory`).
-var _inc_threat_since_s := -1.0
+## Fase 9: estación actual del modo incremental (0..`SeasonSystem.SEASON_COUNT`-1) y la colonia
+## rival que ataca al final de cada una — ver `sim/colony/season_system.gd`/`rival_colony.gd`.
+## Reemplaza la condición de victoria de la Fase 8 (retirada): esto es lo que ahora decide
+## `game_over`/`victory` para el modo incremental.
+var season_index := 0
+var rival_colony: RivalColony
 
 var _terrain_seen := -1
 var _jobs_seen := -1
@@ -131,7 +139,9 @@ func _init(config: SimConfig, seed_value: int = -1) -> void:
 	spider = Spider.new(self)
 	centipede = Centipede.new(self)
 	mantis = Mantis.new(self)
+	rival_colony = RivalColony.new(self)
 	econ = IncrementalEconomy.new(self)
+	upgrades = Upgrades.new(self)
 	ants = AntSystem.new(self)
 	ants.add_ants(cfg.initial_ants)
 	if cfg.rain_auto:
@@ -254,11 +264,10 @@ func tick() -> void:
 		brood.tick(dt)
 		if tick_count % 3 == 0:
 			_update_spider(dt * 3.0, cfg.inc_spider_first_population)
-		# Fase 8: dispara la cuenta de la condición de victoria la primera vez que aparece.
-		if spider.alive and _inc_threat_since_s < 0.0:
-			_inc_threat_since_s = time_s()
 		_check_game_over()
-		EraSystem.check_incremental_victory(self)
+		# Fase 9: estaciones + colonia rival — decide game_over/victory de este modo (reemplaza la
+		# condición de la Fase 8, retirada).
+		SeasonSystem.update(self)
 	elif queen_id >= 0:
 		colony.tick(self, dt)
 		brood.tick(dt)
@@ -519,6 +528,11 @@ func cmd_add_caste_ants(caste: int, n: int) -> void:
 ## Fase 3: compra un huevo con comida; qué sale al nacer (obrera o soldado) es al azar.
 func cmd_buy_egg() -> bool:
 	return incremental and econ.buy_egg()
+
+
+## Fase 9: compra un nivel de mejora de colonia (`Upgrades.Stat`) con comida.
+func cmd_buy_upgrade(stat: int) -> bool:
+	return incremental and upgrades.buy(stat)
 
 
 func cmd_cycle_auto_buy() -> void:

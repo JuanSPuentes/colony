@@ -57,6 +57,12 @@ func _body_size() -> Vector2:
 	return Vector2.ONE
 
 
+## Multiplica el color del sprite (blanco = sin cambio). Lo usa `RivalQueenView` (Fase 9) para
+## reusar el sprite de la hormiga reina tintado en vez de necesitar arte nuevo.
+func _tint() -> Color:
+	return Color.WHITE
+
+
 func _draw() -> void:
 	var t = _get_threat()
 	if sim == null or t == null or not t.alive:
@@ -72,7 +78,7 @@ func _draw() -> void:
 	var p := tpos
 	if moving:
 		p.y -= absf(sin(float(sim.tick_count) * BOB_FREQ)) * size.y * BOB_FRACTION
-	draw_texture_rect(tex, Rect2(p - size * 0.5, size), false)
+	draw_texture_rect(tex, Rect2(p - size * 0.5, size), false, _tint())
 	# Barra de vida, pequeña y por encima.
 	var hp: float = t.hp
 	var max_hp: float = t.max_hp

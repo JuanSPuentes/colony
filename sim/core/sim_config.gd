@@ -246,11 +246,32 @@ extends Resource
 @export var inc_rain_first_s := 600.0
 ## Hojas que rebrota cada planta por segundo, solo de día y hasta su máximo.
 @export var inc_plant_regrow_per_s := 0.06
-## Fase 8: condición de victoria del modo incremental — sobrevivir esto en segundos de simulación
-## DESPUÉS de que aparece la primera araña, con la reina viva (ver README sección 9c/15). Campo
-## propio, no `victory_survive_s`: los dos modos escalan distinto y conviene poder ajustarlos
-## por separado. Primera estimación sin playtesting todavía, igual que el resto del balance.
-@export var inc_victory_survive_s := 150.0
+
+## Fase 9: estaciones y colonia rival del modo incremental (reemplaza la condición de victoria de
+## la Fase 8, retirada — ver README sección 15/16). 4 estaciones fijas (`SeasonSystem.SEASON_COUNT`);
+## derrotar a las 4 colonias rivales, una por estación, es la victoria real de este modo.
+@export_group("Fase 9: estaciones y colonia rival")
+## Días de simulación (`DayNight.day_number`) que dura cada estación antes de que ataque la
+## colonia rival de esa estación.
+@export var season_length_days := 5
+## Oleada de la primera estación: esta cantidad de hormigas rivales. Cada estación siguiente suma
+## `rival_wave_ants_growth` más.
+@export var rival_wave_base_ants := 6
+@export var rival_wave_ants_growth := 4
+## Vida base de la reina rival (antes de `rival_queen_strength_growth` por estación).
+@export var rival_queen_hp_base := 60.0
+@export var rival_queen_strength_growth := 0.5
+## Qué tan lejos del nido (en celdas) aparece la oleada rival, a izquierda o derecha al azar.
+@export var rival_spawn_dist := 45
+
+## Mejoras de la colonia (`sim/colony/upgrades.gd`), compradas con comida: solo afectan a las
+## hormigas nuevas desde que se compran. Mismo costo creciente que un huevo (`inc_egg_cost*growth`).
+@export var inc_upgrade_base_cost := 60.0
+@export var inc_upgrade_cost_growth := 1.2
+@export var inc_upgrade_damage_step := 0.15
+@export var inc_upgrade_hp_step := 0.15
+@export var inc_upgrade_speed_step := 0.08
+@export var inc_upgrade_work_step := 0.12
 
 @export_group("Fase 4: victoria")
 ## Cuánto tiempo de simulación hay que sobrevivir en Colonia madura (con la reina viva) para ganar.

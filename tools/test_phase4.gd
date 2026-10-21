@@ -12,7 +12,7 @@ func _initialize() -> void:
 	_t_victory_after_surviving_mature()
 	_t_no_victory_before_threshold()
 	_t_queen_death_before_threshold_is_defeat_not_victory()
-	_t_incremental_mode_uses_its_own_victory_field()
+	_t_classic_mode_unaffected_by_seasons()
 	_t_save_load_keeps_victory_progress()
 	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
@@ -74,21 +74,20 @@ func _t_queen_death_before_threshold_is_defeat_not_victory() -> void:
 		sim.game_over and not sim.victory and sim.game_over_reason == "La reina murió.")
 
 
-## Cambio intencional de la Fase 8 (ver tools/test_phase8.gd): el modo incremental AHORA sí puede
-## ganar, con su propia condición (`EraSystem.check_incremental_victory`, disparada por la primera
-## araña, no por `_check_victory()`/Colonia madura). Lo que esta prueba sigue confirmando es que
-## los dos modos no comparten el mismo campo de config: `victory_survive_s` es del modo clásico y
-## no debe afectar al incremental, que usa `inc_victory_survive_s` aparte.
-func _t_incremental_mode_uses_its_own_victory_field() -> void:
+## Cambio intencional: el modo incremental tuvo brevemente una condición de victoria propia (Fase
+## 8, sobrevivir tras la primera araña) que se retiró para dar paso a la Fase 9 (estaciones +
+## colonia rival, ver tools/test_phase9.gd) — ver README sección 15/16. Lo que esta prueba sigue
+## confirmando es que el modo clásico (el de esta suite) no se ve afectado por el sistema del
+## incremental: `SeasonSystem.update()` no hace nada si `sim.incremental` es falso.
+func _t_classic_mode_unaffected_by_seasons() -> void:
 	var cfg := SimConfig.new()
 	cfg.rain_auto = false
-	cfg.victory_survive_s = 0.01  # campo del modo clásico: si se colara acá, ganaría casi de inmediato.
-	cfg.inc_victory_survive_s = 999999.0  # bien alto para que esta prueba corta no lo dispare.
 	var sim := Simulation.new(cfg, 4)
-	sim.spawn_incremental_start()
+	sim.spawn_colony_court()
 	_run(sim, 3.0)
-	_check("el modo incremental no usa victory_survive_s (el campo es del modo clásico)",
-		not sim.victory, "victory=%s game_over=%s" % [sim.victory, sim.game_over])
+	_check("el modo clásico no arranca ninguna estación/colonia rival",
+		sim.season_index == 0 and not sim.rival_colony.battle_active,
+		"season_index=%d battle_active=%s" % [sim.season_index, sim.rival_colony.battle_active])
 
 
 func _t_save_load_keeps_victory_progress() -> void:

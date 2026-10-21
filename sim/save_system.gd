@@ -41,7 +41,6 @@ static func to_dict(sim: Simulation) -> Dictionary:
 	d["game_over_reason"] = sim.game_over_reason
 	d["victory"] = sim.victory
 	d["mature_since_s"] = sim._mature_since_s
-	d["inc_threat_since_s"] = sim._inc_threat_since_s
 	d["spiders_spawned"] = sim.spiders_spawned
 	d["spider_next_s"] = sim.spider_next_s
 	d["notifications"] = sim.notifications.duplicate()
@@ -123,6 +122,17 @@ static func to_dict(sim: Simulation) -> Dictionary:
 	d["mantises_spawned"] = sim.mantises_spawned
 	d["mantis_next_s"] = sim.mantis_next_s
 
+	# Fase 9: estaciones + colonia rival (reemplaza lo que guardaba la Fase 8).
+	d["season_index"] = sim.season_index
+	d["rival_colony"] = {
+		"battle_active": sim.rival_colony.battle_active,
+		"battle_won": sim.rival_colony.battle_won,
+		"queen_pos": _v2(sim.rival_colony.queen.pos),
+		"queen_hp": sim.rival_colony.queen.hp,
+		"queen_max_hp": sim.rival_colony.queen.max_hp,
+		"queen_alive": sim.rival_colony.queen.alive,
+	}
+
 	var ants := sim.ants
 	d["ants"] = {
 		"count": ants.count, "alive_count": ants.alive_count,
@@ -137,6 +147,7 @@ static func to_dict(sim: Simulation) -> Dictionary:
 		"hp": Array(ants.hp), "timer": Array(ants.timer),
 		"stuck_t": Array(ants.stuck_t), "check_acc": Array(ants.check_acc),
 		"max_stuck_seen": ants.max_stuck_seen,
+		"faction": Array(ants.faction),  # Fase 9: 0 jugador, 1 rival.
 	}
 
 	var plants := []
@@ -193,7 +204,6 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	# bandera.
 	sim.victory = bool(d.get("victory", false))
 	sim._mature_since_s = float(d.get("mature_since_s", -1.0))
-	sim._inc_threat_since_s = float(d.get("inc_threat_since_s", -1.0))
 	sim.spiders_spawned = int(d["spiders_spawned"])
 	sim.spider_next_s = float(d["spider_next_s"])
 	sim.notifications.clear()
@@ -302,6 +312,18 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 		sim.mantis.target_ant = int(mnd["target_ant"])
 		sim.mantis.alive = mnd["alive"]
 
+	# Fase 9: ausente en guardados de antes de esta fase; queda en "estación 0, sin batalla en
+	# curso", igual que si la partida nunca hubiera tenido este sistema.
+	sim.season_index = int(d.get("season_index", 0))
+	if d.has("rival_colony"):
+		var rcd: Dictionary = d["rival_colony"]
+		sim.rival_colony.battle_active = rcd.get("battle_active", false)
+		sim.rival_colony.battle_won = rcd.get("battle_won", false)
+		sim.rival_colony.queen.pos = _to_v2(rcd["queen_pos"])
+		sim.rival_colony.queen.hp = float(rcd["queen_hp"])
+		sim.rival_colony.queen.max_hp = float(rcd["queen_max_hp"])
+		sim.rival_colony.queen.alive = rcd["queen_alive"]
+
 	var ad: Dictionary = d["ants"]
 	var ants := sim.ants
 	ants.count = int(ad["count"])
@@ -335,6 +357,12 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	ants.stuck_t = PackedFloat32Array(ad["stuck_t"])
 	ants.check_acc = PackedFloat32Array(ad["check_acc"])
 	ants.max_stuck_seen = float(ad["max_stuck_seen"])
+	# Fase 9: ausente en guardados de antes de esta fase: todas quedan de bando 0 (jugador), igual
+	# que si esta fase nunca hubiera existido (no había hormigas rivales que guardar).
+	var faction_in: Array = ad.get("faction", [])
+	ants.faction = PackedByteArray(faction_in) if faction_in.size() == ants.count else PackedByteArray()
+	if ants.faction.size() != ants.count:
+		ants.faction.resize(ants.count)  # 0 por defecto: bando jugador
 
 	sim.plants.clear()
 	for pd in d["plants"]:
