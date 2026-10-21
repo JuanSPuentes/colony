@@ -45,6 +45,7 @@ var world_container: SubViewportContainer
 var terrain_view: TerrainView
 var plant_view: PlantView
 var corpse_view: CorpseView
+var brood_view: BroodView
 var overlay: OverlayView
 var ant_renderer: AntRenderer
 var spider_view: SpiderView
@@ -119,13 +120,14 @@ func _ready() -> void:
 	terrain_view = TerrainView.new()
 	plant_view = PlantView.new()
 	corpse_view = CorpseView.new()
+	brood_view = BroodView.new()
 	overlay = OverlayView.new()
 	ant_renderer = AntRenderer.new()
 	spider_view = SpiderView.new()
 	centipede_view = CentipedeView.new()
 	mantis_view = MantisView.new()
 	day_night_view = DayNightView.new()
-	for n in [terrain_view, plant_view, corpse_view, overlay, ant_renderer, spider_view, centipede_view, mantis_view, day_night_view]:
+	for n in [terrain_view, plant_view, corpse_view, brood_view, overlay, ant_renderer, spider_view, centipede_view, mantis_view, day_night_view]:
 		world_vp.add_child(n)
 	camera = Camera2D.new()
 	world_vp.add_child(camera)
@@ -175,6 +177,7 @@ func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> v
 	day_night_view.setup(sim)
 	plant_view.setup(sim)
 	corpse_view.setup(sim)
+	brood_view.setup(sim)
 	overlay.setup(sim)
 	ant_renderer.setup(sim)
 	spider_view.setup(sim)
