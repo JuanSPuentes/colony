@@ -256,11 +256,15 @@ func tick() -> void:
 		colony.tick(self, dt)
 		brood.tick(dt)
 		_update_era()
-		if tick_count % 3 == 0 and era == Era.MATURE:
+		# Fase 6: en el modo Test las amenazas actúan sin esperar a Colonia madura — el sandbox
+		# arranca con una población fija (50) que puede quedar por debajo de `era3_population` y
+		# nunca llegar sola a esa era; sin este `or test_mode`, aparecían (el jugador las hace
+		# aparecer a mano) pero nunca se movían ni atacaban porque `.step()` no se llamaba nunca.
+		if tick_count % 3 == 0 and (era == Era.MATURE or test_mode):
 			_update_spider(dt * 3.0, cfg.spider_first_population)
 			_update_centipede(dt * 3.0)
 			_update_mantis(dt * 3.0)
-		# Fase 6: el modo Test es un sandbox, nunca termina (ver `spawn_test_start`).
+		# El modo Test es un sandbox, nunca termina (ver `spawn_test_start`).
 		if not test_mode:
 			_check_game_over()
 			_check_victory()
@@ -298,6 +302,11 @@ func _update_spider(step_dt: float, first_population: int) -> void:
 	if spider.alive:
 		spider.step(step_dt)
 		return
+	# Fase 6: en el modo Test solo se mueve/ataca si ya está viva (de que la hizo aparecer el
+	# panel de pruebas); nunca aparece sola por población o por el temporizador de recurrencia —
+	# el sandbox se controla a mano, no solo.
+	if test_mode:
+		return
 	if spiders_spawned == 0 and ants.alive_count >= first_population:
 		spider.spawn(1.0)
 		spiders_spawned += 1
@@ -322,6 +331,8 @@ func _update_centipede(step_dt: float) -> void:
 	if centipede.alive:
 		centipede.step(step_dt)
 		return
+	if test_mode:
+		return
 	if centipedes_spawned == 0 and ants.alive_count >= cfg.centipede_first_population:
 		centipede.spawn(1.0)
 		centipedes_spawned += 1
@@ -344,6 +355,8 @@ func _update_centipede(step_dt: float) -> void:
 func _update_mantis(step_dt: float) -> void:
 	if mantis.alive:
 		mantis.step(step_dt)
+		return
+	if test_mode:
 		return
 	if mantises_spawned == 0 and ants.alive_count >= cfg.mantis_first_population:
 		mantis.spawn(1.0)
