@@ -6,14 +6,18 @@ extends CanvasLayer
 ## (1440x810 por defecto). `_top`/`_tools`/`_help`/`_legend` se conservan con los mismos
 ## nombres que en la Fase 0 porque `tools/ui_test.gd` los lee directamente.
 ##
-## Un solo panel con fondo opaco arriba a la izquierda agrupa TODO el estado del mundo: tres
-## secciones cortas (Colonia / Clima / Amenazas) y, debajo, las notificaciones. Antes eran dos
-## cajas separadas (una sin fondo, chocando con el texto de atrás, y el aviso amarillo aparte);
-## ahora es una sola, con margen, letra más chica y descripciones breves.
-##
-## Fase 3 (menú): la barra de abajo con todas las teclas se quitó de aquí (ocupaba media
-## pantalla); esa misma lista (`CONTROLS`) ahora vive en la sección "Controles" de
-## `OptionsScreen`, detrás de la tuerca, en vez de estar siempre encima del mundo.
+## Fase 10: panel lateral único, fijo y estático a la izquierda, AFUERA del mundo (`main.gd` reduce
+## el `SubViewport` del mundo para dejarle sitio en vez de dibujar el panel encima, ver
+## `main._resize_world_container()`). Reemplaza los dos paneles flotantes que había antes (estado +
+## herramientas): ahora es un solo `Panel` que ocupa todo el alto de la ventana, con una sección por
+## tema (Colonia/Clima/Cría-Amenazas/Herramienta/Reparto-Compra/Mejoras/Estación/Notificaciones).
+## Los overlays que sí siguen flotando sobre el mundo (insignia de feromona, panel de pausa, panel
+## de Test, pantalla de derrota, tooltip) se posicionan contra el rectángulo real del mundo
+## (`main.world_container`), no contra toda la ventana, para seguir centrados en el mapa visible.
+
+## `season_system.gd` no tiene `class_name` (lo carga `Simulation` con `preload`, ver ese archivo);
+## se preloadea igual acá para leer `SEASON_NAMES`/`SEASON_COUNT` sin duplicarlos.
+const SeasonSystem = preload("res://sim/colony/season_system.gd")
 
 const ERA_NAMES: Array[String] = ["Fundación", "Colonia joven", "Colonia madura"]
 const HEADER_COLOR := Color("7fd0ff")
@@ -21,17 +25,21 @@ const HEADER_COLOR := Color("7fd0ff")
 ## pantalla (antes 3.0 daba paneles casi a media ventana con la barra de abajo todavía puesta).
 const S := 2.3
 const FONT := 8.0 * S
-## El panel de estado usa letra más chica que el resto del HUD para caber en menos espacio.
+## El panel lateral usa letra más chica que el resto del HUD para caber en menos espacio.
 const PANEL_FONT := 6.0 * S
 const OUTLINE := 3
-const PANEL_W := 200.0
+## Ancho del panel lateral en píxeles reales de ventana. Debe coincidir con `Main.SIDEBAR_W` (ese
+## archivo reserva exactamente este ancho al achicar el `SubViewport` del mundo); documentado en
+## los dos lados para que quede claro por qué tienen que ir de la mano.
+const SIDEBAR_W_PX := 300.0
+## Ancho del panel expresado en las mismas unidades "baseline" (8px) que usa el resto del layout,
+## para poder reusar los helpers `_panel_label`/`_header`/etc. sin tocarlos: `PANEL_W * S` da
+## siempre `SIDEBAR_W_PX` exacto.
+const PANEL_W := SIDEBAR_W_PX / S
 ## Margen interno de los paneles (en las mismas unidades de 8px que el resto del layout).
 const MARGIN_X := 4.0
 const MARGIN_Y := 3.0
 const CONTENT_W := PANEL_W - MARGIN_X * 2.0
-## Alto del panel de estado desplegado y plegado (solo la línea de `_top`).
-const STATUS_H := 100.0
-const STATUS_FOLDED_H := 7.0 + MARGIN_Y * 2.0
 ## Columnas de la barra de controles: encabezado y pares [tecla, qué hace]. Si se agrega una tecla
 ## nueva en main.gd, se agrega aquí también para que el jugador la vea.
 ## Fase 5: COLONIA (comprar/ir a la reina) y PARTIDA (guardar/reiniciar) se quitaron de esta lista
@@ -43,28 +51,20 @@ const CONTROLS := [
 		["5", "Mover reina (clic der. cancela la orden)"],
 		["Q / E", "Cambiar subtipo"], ["Clic izq / der", "Pintar / quitar"]]],
 	["CÁMARA Y TIEMPO", [["WASD / clic medio", "Mover la cámara"], ["Rueda", "Zoom"], ["Espacio", "Pausa"],
-		["F1 / F2 / F3", "Velocidad x1 / x2 / x4"], ["I", "Plegar / desplegar estado"]]],
+		["F1 / F2 / F3", "Velocidad x1 / x2 / x4"], ["I", "Plegar / desplegar panel"]]],
 ]
 
-## Estado de plegado del panel de estado. `main.gd` lo cambia con I; el botón, con clic.
-var status_open := true
+## Estado de plegado del panel lateral. `main.gd` lo lee en `_resize_world_container()` para
+## devolverle el ancho completo al mundo quien lo pliega; la tecla I y el botón lo cambian.
+var sidebar_open := true
 
 ## Fase 3 (menú): `main.gd` la reenvía como `menu_requested` para que `app.gd` abra Opciones.
 signal gear_pressed
 
-var _status_panel: Panel
-var _status_body: Array[Control] = []
-var _status_btn: Button
-var _ctrl_panel: Panel
-## Fase 3: botones de compra (obrera, soldado, auto-compra) en el panel de herramientas.
-var _buy_row: HBoxContainer
-var _buy_btns: Array[Button] = []
-## Fase 5: sliders de reparto de castas (reemplazan 7/8/9 como forma principal, las teclas se
-## quedan como atajo — ver README sección 12). Mismo lugar que `_buy_row`: nunca se muestran a la
-## vez (uno es del modo incremental, el otro de la colonia con reina).
-var _caste_row: HBoxContainer
-var _caste_sliders: Array[HSlider] = []
-var _threat_header: Label
+var _sidebar: Panel
+## Todo lo que cuelga del panel salvo la línea superior (`_top`), para no usarse hoy pero se deja
+## documentado: con un solo panel ya no hace falta plegar por partes, se pliega entero
+## (`_sidebar.visible`).
 var _m: Node
 
 var _top: Label
@@ -83,13 +83,29 @@ var _tooltip: Label
 ## pueda reiniciar o salir sin saber que Shift+F5/la tuerca existen.
 var _pause_panel: PanelContainer
 ## Recuadro arriba al centro con la feromona activa (muestra de color + nombre), visible solo con
-## la herramienta Feromona [2]. Antes solo aparecía como texto chico dentro del panel de la
-## herramienta, mezclado con Capa/Zoom/Marcadas; esto lo hace imposible de perder de vista.
+## la herramienta Feromona [2]. Sigue siendo un overlay sobre el mundo (no una sección del panel):
+## es información espacial que se mira mientras se pinta, no mientras se lee el panel.
 var _phero_badge: PanelContainer
 var _phero_swatch: ColorRect
 var _phero_label: Label
 ## Fase 6: panel del modo Test (sandbox), visible solo con `sim.test_mode`.
 var _test_panel: PanelContainer
+
+## Fase 3: botones de compra (huevo, auto-compra) del modo incremental.
+var _buy_row: VBoxContainer
+var _buy_btns: Array[Button] = []
+## Fase 5: sliders de reparto de castas (modo clásico). Mismo lugar que `_buy_row`: nunca se
+## muestran a la vez (uno es del modo incremental, el otro de la colonia con reina).
+var _caste_row: VBoxContainer
+var _caste_sliders: Array[HSlider] = []
+var _threat_header: Label
+## Fase 9 (antes sin interfaz): mejoras de colonia, solo modo incremental.
+var _upgrade_section: Control
+var _upgrade_btns: Array[Button] = []
+## Fase 9 (antes sin interfaz): estación actual + estado de la colonia rival, solo incremental.
+var _season_section: Control
+var _season_label: Label
+var _rival_label: Label
 
 
 func _ready() -> void:
@@ -101,49 +117,54 @@ func _ready() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 
-	# Estado del mundo (arriba) y controles del jugador (debajo) van en dos recuadros iguales:
-	# mismo fondo, mismo borde, mismo margen, para que se lean como una sola familia de paneles.
-	var panel := _make_panel(root, Vector2(3, 1), Vector2(PANEL_W, STATUS_H))
-	_status_panel = panel
-	var y := 0.0
-	# `_top` queda visible aunque el panel esté plegado; le dejamos sitio al botón a la derecha.
-	_top = _panel_label(panel, y, CONTENT_W - 42.0)
-	y += 8.0
-	_header(panel, y, "COLONIA")
-	y += 7.0
-	_colony = _panel_rich(panel, y)
-	y += 7.0
-	_resources = _panel_label(panel, y)
-	y += 9.0
-	_header(panel, y, "CLIMA")
-	y += 7.0
-	_weather = _panel_label(panel, y)
-	y += 9.0
-	_threat_header = _header(panel, y, "AMENAZAS")
-	y += 7.0
-	_threats = _panel_label(panel, y)
-	y += 10.0
-	_log = _panel_rich(panel, y, 28.0)
-	for c in panel.get_children():
-		if c != _top:
-			_status_body.append(c)
-	_status_btn = _fold_button(panel, PANEL_W, toggle_status)
+	_sidebar = Panel.new()
+	_sidebar.add_theme_stylebox_override("panel", _panel_style(1.0))
+	_sidebar.position = Vector2.ZERO
+	_sidebar.size = Vector2(PANEL_W, 270.0) * S  # alto real lo fija `_layout()` cada frame.
+	_sidebar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_sidebar)
 
-	# Segundo recuadro, mismo estilo, recortado al ancho del texto (no al ancho del primero).
-	# Su posición vertical la fija `_layout()`: va justo debajo del panel de estado, plegado o no.
-	const CTRL_W := PANEL_W + 14.0
-	const CTRL_CONTENT_W := CTRL_W - MARGIN_X * 2.0
-	_ctrl_panel = _make_panel(root, Vector2(3, 113), Vector2(CTRL_W, 40))
-	var cy := 0.0
-	_tools = _panel_label(_ctrl_panel, cy, CTRL_CONTENT_W)
-	cy += 7.0
-	_ratio = _panel_label(_ctrl_panel, cy, CTRL_CONTENT_W)
-	_buy_row = HBoxContainer.new()
-	_buy_row.position = Vector2(MARGIN_X, MARGIN_Y + cy + 1.0) * S
-	_buy_row.size = Vector2(CTRL_CONTENT_W, 8.0) * S
-	_buy_row.add_theme_constant_override("separation", int(3 * S))
-	_buy_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_ctrl_panel.add_child(_buy_row)
+	var y := 0.0
+	# El botón de plegar vive FUERA del panel (hijo de `root`, no de `_sidebar`): si colgara del
+	# panel, se escondería con él al plegarlo y ya no habría forma de volver a abrirlo con el mouse.
+	_build_fold_button(root)
+	y += 9.0
+	_top = _panel_label(_sidebar, y)
+	y += 9.0
+
+	_header(_sidebar, y, "COLONIA")
+	y += 7.0
+	_colony = _panel_rich(_sidebar, y)
+	y += 7.0
+	_resources = _panel_label(_sidebar, y)
+	y += 10.0
+
+	_header(_sidebar, y, "CLIMA")
+	y += 7.0
+	_weather = _panel_label(_sidebar, y)
+	y += 10.0
+
+	_threat_header = _header(_sidebar, y, "AMENAZAS")
+	y += 7.0
+	_threats = _panel_label(_sidebar, y)
+	y += 10.0
+
+	_header(_sidebar, y, "HERRAMIENTA")
+	y += 7.0
+	_tools = _panel_label(_sidebar, y)
+	y += 7.0
+	_legend = _panel_rich(_sidebar, y, 8.0)
+	y += 11.0
+
+	_header(_sidebar, y, "REPARTO / COMPRA")
+	y += 7.0
+	_ratio = _panel_label(_sidebar, y)
+	y += 7.0
+	_buy_row = VBoxContainer.new()
+	_buy_row.position = Vector2(MARGIN_X, MARGIN_Y + y) * S
+	_buy_row.size = Vector2(CONTENT_W, 8.0) * S
+	_buy_row.add_theme_constant_override("separation", int(2 * S))
+	_sidebar.add_child(_buy_row)
 	for k in 2:
 		var b := _buy_button()
 		_buy_row.add_child(b)
@@ -151,32 +172,64 @@ func _ready() -> void:
 	_buy_btns[0].pressed.connect(func() -> void: _m.sim.cmd_buy_egg())
 	_buy_btns[1].pressed.connect(func() -> void: _m.sim.cmd_cycle_auto_buy())
 
-	# Fase 5: debajo de la línea de `_ratio` (a diferencia de `_buy_row`, que sí se superpone con
-	# `_ratio` a propósito porque nunca se muestran juntos — `_caste_row` sí se ve a la vez que
-	# `_ratio`, que le sirve de etiqueta con los porcentajes). Orden Obreras/Nodrizas/Soldados/Zánganos.
-	_caste_row = HBoxContainer.new()
-	_caste_row.position = Vector2(MARGIN_X, MARGIN_Y + cy + 8.0) * S
-	_caste_row.size = Vector2(CTRL_CONTENT_W, 8.0) * S
-	_caste_row.add_theme_constant_override("separation", int(3 * S))
-	_ctrl_panel.add_child(_caste_row)
+	_caste_row = VBoxContainer.new()
+	_caste_row.position = Vector2(MARGIN_X, MARGIN_Y + y) * S
+	_caste_row.size = Vector2(CONTENT_W, 8.0) * S
+	_caste_row.add_theme_constant_override("separation", int(2 * S))
+	_sidebar.add_child(_caste_row)
 	var castes := [CasteDefs.Caste.WORKER, CasteDefs.Caste.NURSE, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE]
 	for c in castes:
 		var s := HSlider.new()
 		s.min_value = 0.05
 		s.max_value = 0.9
 		s.step = 0.01
-		s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		s.custom_minimum_size = Vector2(0, 8.0) * S
+		s.custom_minimum_size = Vector2(CONTENT_W, 8.0) * S
 		s.modulate = CasteDefs.COLORS[c]
 		_caste_row.add_child(s)
 		_caste_sliders.append(s)
 		s.value_changed.connect(func(v: float) -> void: _m.sim.cmd_set_caste_target(c, v))
-	cy += 18.0  # dejar sitio bajo el más alto de los dos (`_caste_row`, que termina en cy+16).
-	_legend = _panel_rich(_ctrl_panel, cy, 8.0, CTRL_CONTENT_W)
+	y += 9.0 * 2  # dos filas posibles (compra de huevo es 2 botones, reparto es 4 sliders).
+
+	# Fase 9: mejoras de colonia — antes solo accesibles por código (`cmd_buy_upgrade`), ahora con
+	# un botón por stat. Solo tiene sentido en el modo incremental (`Upgrades`/`cmd_buy_upgrade`
+	# están atados a `sim.incremental`, ver `sim/colony/upgrades.gd`); se oculta entero en los
+	# demás modos (`update_info`). Un `Control` simple, no un `*Container`: estos no auto-posicionan
+	# a sus hijos (a diferencia de `_buy_row`/`_caste_row`, que sí lo necesitan para las filas de
+	# botones/sliders), así que las posiciones explícitas de `_header`/`_panel_label` valen tal cual
+	# — un `VBoxContainer` aquí recalcula el tamaño mínimo de cada `Label` y, con `clip_text=true`,
+	# lo reporta como 0 y colapsa la fila entera (headers invisibles: bug real visto en pantalla).
+	_upgrade_section = Control.new()
+	_upgrade_section.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sidebar.add_child(_upgrade_section)
+	_header(_upgrade_section, y, "MEJORAS")
+	y += 7.0
+	for stat in Upgrades.STAT_COUNT:
+		var ub := _buy_button()
+		ub.position = Vector2(MARGIN_X, MARGIN_Y + y) * S
+		_upgrade_section.add_child(ub)
+		_upgrade_btns.append(ub)
+		ub.pressed.connect(func() -> void: _m.sim.cmd_buy_upgrade(stat))
+		y += 8.0
+
+	# Fase 9: estación actual + estado de la colonia rival — tampoco tenía interfaz, solo
+	# `sim.season_index`/`sim.rival_colony` leídos por código. Solo incremental, mismo motivo que
+	# Mejoras (`sim/colony/season_system.gd` solo corre en ese modo). Mismo `Control` simple que
+	# `_upgrade_section`, por el mismo motivo.
+	_season_section = Control.new()
+	_season_section.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sidebar.add_child(_season_section)
+	_header(_season_section, y, "ESTACIÓN")
+	y += 7.0
+	_season_label = _panel_label(_season_section, y)
+	y += 7.0
+	_rival_label = _panel_label(_season_section, y)
+	y += 7.0
+
+	y += 3.0
+	_log = _panel_rich(_sidebar, y, 28.0)
 
 	_build_gear_button(root)
 	_build_phero_badge(root)
-	_layout()
 
 	_defeat = Label.new()
 	_defeat.add_theme_font_size_override("font_size", FONT * 2.0)
@@ -199,24 +252,26 @@ func _ready() -> void:
 	root.add_child(_tooltip)
 
 
-## Botón "ocultar / mostrar" en la esquina superior derecha de un panel. Sin foco de teclado: si lo
-## tuviera, Espacio (pausa) lo activaría en vez de pausar.
-func _fold_button(parent: Panel, panel_w: float, on_press: Callable) -> Button:
+## Botón "ocultar / mostrar" el panel lateral, fijo en la esquina superior izquierda de la ventana
+## (no del panel: así sigue visible y clicable aunque el panel esté oculto).
+func _build_fold_button(root: Control) -> void:
 	var b := Button.new()
 	b.flat = true
 	b.focus_mode = Control.FOCUS_NONE
 	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	b.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	b.add_theme_font_size_override("font_size", PANEL_FONT)
 	b.add_theme_color_override("font_color", HEADER_COLOR)
 	b.add_theme_color_override("font_hover_color", Color.WHITE)
 	b.add_theme_color_override("font_pressed_color", Color.WHITE)
-	b.position = Vector2(panel_w - MARGIN_X - 40.0, MARGIN_Y - 1.0) * S
-	b.custom_minimum_size = Vector2(40.0, 8.0) * S
+	b.position = Vector2(MARGIN_X, MARGIN_Y) * S
+	b.custom_minimum_size = Vector2(PANEL_W - MARGIN_X * 2.0, 7.0) * S
 	b.size = b.custom_minimum_size
-	b.pressed.connect(on_press)
-	parent.add_child(b)
-	return b
+	b.pressed.connect(toggle_sidebar)
+	root.add_child(b)
+	_sidebar_btn = b
+
+
+var _sidebar_btn: Button
 
 
 ## Fase 3 (menú): tuerca en la esquina superior derecha de la ventana real (no del panel: usa
@@ -239,9 +294,10 @@ func _build_gear_button(root: Control) -> void:
 	root.add_child(b)
 
 
-## Recuadro arriba al centro con la feromona activa: una muestra de color (mismo color que la capa
-## de depuración, `OverlayView.PHERO_COLORS`) y su nombre. Solo visible con la herramienta
-## Feromona [2] (ver `_layout`/`update_info`, que lo esconde el resto del tiempo).
+## Recuadro con la feromona activa: una muestra de color (mismo color que la capa de depuración,
+## `OverlayView.PHERO_COLORS`) y su nombre. Solo visible con la herramienta Feromona [2]; su
+## posición se recalcula cada frame contra el rectángulo del mundo (`update_info`), no contra toda
+## la ventana, para seguir centrado sobre el mapa visible aunque el panel lateral le quite sitio.
 func _build_phero_badge(root: Control) -> void:
 	var panel := PanelContainer.new()
 	var style := _panel_style()
@@ -250,8 +306,6 @@ func _build_phero_badge(root: Control) -> void:
 	style.content_margin_top = 3.0 * S
 	style.content_margin_bottom = 3.0 * S
 	panel.add_theme_stylebox_override("panel", style)
-	panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	panel.position.y = 3.0 * S
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.visible = false
 	root.add_child(panel)
@@ -281,7 +335,6 @@ func _build_pause_panel(root: Control) -> void:
 	style.content_margin_top = 10.0 * S
 	style.content_margin_bottom = 10.0 * S
 	panel.add_theme_stylebox_override("panel", style)
-	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.visible = false
 	root.add_child(panel)
@@ -310,9 +363,8 @@ func _build_pause_panel(root: Control) -> void:
 
 
 ## Fase 6: panel del modo Test (sandbox) — reiniciar, poner/quitar amenazas, agregar hormigas de
-## cualquier casta. Arriba a la derecha; `update_info` lo reposiciona cada vez según su tamaño real
-## (mismo truco que `_pause_panel`/`_phero_badge`, no hace falta saber el ancho de antemano) y solo
-## lo deja visible con `sim.test_mode`.
+## cualquier casta. Su posición la fija `update_info` cada frame contra la esquina superior derecha
+## del rectángulo del mundo (no de toda la ventana), y solo lo deja visible con `sim.test_mode`.
 func _build_test_panel(root: Control) -> void:
 	var panel := PanelContainer.new()
 	var style := _panel_style()
@@ -364,13 +416,12 @@ func _test_btn(parent: Control, text: String, cb: Callable) -> void:
 
 
 ## Botón de compra: recuadro con borde (a diferencia de los de plegar, que son solo texto) para que
-## se lea como algo que se pulsa. Sin foco de teclado, por el mismo motivo que `_fold_button`.
+## se lea como algo que se pulsa. Sin foco de teclado, por el mismo motivo que el botón de plegar.
 func _buy_button() -> Button:
 	var b := Button.new()
 	b.focus_mode = Control.FOCUS_NONE
 	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	b.custom_minimum_size = Vector2(0, 8.0) * S
+	b.custom_minimum_size = Vector2(CONTENT_W, 8.0) * S
 	b.add_theme_font_size_override("font_size", PANEL_FONT)
 	for s in ["normal", "hover", "pressed", "disabled"]:
 		var st := StyleBoxFlat.new()
@@ -387,26 +438,17 @@ func _buy_button() -> Button:
 	return b
 
 
-## Alto del panel de estado desplegado: crece con los avisos en vez de dejar siempre un hueco fijo
-## para ellos (`STATUS_H` es el alto con la lista de avisos llena a 4 líneas).
-func _status_open_h() -> float:
-	var lines := _log.text.count("\n") if _log != null else 0
-	return minf(STATUS_H, STATUS_H - 32.0 + 8.0 * lines)
-
-
-func toggle_status() -> void:
-	status_open = not status_open
+func toggle_sidebar() -> void:
+	sidebar_open = not sidebar_open
 	_layout()
 
 
-## Aplica el estado de plegado: tamaño, visibilidad y el panel de herramientas pegado debajo del
-## de estado.
+## Aplica el estado de plegado (todo el panel, de una) y lo estira al alto real de la ventana.
 func _layout() -> void:
-	for c in _status_body:
-		c.visible = status_open
-	_status_btn.text = "ocultar (I)" if status_open else "mostrar (I)"
-	_status_panel.size.y = (_status_open_h() if status_open else STATUS_FOLDED_H) * S
-	_ctrl_panel.position.y = _status_panel.position.y + _status_panel.size.y + 4.0 * S
+	_sidebar.visible = sidebar_open
+	_sidebar_btn.text = "ocultar panel (I)" if sidebar_open else "mostrar panel (I)"
+	var h := get_viewport().get_visible_rect().size.y if get_viewport() != null else 270.0 * S
+	_sidebar.size.y = maxf(h, 270.0 * S)
 
 
 ## Mismo fondo oscuro y borde dorado en todos los recuadros de la interfaz (paneles, botones de
@@ -419,18 +461,6 @@ func _panel_style(bg_alpha: float = 0.92) -> StyleBoxFlat:
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(int(3 * S))
 	return style
-
-
-## Un recuadro con el mismo fondo/borde en toda la interfaz, para que se lea como una sola familia
-## de paneles (no uno con fondo y el resto suelto encima del mundo).
-func _make_panel(parent: Control, pos: Vector2, size: Vector2) -> Panel:
-	var panel := Panel.new()
-	panel.add_theme_stylebox_override("panel", _panel_style())
-	panel.position = pos * S
-	panel.size = size * S
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(panel)
-	return panel
 
 
 ## Como `_label`, pero en letra chica, con el margen del panel ya aplicado, y en coordenadas
@@ -447,6 +477,7 @@ func _panel_label(parent: Control, y: float, w: float = CONTENT_W) -> Label:
 	l.clip_text = true
 	l.custom_minimum_size = Vector2(w, 0) * S
 	l.size = Vector2(w, 7) * S
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	parent.add_child(l)
 	return l
 
@@ -484,6 +515,15 @@ func _trend_arrow(v: float) -> String:
 
 func _plural(n: int, one: String, many: String) -> String:
 	return "%d %s" % [n, one if n == 1 else many]
+
+
+## Rectángulo real del mundo en la ventana (posición y tamaño del `SubViewportContainer` de
+## `main.gd`), para que los overlays que flotan sobre el mapa (insignia de feromona, pausa, panel
+## de Test, derrota) se centren en el mapa visible y no en el hueco que deja el panel lateral.
+func _world_rect(m: Node) -> Rect2:
+	if m.world_container == null:
+		return Rect2(Vector2.ZERO, get_viewport().get_visible_rect().size)
+	return Rect2(m.world_container.position, m.world_container.size)
 
 
 ## Modo incremental (Fase 3): sin semilla, sin agua, sin araña ni eras. Muestra el día, la comida
@@ -553,6 +593,23 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 	_buy_btns[0].text = "[7] Huevo: %.0f" % econ.egg_cost()
 	_buy_btns[0].disabled = not econ.can_buy_egg()
 	_buy_btns[1].text = "[9] Auto: %s" % IncrementalEconomy.AUTO_NAMES[econ.auto_mode]
+
+	# Fase 9 (antes sin interfaz): mejoras de colonia.
+	var up := sim.upgrades
+	for stat in Upgrades.STAT_COUNT:
+		var b := _upgrade_btns[stat]
+		b.text = "%s Nv.%d: %.0f" % [Upgrades.STAT_NAMES[stat], up.levels[stat], up.cost(stat)]
+		b.disabled = not up.can_buy(stat)
+
+	# Fase 9 (antes sin interfaz): estación actual + colonia rival.
+	_season_label.text = "%s (día %d/%d)" % [
+		SeasonSystem.SEASON_NAMES[sim.season_index], (sim.day_number() - 1) % sim.cfg.season_length_days + 1,
+		sim.cfg.season_length_days] if sim.season_index < SeasonSystem.SEASON_COUNT else "¡Las 4 estaciones superadas!"
+	var rival := sim.rival_colony
+	if rival.battle_active:
+		_rival_label.text = "¡Batalla! Reina rival %d%%" % int(100.0 * rival.queen.hp / maxf(rival.queen.max_hp, 0.01))
+	else:
+		_rival_label.text = "Sin ataque en curso"
 
 
 ## Fase 5: tooltip al pasar el mouse. Se recalcula cada frame (barato: una hormiga cercana y una
@@ -671,14 +728,18 @@ func update_info(m: Node) -> void:
 	_buy_row.visible = sim.incremental
 	_ratio.visible = not sim.incremental
 	_caste_row.visible = not sim.incremental
+	# Fase 9: Mejoras y Estación solo existen de verdad en el modo incremental (`Upgrades`/
+	# `SeasonSystem` atados a `sim.incremental`, ver sim/colony/upgrades.gd y season_system.gd).
+	_upgrade_section.visible = sim.incremental
+	_season_section.visible = sim.incremental
 
+	var world_rect := _world_rect(m)
 	_pause_panel.visible = m.paused and not sim.game_over
 	if _pause_panel.visible:
-		_pause_panel.position = (get_viewport().get_visible_rect().size - _pause_panel.size) * 0.5
+		_pause_panel.position = world_rect.position + (world_rect.size - _pause_panel.size) * 0.5
 	_test_panel.visible = sim.test_mode
 	if _test_panel.visible:
-		var vp_size := get_viewport().get_visible_rect().size
-		_test_panel.position = Vector2(vp_size.x - _test_panel.size.x - 10.0 * S, 10.0 * S)
+		_test_panel.position = world_rect.position + Vector2(world_rect.size.x - _test_panel.size.x - 10.0 * S, 10.0 * S)
 	_threat_header.text = "CRÍA" if sim.incremental else "AMENAZAS"
 	if sim.incremental:
 		_update_incremental(m, sim)
@@ -697,7 +758,7 @@ func update_info(m: Node) -> void:
 		_phero_swatch.color = OverlayView.PHERO_COLORS[m.phero_index]
 		var name: String = OverlayView.LAYER_NAMES[m.phero_index + 1]
 		_phero_label.text = name[0].to_upper() + name.substr(1)
-		_phero_badge.position.x = (get_viewport().get_visible_rect().size.x - _phero_badge.size.x) * 0.5
+		_phero_badge.position = world_rect.position + Vector2((world_rect.size.x - _phero_badge.size.x) * 0.5, 3.0 * S)
 
 	if m.overlay.layer == OverlayView.Layer.STATES:
 		var parts := ""
@@ -723,4 +784,4 @@ func update_info(m: Node) -> void:
 			_defeat.text = "LA COLONIA CAYÓ\n%s\n\nF5 para reiniciar" % sim.game_over_reason
 			_defeat.add_theme_color_override("font_color", Color("ff6a6a"))
 		_defeat.size = Vector2(400, 120) * S / 2.0
-		_defeat.position = (Vector2(240, 135) * S) - _defeat.size * 0.5
+		_defeat.position = world_rect.position + world_rect.size * 0.5 - _defeat.size * 0.5

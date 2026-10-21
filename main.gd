@@ -19,6 +19,9 @@ const ZOOM_LEVELS: Array[float] = [0.5, 1.0, 2.0, 3.0, 4.0]
 const MAX_TICKS_PER_FRAME := 40
 const OVERLAY_HZ := 5.0
 const WORLD_SIZE := Vector2(480.0, 270.0)
+## Fase 10 (HUD lateral): ancho fijo del panel lateral, en píxeles reales de ventana. Debe coincidir
+## con `Hud.SIDEBAR_W` (el HUD dibuja el panel con ese mismo ancho); documentado en los dos lados.
+const SIDEBAR_W := 300.0
 ## Traduce clics/trazos a los `cmd_*` de `sim` según la herramienta activa (ver ese archivo).
 const InputTools = preload("res://main_input_tools.gd")
 
@@ -218,13 +221,28 @@ func load_game() -> void:
 
 
 func _resize_world_container() -> void:
-	var sz := world_size_override if world_size_override != Vector2.ZERO else Vector2(get_tree().root.size)
-	world_container.position = Vector2.ZERO
-	world_container.size = sz
+	# Las pruebas (`world_size_override`) fijan un tamaño exacto para que el mapeo de clics sea 1:1
+	# y predecible; en ese modo el panel lateral NO se reserva, para no cambiarles el mapeo de
+	# coordenadas (ver ARCHITECTURE.md sección 2: lo nuevo no debe romper lo viejo en silencio).
+	if world_size_override != Vector2.ZERO:
+		world_container.position = Vector2.ZERO
+		world_container.size = world_size_override
+		world_container.stretch_shrink = maxi(1, roundi(world_size_override.x / WORLD_SIZE.x))
+		return
+	var total := Vector2(get_tree().root.size)
+	var sidebar_w := SIDEBAR_W if (hud != null and hud.sidebar_open) else 0.0
+	var free := Vector2(maxf(1.0, total.x - sidebar_w), total.y)
+	# El mundo llena TODA el área libre (sin franjas negras): a diferencia de un ajuste que respeta
+	# el aspecto 16:9 exacto del mundo (480x270) dejando letterbox arriba/abajo cuando el área libre
+	# es más angosta que alta, acá se estira el contenedor a lo ancho y lo alto disponibles. Con el
+	# ancho de panel y la ventana de hoy la distorsión es mínima y el usuario prefirió esto a ver
+	# bordes vacíos.
+	world_container.position = Vector2(sidebar_w, 0.0)
+	world_container.size = free
 	# `stretch=true` hace que el SubViewport interno renderice a la resolución del contenedor,
 	# no a la que le pusimos; `stretch_shrink` es lo que de verdad controla la baja resolución
 	# interna (el "pixel art" real) antes de ampliarla sin filtro para mostrarla.
-	world_container.stretch_shrink = maxi(1, roundi(sz.x / WORLD_SIZE.x))
+	world_container.stretch_shrink = maxi(1, roundi(free.x / WORLD_SIZE.x))
 
 
 func _current_phero() -> PheromoneField:
@@ -315,7 +333,7 @@ func _outer_to_inner_scale() -> Vector2:
 ## Convierte una posición de evento de mouse (en píxeles de la ventana real) a coordenadas del
 ## mundo en píxeles, ya pasando por el zoom y la posición de la cámara.
 func _to_world(screen_pos: Vector2) -> Vector2:
-	var inner := screen_pos * _outer_to_inner_scale()
+	var inner := (screen_pos - world_container.position) * _outer_to_inner_scale()
 	return world_vp.get_canvas_transform().affine_inverse() * inner
 
 
@@ -431,7 +449,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			else:
 				start(seed_value)
 		KEY_I:
-			hud.toggle_status()
+			hud.toggle_sidebar()
 		KEY_F6:
 			save_game()
 		KEY_F7:

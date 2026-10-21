@@ -123,14 +123,17 @@ func _run() -> void:
 	_check("9 activa la auto-compra", _main.sim.econ.auto_mode == IncrementalEconomy.Auto.ON and _main.hud._buy_btns[1].text.contains("encendida"))
 	await _key(KEY_9)
 
-	# Panel plegable: I pliega el estado (la línea de arriba sigue visible). La barra de controles
-	# de abajo se quitó del HUD (Fase 3): esa misma lista vive ahora en Opciones (`Hud.CONTROLS`).
+	# Fase 10: panel lateral único, plegable entero con I (ya no por secciones). Al plegarlo, el
+	# mundo recupera el ancho completo (en modo prueba el override lo deja fijo en 480x270 de
+	# todas formas, ver `main._resize_world_container`; lo que importa acá es que el panel entero
+	# se oculte/muestre). La barra de controles de abajo se quitó del HUD (Fase 3): esa misma lista
+	# vive ahora en Opciones (`Hud.CONTROLS`).
 	var hud: Hud = _main.hud
-	var status_h: float = hud._status_panel.size.y
+	_check("el panel arranca visible", hud.sidebar_open and hud._sidebar.visible)
 	await _key(KEY_I)
-	_check("I pliega el panel de estado y deja la línea de arriba", not hud.status_open and hud._status_panel.size.y < status_h and hud._top.visible and not hud._weather.visible and hud._ctrl_panel.position.y < status_h)
+	_check("I pliega el panel entero", not hud.sidebar_open and not hud._sidebar.visible)
 	await _key(KEY_I)
-	_check("I lo vuelve a desplegar", hud.status_open and hud._status_panel.size.y == status_h and hud._weather.visible)
+	_check("I lo vuelve a desplegar", hud.sidebar_open and hud._sidebar.visible and hud._weather.visible)
 
 	# Pausa y velocidades.
 	await _key(KEY_SPACE)
