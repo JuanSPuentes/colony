@@ -7,7 +7,7 @@ extends Node2D
 ## El cuerpo usa el set de sprites de `view/sprites/ant/` (8 direcciones, pixel art en gris,
 ## 64x64, generado para este juego — ver `A_high-quality_2D_pixel-Idle.zip`), en vez del dibujo
 ## procedural de antes (3 lóbulos + patas/antenas horneadas a mano). Cada hormiga elige, por
-## tick, el sprite de la dirección más cercana a hacia dónde camina (`_dir_index`); un
+## tick, el sprite de la dirección más cercana a hacia dónde camina (`SpriteDir.index`); un
 ## `MultiMeshInstance2D` por dirección es más barato que rotar libremente un solo sprite (que
 ## emborronaría el pixel art) y más simple que un shader de atlas con UV por instancia. El color de
 ## instancia multiplica al sprite (gris) igual que multiplicaba al color por vértice del mesh viejo,
@@ -26,7 +26,8 @@ const WING_SIZE := Vector2(2.4, 0.9)
 
 ## Orden fijo, en el mismo sentido que crece `Vector2.angle()` (X+ = este, Y+ = hacia abajo/hacia
 ## adentro de la tierra = "sur"): est, sureste, sur, suroeste, oeste, noroeste, norte, noreste.
-## `_dir_index` devuelve un índice a este array.
+## `SpriteDir.index` devuelve un índice a este array (compartido con `ThreatSpriteView`, la base
+## de las vistas de araña/ciempiés/mantis).
 const DIR_TEXTURES: Array[Texture2D] = [
 	preload("res://view/sprites/ant/east.png"),
 	preload("res://view/sprites/ant/south-east.png"),
@@ -37,7 +38,7 @@ const DIR_TEXTURES: Array[Texture2D] = [
 	preload("res://view/sprites/ant/north.png"),
 	preload("res://view/sprites/ant/north-east.png"),
 ]
-const DIR_COUNT := 8
+const DIR_COUNT := SpriteDir.COUNT
 
 ## Umbral de desplazamiento (al cuadrado) para actualizar la dirección: por debajo de esto una
 ## hormiga casi quieta no cambia de sprite por ruido de redondeo de posición.
@@ -122,13 +123,6 @@ func _ensure_capacity(n: int) -> void:
 		_last_dir.resize(_capacity)
 
 
-## Sector de 45° más cercano a `angle` (radianes, `Vector2.angle()`: 0 = este, crece hacia +Y).
-## Ver el orden de `DIR_TEXTURES` arriba.
-func _dir_index(angle: float) -> int:
-	var a := fposmod(angle, TAU)
-	return int(round(a / (PI / 4.0))) % DIR_COUNT
-
-
 ## `alpha` (0..1) es qué fracción del tick actual ha transcurrido. `frame_start_pos`, si viene con
 ## tamaño suficiente, es de dónde partió cada hormiga al inicio de este frame real (puede cubrir
 ## varios ticks a velocidad x2/x4); una hormiga nacida después de capturarlo cae al `ants.prev` de
@@ -150,7 +144,7 @@ func update(alpha: float, frame_start_pos: PackedVector2Array = PackedVector2Arr
 		var moving := delta.length_squared() > TURN_EPS2
 		var dir := _last_dir[i]
 		if moving:
-			dir = _dir_index(delta.angle())
+			dir = SpriteDir.index(delta.angle())
 			_last_dir[i] = dir
 		# Tamaño por casta (hoy solo la reina, bien más grande que el resto: ver CasteDefs.VISUAL_SCALE).
 		var scale := CasteDefs.VISUAL_SCALE[ants.caste[i]]
