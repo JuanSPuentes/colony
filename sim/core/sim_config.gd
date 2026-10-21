@@ -246,6 +246,11 @@ extends Resource
 @export var inc_rain_first_s := 600.0
 ## Hojas que rebrota cada planta por segundo, solo de día y hasta su máximo.
 @export var inc_plant_regrow_per_s := 0.06
+## Fase 8: condición de victoria del modo incremental — sobrevivir esto en segundos de simulación
+## DESPUÉS de que aparece la primera araña, con la reina viva (ver README sección 9c/15). Campo
+## propio, no `victory_survive_s`: los dos modos escalan distinto y conviene poder ajustarlos
+## por separado. Primera estimación sin playtesting todavía, igual que el resto del balance.
+@export var inc_victory_survive_s := 150.0
 
 @export_group("Fase 4: victoria")
 ## Cuánto tiempo de simulación hay que sobrevivir en Colonia madura (con la reina viva) para ganar.

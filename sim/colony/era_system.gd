@@ -42,3 +42,17 @@ static func check_victory(sim) -> void:
 		sim.game_over = true
 		sim.victory = true
 		sim.game_over_reason = "La colonia prosperó."
+
+
+## Fase 8: condición de victoria del modo incremental (README sección 15), mismo espíritu que
+## `check_victory` pero sin eras: el disparador es que aparezca la primera araña
+## (`sim._inc_threat_since_s`, puesto en `Simulation.tick()` apenas `spider.alive` es cierto por
+## primera vez) en vez de llegar a Colonia madura.
+static func check_incremental_victory(sim) -> void:
+	var cfg: SimConfig = sim.cfg
+	if sim.game_over or sim._inc_threat_since_s < 0.0:
+		return
+	if sim.time_s() - sim._inc_threat_since_s >= cfg.inc_victory_survive_s:
+		sim.game_over = true
+		sim.victory = true
+		sim.game_over_reason = "La colonia prosperó."

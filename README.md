@@ -38,6 +38,7 @@ convención de una prueba por fase. Existe justo para que el proyecto no se vuel
 12. [Fase 5: el ciempiés](#12-fase-5-el-ciempiés)
 13. [Fase 6: el modo Test](#13-fase-6-el-modo-test)
 14. [Fase 7: la mantis](#14-fase-7-la-mantis)
+15. [Fase 8: victoria del modo incremental](#15-fase-8-victoria-del-modo-incremental)
 
 ---
 
@@ -335,6 +336,7 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | `Godot --headless --path . --script tools/test_phase5.gd` | El ciempiés, segunda amenaza (sección 12): no aparece antes del umbral de población, aparece al cruzarlo, encuentra y daña una hormiga bajo tierra (no solo en superficie, a diferencia de la araña), toda la colonia lo ataca igual que a la araña, muere y deja cadáver recolectable, huye y desaparece con poca vida, el modo incremental nunca lo dispara, guardar/cargar conserva su estado. |
 | `Godot --headless --path . --script tools/test_phase6.gd` | El modo Test (sección 13): composición fija de 50 hormigas al arrancar, empieza de día, la reina puede morir sin terminar la partida, los comandos de lluvia/araña/ciempiés del panel de pruebas, agregar hormigas de cualquier casta a voluntad, los otros dos modos no se ven afectados, guardar/cargar conserva `test_mode`. |
 | `Godot --headless --path . --script tools/test_phase7.gd` | La mantis, tercera amenaza (sección 14): no aparece antes del umbral, aparece al cruzarlo, nunca se mueve, no reacciona a una hormiga lejos pero sí a una que entra en `mantis_strike_range_px`, pega más fuerte que la araña, toda la colonia la ataca igual, muere y deja cadáver, huye con poca vida, el modo incremental nunca la dispara, guardar/cargar conserva su estado. |
+| `Godot --headless --path . --script tools/test_phase8.gd` | Victoria del modo incremental (sección 15): gana al sobrevivir `inc_victory_survive_s` desde que aparece la araña con la reina viva, no gana antes de tiempo, no gana si la araña nunca apareció, morir la reina antes del umbral sigue siendo derrota, el modo clásico no se ve afectado (campos de config separados), guardar/cargar conserva el progreso hacia la victoria. |
 | `Godot --headless --path . --script tools/test_app_menu.gd` | El menú (`app/`): arranca mostrando el menú, Opciones desde el menú vuelve al menú, Opciones desde la tuerca en partida vuelve a la partida (pausada) y no al menú, Juego normal arranca en modo incremental (comida/compra), Modo infinito arranca en modo Historia con la colonia completa, Test arranca el modo sandbox con 50 hormigas, F5 conserva el modo, volumen/brillo se guardan, Salir pide confirmación en vez de cerrar directo. |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
@@ -479,11 +481,9 @@ verdad:
 - **`victory_survive_s` (180 s por defecto) es una primera estimación, sin playtesting real
   todavía** — igual que el resto del balance del proyecto (ver sección 10). Ajustarlo es cambiar un
   número en `SimConfig`, no lógica.
-- **Solo la colonia con reina (`Modo infinito` en el menú de hoy) puede ganar.** El modo de
-  comida/compra (`Juego normal`) ya tiene una amenaza real (la araña, agregada después de esta
-  fase — ver sección 3) y la reina ya podía morir antes de eso (de hambre/sed prolongadas, igual
-  que en el modo clásico), pero sigue sin condición de victoria propia. Queda pendiente a
-  propósito: agregarla es la continuación obvia ahora que hay una amenaza, no se hizo todavía.
+- **Solo la colonia con reina (`Modo infinito`) podía ganar hasta esta fase.** El modo de
+  comida/compra (`Juego normal`) ya tenía una amenaza real (la araña) y la reina ya podía morir
+  antes de eso, pero no tenía condición de victoria propia — la Fase 8 (sección 15) lo agrega.
 - **El cronómetro de victoria no se reinicia si la población baja de Colonia madura.** Una vez que
   la colonia llega ahí por primera vez (`Simulation._mature_since_s`), el reloj corre aunque
   mueran hormigas después; bajar de era no existe hoy (las eras solo suben), así que esto no se
@@ -614,3 +614,34 @@ pasa lo bastante cerca, pega mucho más fuerte que las otras dos (`cfg.mantis_da
 - **Simplificación deliberada:** números de balance sin playtesting todavía, igual que las otras
   dos amenazas. Sigue sin soporte para "2 mantis a la vez" (una instancia por tipo, ver sección
   13).
+
+## 15. Fase 8: victoria del modo incremental
+
+Hasta esta fase solo la colonia con reina (`Modo infinito`) podía ganar (Fase 4); "Juego normal"
+(el modo incremental, comida/compra) solo podía perderse. Esta fase le agrega su propia condición
+de victoria, mismo espíritu que la Fase 4 (sobrevivir un tiempo con la reina viva) pero adaptada a
+que este modo no tiene eras.
+
+- **Condición:** sobrevivir `cfg.inc_victory_survive_s` segundos de simulación (150 s por defecto)
+  DESPUÉS de que aparece la primera araña, con la reina viva. El disparador es la araña (la
+  amenaza real de este modo) en vez de llegar a Colonia madura, que es el equivalente del modo
+  clásico pero este modo no tiene eras.
+- **Dónde vive:** `Simulation._inc_threat_since_s` (cuándo apareció la primera araña por primera
+  vez, -1.0 si nunca) y `EraSystem.check_incremental_victory()`, llamada junto a
+  `_check_game_over()` en la rama `if incremental:` de `tick()` — mismo lugar donde ya vivía
+  `_update_spider()` para este modo. `EraSystem.check_victory()` (Fase 4) sigue siendo la del modo
+  clásico; son dos funciones separadas en el mismo archivo porque ambas son reglas de "cuánto dura
+  viva la colonia", no porque compartan disparador.
+- **Campo de config propio:** `inc_victory_survive_s`, no `victory_survive_s` (el del modo
+  clásico) — los dos modos escalan distinto (colonias de tamaño y ritmo muy diferentes) y conviene
+  poder ajustarlos por separado. `tools/test_phase8.gd` confirma que un modo no usa el campo del
+  otro por accidente.
+- **Guardado:** `d["inc_threat_since_s"]` con `d.get(..., -1.0)`, mismo patrón que
+  `mature_since_s` de la Fase 4.
+- **Cambio intencional en una prueba vieja:** `tools/test_phase4.gd` tenía una prueba
+  (`_t_incremental_mode_never_wins`) que afirmaba literalmente que el modo incremental nunca podía
+  ganar — cierto hasta esta fase, a propósito. Se renombró y adaptó
+  (`_t_incremental_mode_uses_its_own_victory_field`) para seguir probando lo que de verdad importa
+  ahora: que `victory_survive_s` (el campo del modo clásico) no afecta al incremental.
+- **Simplificación deliberada:** `inc_victory_survive_s` es una primera estimación sin
+  playtesting, igual que el resto del balance del proyecto (ver sección 10).

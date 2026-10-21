@@ -97,6 +97,9 @@ const MAX_NOTIFICATIONS := 5
 ## Fase 4: -1 hasta que la colonia (no incremental) llega a Colonia madura por primera vez; desde
 ## ahí mide cuánto tiempo de simulación lleva viva en esa era para la condición de victoria.
 var _mature_since_s := -1.0
+## Fase 8: -1 hasta que aparece la primera araña en el modo incremental (equivalente a
+## `_mature_since_s`, pero ese modo no tiene eras — ver `EraSystem.check_incremental_victory`).
+var _inc_threat_since_s := -1.0
 
 var _terrain_seen := -1
 var _jobs_seen := -1
@@ -251,7 +254,11 @@ func tick() -> void:
 		brood.tick(dt)
 		if tick_count % 3 == 0:
 			_update_spider(dt * 3.0, cfg.inc_spider_first_population)
+		# Fase 8: dispara la cuenta de la condición de victoria la primera vez que aparece.
+		if spider.alive and _inc_threat_since_s < 0.0:
+			_inc_threat_since_s = time_s()
 		_check_game_over()
+		EraSystem.check_incremental_victory(self)
 	elif queen_id >= 0:
 		colony.tick(self, dt)
 		brood.tick(dt)

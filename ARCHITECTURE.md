@@ -106,6 +106,7 @@ tools/
   test_phase5.gd   Segunda amenaza: el ciempiés (README sección 12).
   test_phase6.gd   Modo Test: sandbox sin victoria/derrota (README sección 13).
   test_phase7.gd   Tercera amenaza: la mantis (README sección 14).
+  test_phase8.gd   Victoria del modo incremental (README sección 15).
   test_phaseN.gd   (la que corresponda cuando llegue)
   test_app_menu.gd Flujo del menú (app/): qué pantalla se ve tras cada botón, que la tuerca
                    durante la partida vuelva al juego (no al menú), que Salir pida confirmación.

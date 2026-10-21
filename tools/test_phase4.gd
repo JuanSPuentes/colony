@@ -12,7 +12,7 @@ func _initialize() -> void:
 	_t_victory_after_surviving_mature()
 	_t_no_victory_before_threshold()
 	_t_queen_death_before_threshold_is_defeat_not_victory()
-	_t_incremental_mode_never_wins()
+	_t_incremental_mode_uses_its_own_victory_field()
 	_t_save_load_keeps_victory_progress()
 	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
@@ -74,17 +74,21 @@ func _t_queen_death_before_threshold_is_defeat_not_victory() -> void:
 		sim.game_over and not sim.victory and sim.game_over_reason == "La reina murió.")
 
 
-## El modo incremental no pasa por `elif queen_id >= 0:` en `tick()` (nunca llama `spawn_colony_court`,
-## así que `queen_id` queda en -1), que es la única rama que llama `_check_victory()`: confirma que
-## la Fase 3 sigue exactamente igual que antes de esta fase, sin importar cuánto tiempo pase.
-func _t_incremental_mode_never_wins() -> void:
+## Cambio intencional de la Fase 8 (ver tools/test_phase8.gd): el modo incremental AHORA sí puede
+## ganar, con su propia condición (`EraSystem.check_incremental_victory`, disparada por la primera
+## araña, no por `_check_victory()`/Colonia madura). Lo que esta prueba sigue confirmando es que
+## los dos modos no comparten el mismo campo de config: `victory_survive_s` es del modo clásico y
+## no debe afectar al incremental, que usa `inc_victory_survive_s` aparte.
+func _t_incremental_mode_uses_its_own_victory_field() -> void:
 	var cfg := SimConfig.new()
 	cfg.rain_auto = false
-	cfg.victory_survive_s = 0.01  # si se colara el chequeo, ganaría casi de inmediato.
+	cfg.victory_survive_s = 0.01  # campo del modo clásico: si se colara acá, ganaría casi de inmediato.
+	cfg.inc_victory_survive_s = 999999.0  # bien alto para que esta prueba corta no lo dispare.
 	var sim := Simulation.new(cfg, 4)
 	sim.spawn_incremental_start()
 	_run(sim, 3.0)
-	_check("el modo incremental nunca dispara victoria", not sim.victory, "victory=%s game_over=%s" % [sim.victory, sim.game_over])
+	_check("el modo incremental no usa victory_survive_s (el campo es del modo clásico)",
+		not sim.victory, "victory=%s game_over=%s" % [sim.victory, sim.game_over])
 
 
 func _t_save_load_keeps_victory_progress() -> void:
