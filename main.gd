@@ -313,7 +313,13 @@ func _apply_camera() -> void:
 ## clamplear la cámara con el zoom intermedio de cada frame sin pisar `camera.zoom` con el valor
 ## final todavía no alcanzado.
 func _clamp_camera(z: float) -> void:
-	var half := Vector2(480.0, 270.0) / (2.0 * z)
+	# `480x270` (`WORLD_SIZE`) ya NO es necesariamente la resolución real de `world_vp`: con el
+	# panel lateral (Fase 10) `free.x` (ventana menos panel) casi nunca es múltiplo exacto de 480
+	# (antes siempre lo era: 1440/480=3 justo), así que `stretch_shrink` redondea y el
+	# `SubViewportContainer` (con `stretch=true`) termina fijando el `SubViewport` a
+	# `container.size / stretch_shrink`, un tamaño distinto a `WORLD_SIZE`. Usar la constante acá
+	# mostraba/clampeaba una cámara que no correspondía a lo que la cámara realmente encuadra.
+	var half := Vector2(world_vp.size) / (2.0 * z)
 	var world := Vector2(sim.world.w, sim.world.h) * cfg.cell_px
 	camera.position.x = clampf(camera.position.x, minf(half.x, world.x * 0.5), maxf(world.x - half.x, world.x * 0.5))
 	camera.position.y = clampf(camera.position.y, minf(half.y, world.y * 0.5), maxf(world.y - half.y, world.y * 0.5))
@@ -326,13 +332,18 @@ func _world_cell(p: Vector2) -> Vector2i:
 
 
 ## Factor para pasar de píxeles de la ventana real (donde vive `Main`) a píxeles lógicos del
-## SubViewport del mundo (480x270). En el juego real son 3 (ventana 1440x810); en las pruebas,
-## que fuerzan `root.size = Vector2i(480, 270)`, es 1 (el contenedor llena esa ventana reducida).
+## SubViewport del mundo. Se calcula contra `world_vp.size` real, no contra la constante
+## `WORLD_SIZE` (480x270): con `stretch=true`, `SubViewportContainer` fija el tamaño del
+## `SubViewport` a `container.size / stretch_shrink`, que desde el panel lateral (Fase 10) ya casi
+## nunca coincide con `WORLD_SIZE` exacto (antes, sin panel, `free.x` siempre era múltiplo exacto
+## de 480 con la ventana de 1440px, así que coincidían por casualidad). Usar la constante aquí
+## hacía que todo clic (cavar, mover la reina, pintar feromonas) apuntara a una celda del mundo
+## equivocada en cuanto el panel reservaba un ancho que no fuera múltiplo de 480.
 func _outer_to_inner_scale() -> Vector2:
 	var cs := world_container.size
 	if cs.x <= 0.0 or cs.y <= 0.0:
 		return Vector2.ONE
-	return WORLD_SIZE / cs
+	return Vector2(world_vp.size) / cs
 
 
 ## Convierte una posición de evento de mouse (en píxeles de la ventana real) a coordenadas del
