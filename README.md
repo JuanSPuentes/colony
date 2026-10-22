@@ -42,6 +42,7 @@ convención de una prueba por fase. Existe justo para que el proyecto no se vuel
 16. [Fase 9: estaciones, colonia rival y mejoras](#16-fase-9-estaciones-colonia-rival-y-mejoras)
 17. [Fase 10: panel lateral del HUD y tutorial de "Juego normal"](#17-fase-10-panel-lateral-del-hud-y-tutorial-de-juego-normal)
 18. [Fase 11: árboles con sprite y mapa aleatorio en "Juego normal"](#18-fase-11-árboles-con-sprite-y-mapa-aleatorio-en-juego-normal)
+19. [Fase 12: guía rápida al entrar a "Juego normal"](#19-fase-12-guía-rápida-al-entrar-a-juego-normal)
 
 ---
 
@@ -730,3 +731,18 @@ condición de victoria real de este modo.
   ya estaba (no sortea una nueva cada reinicio, sería confuso).
 - Pruebas: `tools/test_app_menu.gd` ganó un chequeo de que dos partidas sucesivas de "Juego
   normal" caen en semillas distintas, y uno de que "Modo infinito" sigue usando la semilla fija.
+
+## 19. Fase 12: guía rápida al entrar a "Juego normal"
+
+- **`app/guide_screen.gd` (`GuideScreen`):** pantalla de una sola vez, a pedido del jugador
+  ("algo simple y sencillo" que explique hormigas/amenazas/mecánica antes de arrancar). Se
+  muestra solo al entrar a "Juego normal" desde el menú (`app.gd::_start_game`), con la partida
+  pausada detrás; un botón ("¡Entendido, a jugar!") la cierra y despausa. No aparece en "Modo
+  infinito" ni en Test (no se pidió ahí), ni al reiniciar con F5 dentro de una partida ya
+  arrancada (eso llama a `main.gd::start()` directo, sin pasar por `app.gd::_start_game`).
+- Mismo estilo visual que `OptionsScreen` (tarjetas doradas sobre fondo oscuro, scroll si no
+  entra todo) para que se sienta parte de la misma interfaz. Contenido breve a propósito, en
+  tarjetas cortas: Tu colonia, Comida, Amenazas, Estaciones, Mejoras — una idea por línea, sin
+  repetir el detalle que ya cubre `TutorialView` paso a paso mientras se juega.
+- Pruebas: `tools/test_app_menu.gd` ganó chequeos de que la guía aparece y pausa al entrar a
+  Juego normal, que cerrarla despausa, y de que Modo infinito/Test nunca la muestran.

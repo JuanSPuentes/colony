@@ -63,6 +63,13 @@ func _run() -> void:
 	await _frames(3)
 	_check("Juego normal arranca en modo incremental (comida/compra)", _app.game != null and _app.game.sim.incremental, "" if _app.game == null else "incremental=%s" % _app.game.sim.incremental)
 
+	# Fase 12: la guía rápida aparece sola al entrar a Juego normal, con la partida pausada detrás,
+	# y nunca en los otros modos (se comprueba más abajo, al arrancar Historia y Test).
+	_check("la guía aparece al entrar a Juego normal, con la partida pausada", _app.guide.visible and _app.game.paused)
+	_app.guide.closed.emit()
+	await _frames(1)
+	_check("cerrar la guía la oculta y despausa la partida", not _app.guide.visible and not _app.game.paused)
+
 	# La tuerca durante la partida: abre Opciones y pausa; la flecha debe volver al juego, no al menú.
 	_app.game.menu_requested.emit()
 	await _frames(1)
@@ -89,6 +96,7 @@ func _run() -> void:
 	_check("la colonia de Historia arranca con obreras+reina+nodrizas", _app.game.sim.ants.alive_count == expected_historia, "esperado=%d real=%d" % [expected_historia, _app.game.sim.ants.alive_count])
 	_check("Modo infinito sigue arrancando con la semilla fija de siempre (cfg.world_seed)",
 		_app.game.seed_value == _app.game.cfg.world_seed)
+	_check("Modo infinito no muestra la guía de Juego normal", not _app.guide.visible and not _app.game.paused)
 
 	# Fase 11: "Juego normal" sortea un mapa nuevo cada vez (a pedido del jugador), a diferencia
 	# de Modo infinito. Dos partidas sucesivas de Juego normal deben caer en semillas distintas
@@ -128,6 +136,7 @@ func _run() -> void:
 	await _frames(3)
 	_check("Test arranca el modo sandbox (sim.test_mode)", _app.game.sim.test_mode)
 	_check("la colonia de Test arranca con 50 hormigas", _app.game.sim.ants.alive_count == 50, "real=%d" % _app.game.sim.ants.alive_count)
+	_check("Test no muestra la guía de Juego normal", not _app.guide.visible and not _app.game.paused)
 
 	# Salir: el botón debe pedir confirmación, no cerrar directo.
 	var closed := false

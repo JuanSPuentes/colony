@@ -1,15 +1,16 @@
 extends Node2D
 ## Punto de entrada real del juego (ver `project.godot`, `run/main_scene`). Decide qué pantalla se
-## ve: menú, opciones o la partida. `main.tscn` sigue arrancando solo (modo Infinito) cuando se
-## abre directo, para que las pruebas (`ui_test.gd`, `screenshot.gd`) no cambien: aquí lo
-## instanciamos con `auto_start = false` y lo arrancamos nosotros en el modo que haya elegido el
-## jugador.
+## ve: menú, opciones, la guía rápida de Juego normal o la partida. `main.tscn` sigue arrancando
+## solo (modo Infinito) cuando se abre directo, para que las pruebas (`ui_test.gd`,
+## `screenshot.gd`) no cambien: aquí lo instanciamos con `auto_start = false` y lo arrancamos
+## nosotros en el modo que haya elegido el jugador.
 
 const MAIN_SCENE := "res://main.tscn"
 
 var settings: AppSettings
 var menu: MainMenu
 var options: OptionsScreen
+var guide: GuideScreen
 var quit_dialog: ConfirmationDialog
 var game: Node2D
 ## A dónde vuelve la flecha de Opciones: "menu" (se abrió desde el menú) o "game" (desde la tuerca).
@@ -39,6 +40,11 @@ func _ready() -> void:
 	options.brightness_changed.connect(_on_brightness_changed)
 	options.quit_requested.connect(_ask_quit)
 
+	guide = GuideScreen.new()
+	guide.visible = false
+	add_child(guide)
+	guide.closed.connect(_on_guide_closed)
+
 	quit_dialog = ConfirmationDialog.new()
 	quit_dialog.title = "Salir"
 	quit_dialog.dialog_text = "¿Seguro que quieres cerrar el juego?"
@@ -62,6 +68,12 @@ func _start_game(incremental: bool) -> void:
 	# MISMA semilla que ya estaba (ver `main.gd::start`); solo Shift+F5 sortea una nueva a mano.
 	var seed_value: int = randi() if incremental else game.cfg.world_seed
 	game.start(seed_value, null, "incremental" if incremental else "historia")
+	# Fase 12: guía rápida solo para "Juego normal" (a pedido del jugador), una vez por partida
+	# nueva — no al reiniciar con F5 (eso llama a `game.start()` directo, no pasa por acá) ni en
+	# Modo infinito/Test (esos modos no la pidieron). Pausa la partida detrás hasta cerrarla.
+	if incremental:
+		game.paused = true
+		guide.visible = true
 
 
 ## Fase 6: igual que `_start_game`, pero en el modo Test (sandbox, sin victoria/derrota). Función
@@ -84,6 +96,12 @@ func _open_options(return_to: String) -> void:
 	options.set_values(settings.volume, settings.brightness)
 	options.visible = true
 	menu.visible = false
+
+
+func _on_guide_closed() -> void:
+	guide.visible = false
+	if game != null:
+		game.paused = false
 
 
 func _on_options_back() -> void:
