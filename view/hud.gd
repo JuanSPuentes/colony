@@ -60,6 +60,10 @@ var sidebar_open := true
 
 ## Fase 3 (menú): `main.gd` la reenvía como `menu_requested` para que `app.gd` abra Opciones.
 signal gear_pressed
+## `main.gd` la escucha para recalcular `_resize_world_container()`: el panel lateral reserva/
+## libera sitio real del mundo, así que cambiar `sidebar_open` sin avisarle a `main` deja el
+## `SubViewport` con el tamaño viejo (clics mapeando contra la franja equivocada).
+signal sidebar_toggled
 
 var _sidebar: Panel
 ## Todo lo que cuelga del panel salvo la línea superior (`_top`), para no usarse hoy pero se deja
@@ -441,6 +445,7 @@ func _buy_button() -> Button:
 func toggle_sidebar() -> void:
 	sidebar_open = not sidebar_open
 	_layout()
+	sidebar_toggled.emit()
 
 
 ## Aplica el estado de plegado (todo el panel, de una) y lo estira al alto real de la ventana.

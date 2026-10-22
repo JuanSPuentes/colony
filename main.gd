@@ -138,7 +138,12 @@ func _ready() -> void:
 	world_vp.add_child(camera)
 	hud = Hud.new()
 	hud.gear_pressed.connect(func() -> void: menu_requested.emit())
+	hud.sidebar_toggled.connect(_resize_world_container)
 	add_child(hud)
+	# `hud` no existía todavía en la llamada de arriba (línea ~122): esa primera vez
+	# `_resize_world_container()` ve `hud == null` y no reserva los 300px del panel, dejándolo
+	# encima del mundo en vez de encogerlo. Hay que recalcular ya que el HUD existe.
+	_resize_world_container()
 	tutorial = TutorialView.new()
 	add_child(tutorial)
 	if auto_start:
