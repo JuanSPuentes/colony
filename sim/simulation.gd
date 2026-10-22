@@ -57,6 +57,11 @@ var econ: IncrementalEconomy
 ## Fase 9: mejoras de colonia del modo incremental (siempre existe, como el resto de los sistemas
 ## "siempre creados"; solo se puede comprar algo en `sim.incremental`, ver `Upgrades.can_buy`).
 var upgrades: Upgrades
+## Fase 10 (tutorial del modo incremental): cuántos huevos/mejoras se compraron en total. Solo lo
+## usa `view/tutorial_view.gd` para saber si ya se cumplió ese paso, mismo espíritu que
+## `food_painted`/`dug` para el tutorial de la colonia con reina.
+var eggs_bought := 0
+var upgrades_bought := 0
 
 var leaves_stored := 0
 var delivered := 0
@@ -527,12 +532,18 @@ func cmd_add_caste_ants(caste: int, n: int) -> void:
 
 ## Fase 3: compra un huevo con comida; qué sale al nacer (obrera o soldado) es al azar.
 func cmd_buy_egg() -> bool:
-	return incremental and econ.buy_egg()
+	var ok := incremental and econ.buy_egg()
+	if ok:
+		eggs_bought += 1
+	return ok
 
 
 ## Fase 9: compra un nivel de mejora de colonia (`Upgrades.Stat`) con comida.
 func cmd_buy_upgrade(stat: int) -> bool:
-	return incremental and upgrades.buy(stat)
+	var ok := incremental and upgrades.buy(stat)
+	if ok:
+		upgrades_bought += 1
+	return ok
 
 
 func cmd_cycle_auto_buy() -> void:

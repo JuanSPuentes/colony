@@ -194,6 +194,7 @@ func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> v
 	centipede_view.setup(sim)
 	mantis_view.setup(sim)
 	rival_queen_view.setup(sim)
+	tutorial.step = 0
 	_acc = 0.0
 	_painting = false
 	if sim.queen_id >= 0 and sim.ants.alive[sim.queen_id] == 1:

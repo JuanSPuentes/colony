@@ -40,6 +40,7 @@ convención de una prueba por fase. Existe justo para que el proyecto no se vuel
 14. [Fase 7: la mantis](#14-fase-7-la-mantis)
 15. [Fase 8: victoria del modo incremental (retirada)](#15-fase-8-victoria-del-modo-incremental-retirada)
 16. [Fase 9: estaciones, colonia rival y mejoras](#16-fase-9-estaciones-colonia-rival-y-mejoras)
+17. [Fase 10: panel lateral del HUD y tutorial de "Juego normal"](#17-fase-10-panel-lateral-del-hud-y-tutorial-de-juego-normal)
 
 ---
 
@@ -339,6 +340,7 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | `Godot --headless --path . --script tools/test_phase7.gd` | La mantis, tercera amenaza (sección 14): no aparece antes del umbral, aparece al cruzarlo, nunca se mueve, no reacciona a una hormiga lejos pero sí a una que entra en `mantis_strike_range_px`, pega más fuerte que la araña, toda la colonia la ataca igual, muere y deja cadáver, huye con poca vida, el modo incremental nunca la dispara, guardar/cargar conserva su estado. |
 | `Godot --headless --path . --script tools/test_phase9.gd` | Estaciones + colonia rival + mejoras (sección 16): hormigas rivales no se pelean entre sí, jugador y rival se dañan entre sí, la oleada aparece justo en el último día de estación, la estación no avanza mientras la batalla siga activa, se gana al morir la reina rival, las 4 estaciones ganan el juego, el modo clásico no se ve afectado, las mejoras suben el daño/HP de hormigas nuevas (no de las ya vivas), guardar/cargar conserva estación/batalla/bando. |
 | `Godot --headless --path . --script tools/test_app_menu.gd` | El menú (`app/`): arranca mostrando el menú, Opciones desde el menú vuelve al menú, Opciones desde la tuerca en partida vuelve a la partida (pausada) y no al menú, Juego normal arranca en modo incremental (comida/compra), Modo infinito arranca en modo Historia con la colonia completa, Test arranca el modo sandbox con 50 hormigas, F5 conserva el modo, volumen/brillo se guardan, Salir pide confirmación en vez de cerrar directo. |
+| `Godot --headless --path . --script tools/test_phase10.gd` | Tutorial de "Juego normal" (sección 17): la lista de pasos propia del modo incremental progresa en orden (cavar, comida, comprar huevo, comprar mejora), `cmd_buy_egg`/`cmd_buy_upgrade` incrementan los contadores que lee, el modo historia sigue con su propia lista sin mezclarse, el modo Test nunca muestra la burbuja, reiniciar partida reinicia el progreso. |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
 **Última ejecución verificada (2026-10-20, Godot 4.7.2):** las siete suites en 34/34 (Fase 0),
@@ -675,3 +677,32 @@ condición de victoria real de este modo.
 - **Pendiente para una próxima entrega:** panel del HUD para comprar mejoras y ver el estado de la
   estación actual a simple vista (hoy se compran con `cmd_buy_upgrade`, sin botón todavía); arte
   propio para la reina rival en vez de la hormiga reina teñida.
+
+## 17. Fase 10: panel lateral del HUD y tutorial de "Juego normal"
+
+- **Panel lateral único (`Hud.sidebar_open`, `main.SIDEBAR_W`):** reemplaza los paneles flotantes
+  que antes se dibujaban encima del mundo. Ahora `main.gd` reduce el `SubViewport` del mundo para
+  dejarle sitio fijo a la izquierda (`_resize_world_container()`), con Colonia/Clima/Amenazas/
+  Herramienta/Reparto-Compra/Mejoras/Estación/Notificaciones, cerrando el pendiente de HUD que
+  había quedado abierto al final de la Fase 9. Se pliega con la tecla I.
+  - **Dos bugs de coordenadas encontrados al cerrar esto, ya corregidos:** (1) `_resize_world_container()`
+    se llamaba antes de crear el HUD, así que la primera vez veía `hud == null` y no reservaba los
+    300px del panel — quedaba dibujado encima del mundo en vez de a un lado hasta que la ventana
+    cambiara de tamaño de verdad; ahora se recalcula justo tras crear el HUD y cada vez que se
+    plie/despliega (`Hud.sidebar_toggled`). (2) `_outer_to_inner_scale()`/`_clamp_camera()` asumían
+    que el `SubViewport` del mundo siempre mide exactamente 480x270: antes era cierto solo porque la
+    ventana (1440x810) era múltiplo exacto de esa resolución; con el panel reservando 300px el ancho
+    libre deja de serlo, `SubViewportContainer` (con `stretch=true`) termina usando otra resolución
+    interna, y cavar/mover la reina/pintar feromonas apuntaban a una celda equivocada. Ahora ambas
+    funciones leen `world_vp.size` real en vez de la constante.
+- **Tutorial de "Juego normal" (`TutorialView.STEPS_INCREMENTAL`):** el modo incremental es el que
+  arranca primero en el menú desde la Fase 9, pero no tenía ninguna guía — `TutorialView` solo
+  cubría "Modo infinito" (colonia con reina). Pasos propios: cavar, pintar comida, comprar un
+  huevo, comprar una mejora (`sim.eggs_bought`/`sim.upgrades_bought`, nuevos, mismo patrón que
+  `sim.dug`/`sim.food_painted`). No se muestra en el modo Test (ya tiene su propio panel). De paso
+  se corrigió que el progreso del tutorial no se reiniciaba al volver a arrancar partida
+  (`main.gd::start()` no tocaba `tutorial.step`).
+- **El menú principal usa el sprite real de la hormiga** en el fondo animado (`MenuBackground`),
+  en vez de la silueta dibujada a mano que tenía desde antes de existir arte pixel art.
+- Pruebas nuevas: `tools/test_phase10.gd` (progresión del tutorial en los tres modos, reinicio del
+  progreso al reiniciar partida).
