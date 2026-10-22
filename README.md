@@ -41,6 +41,7 @@ convención de una prueba por fase. Existe justo para que el proyecto no se vuel
 15. [Fase 8: victoria del modo incremental (retirada)](#15-fase-8-victoria-del-modo-incremental-retirada)
 16. [Fase 9: estaciones, colonia rival y mejoras](#16-fase-9-estaciones-colonia-rival-y-mejoras)
 17. [Fase 10: panel lateral del HUD y tutorial de "Juego normal"](#17-fase-10-panel-lateral-del-hud-y-tutorial-de-juego-normal)
+18. [Fase 11: árboles con sprite y mapa aleatorio en "Juego normal"](#18-fase-11-árboles-con-sprite-y-mapa-aleatorio-en-juego-normal)
 
 ---
 
@@ -341,6 +342,7 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | `Godot --headless --path . --script tools/test_phase9.gd` | Estaciones + colonia rival + mejoras (sección 16): hormigas rivales no se pelean entre sí, jugador y rival se dañan entre sí, la oleada aparece justo en el último día de estación, la estación no avanza mientras la batalla siga activa, se gana al morir la reina rival, las 4 estaciones ganan el juego, el modo clásico no se ve afectado, las mejoras suben el daño/HP de hormigas nuevas (no de las ya vivas), guardar/cargar conserva estación/batalla/bando. |
 | `Godot --headless --path . --script tools/test_app_menu.gd` | El menú (`app/`): arranca mostrando el menú, Opciones desde el menú vuelve al menú, Opciones desde la tuerca en partida vuelve a la partida (pausada) y no al menú, Juego normal arranca en modo incremental (comida/compra), Modo infinito arranca en modo Historia con la colonia completa, Test arranca el modo sandbox con 50 hormigas, F5 conserva el modo, volumen/brillo se guardan, Salir pide confirmación en vez de cerrar directo. |
 | `Godot --headless --path . --script tools/test_phase10.gd` | Tutorial de "Juego normal" (sección 17): la lista de pasos propia del modo incremental progresa en orden (cavar, comida, comprar huevo, comprar mejora), `cmd_buy_egg`/`cmd_buy_upgrade` incrementan los contadores que lee, el modo historia sigue con su propia lista sin mezclarse, el modo Test nunca muestra la burbuja, reiniciar partida reinicia el progreso. |
+| (sección 18, sin suite propia) | Mapa aleatorio en "Juego normal": cubierto dentro de `tools/test_app_menu.gd` (dos partidas sucesivas caen en semillas distintas; Modo infinito sigue fijo). |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
 **Última ejecución verificada (2026-10-20, Godot 4.7.2):** las siete suites en 34/34 (Fase 0),
@@ -706,3 +708,25 @@ condición de victoria real de este modo.
   en vez de la silueta dibujada a mano que tenía desde antes de existir arte pixel art.
 - Pruebas nuevas: `tools/test_phase10.gd` (progresión del tutorial en los tres modos, reinicio del
   progreso al reiniciar partida).
+
+## 18. Fase 11: árboles con sprite y mapa aleatorio en "Juego normal"
+
+- **Plantas con sprite real (`view/plant_view.gd`):** reemplaza las dos formas procedurales
+  diminutas (~7px) por el sprite de árbol que pasó el jugador ("Árbol frondoso pixelado en
+  escala de grises"), ~4 celdas de alto. El archivo original venía con un fondo ajedrezado
+  blanco/gris (no transparencia de verdad: `Image.detect_alpha()` daba falso); se le quitó con un
+  relleno por inundación desde los bordes de la imagen antes de guardarlo en el repo, así que solo
+  se borra el fondo conectado al borde y nunca un gris interno del propio árbol. También se bajó
+  de 1254x1254 a 256x256 (el resto de sprites del repo son ~64x64; a 1254px no había ninguna
+  ganancia visual a los ~32px que ocupa en pantalla, solo 1.8MB de repo de más).
+  La planta sigue encogiendo con `leaves/max_leaves` como antes (`MIN_SCALE`), solo que ahora
+  escala el sprite entero en vez de dibujar un tallo desnudo.
+- **Mapa aleatorio en "Juego normal" (`app.gd::_start_game`):** antes todas las partidas (los tres
+  modos) arrancaban siempre con `cfg.world_seed` fijo (12345); solo Shift+F5 sorteaba una semilla
+  nueva a mano. Ahora "Juego normal" sortea una semilla (`randi()`) cada vez que se entra desde el
+  menú, así que el mapa cambia en cada partida nueva, a pedido del jugador. "Modo infinito" sigue
+  arrancando con la semilla fija de siempre (no se pidió cambiarlo, y sirve para depurar ese modo
+  con un mapa reproducible). F5 dentro de una partida sigue reiniciando con la MISMA semilla que
+  ya estaba (no sortea una nueva cada reinicio, sería confuso).
+- Pruebas: `tools/test_app_menu.gd` ganó un chequeo de que dos partidas sucesivas de "Juego
+  normal" caen en semillas distintas, y uno de que "Modo infinito" sigue usando la semilla fija.

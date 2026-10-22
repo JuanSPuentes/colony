@@ -87,6 +87,36 @@ func _run() -> void:
 	_check("Modo infinito arranca en modo Historia (con reina y nodrizas)", not _app.game.sim.incremental and _app.game.sim.queen_id >= 0)
 	var expected_historia: int = _app.game.cfg.initial_ants + 1 + _app.game.cfg.initial_nurses
 	_check("la colonia de Historia arranca con obreras+reina+nodrizas", _app.game.sim.ants.alive_count == expected_historia, "esperado=%d real=%d" % [expected_historia, _app.game.sim.ants.alive_count])
+	_check("Modo infinito sigue arrancando con la semilla fija de siempre (cfg.world_seed)",
+		_app.game.seed_value == _app.game.cfg.world_seed)
+
+	# Fase 11: "Juego normal" sortea un mapa nuevo cada vez (a pedido del jugador), a diferencia
+	# de Modo infinito. Dos partidas sucesivas de Juego normal deben caer en semillas distintas
+	# (y, con ellas, mapas distintos); no se compara un número exacto de semillas porque `randi()`
+	# podría repetir por pura casualidad una vez en un millón, pero dos partidas seguidas con
+	# exactamente la misma huella de mundo sería sospechoso de verdad. `_app` (Modo infinito, de
+	# más arriba) no se toca ni se libera acá: sigue vivo para la sección de Test de más abajo,
+	# que es quien lo libera.
+	var app_a: Node = load("res://app/app.tscn").instantiate()
+	root.add_child(app_a)
+	await _frames(2)
+	app_a.menu.play_normal.emit()
+	await _frames(3)
+	var seed_a: int = app_a.game.seed_value
+	app_a.queue_free()
+	await _frames(1)
+	var app_b: Node = load("res://app/app.tscn").instantiate()
+	root.add_child(app_b)
+	await _frames(2)
+	app_b.menu.play_normal.emit()
+	await _frames(3)
+	var seed_b: int = app_b.game.seed_value
+	_check("Juego normal sortea una semilla distinta en cada partida nueva", seed_a != seed_b,
+		"a=%d b=%d" % [seed_a, seed_b])
+	app_b.queue_free()
+	await _frames(1)
+	# `_app` sigue siendo la instancia de Modo infinito de más arriba (con su partida corriendo):
+	# `app_a`/`app_b` fueron instancias propias solo para este chequeo, no la tocaron.
 
 	# Fase 6: Test arranca el sandbox con la composición fija (50 hormigas), nunca con victoria/derrota.
 	_app.game.queue_free()

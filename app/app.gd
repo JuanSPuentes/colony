@@ -55,7 +55,13 @@ func _start_game(incremental: bool) -> void:
 	add_child(game)
 	game.set_brightness(settings.brightness)
 	game.menu_requested.connect(func() -> void: _open_options("game"))
-	game.start(game.cfg.world_seed, null, "incremental" if incremental else "historia")
+	# "Juego normal" sortea una semilla nueva en cada partida (mapa distinto cada vez, a pedido
+	# del jugador); "Modo infinito" sigue arrancando siempre con `cfg.world_seed` fijo, como desde
+	# el principio del proyecto — acá no se pidió cambiarlo, y el seed fijo sigue siendo útil para
+	# depurar ese modo con un mapa reproducible. F5 dentro de una partida sigue reiniciando con la
+	# MISMA semilla que ya estaba (ver `main.gd::start`); solo Shift+F5 sortea una nueva a mano.
+	var seed_value: int = randi() if incremental else game.cfg.world_seed
+	game.start(seed_value, null, "incremental" if incremental else "historia")
 
 
 ## Fase 6: igual que `_start_game`, pero en el modo Test (sandbox, sin victoria/derrota). Función
