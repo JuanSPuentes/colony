@@ -2,8 +2,10 @@ class_name MenuBackground
 extends Control
 ## Fondo animado del menú principal: cielo con sol, nubes a la deriva, dos capas de montañas,
 ## una franja de tierra con un hormiguero y hormigas caminando (algunas cargan una hoja), y
-## lluvia que entra y sale cada tanto. Todo dibujado a mano con `_draw()`, sin texturas ni
-## assets externos (ver README: "sin descargas, sin red, sin assets externos").
+## lluvia que entra y sale cada tanto. Cielo/montañas/tierra/nubes/lluvia siguen dibujados a mano
+## con `_draw()`; las hormigas usan el mismo sprite pixel art que el juego (`ANT_TEX_EAST/WEST`,
+## reusando los PNG que ya están en el repo), para que el menú se vea consistente con el resto del
+## arte en vez de con la silueta vectorial que tenía antes.
 
 const SKY_TOP := Color("3f6f9e")
 const SKY_HORIZON := Color("bcd9e8")
@@ -13,15 +15,20 @@ const MOUNTAIN_NEAR := Color("4a5640")
 const GROUND_COLOR := Color("6b4a2f")
 const GROUND_DARK := Color("4a311e")
 const MOUND_COLOR := Color("5a3d26")
-## Paleta de la hormiga (estilo propio inspirado en referencias de pixel art: cuerpo cálido
-## segmentado, cabeza más oscura, gáster con un brillo, patas/antenas casi negras para que
-## contrasten a este tamaño tan chico).
-const ANT_HEAD := Color("2e1a10")
-const ANT_THORAX := Color("5a3420")
-const ANT_GASTER := Color("6b3f24")
-const ANT_GASTER_HILITE := Color("8a5633")
-const ANT_LIMB := Color("160d08")
 const LEAF_COLOR := Color("5fe05f")
+## Las hormigas del menú reusan el mismo sprite pixel art que las del juego (`AntRenderer`), en
+## vez de la silueta dibujada a mano que había antes: solo se necesitan "este"/"oeste" porque acá
+## siempre caminan en horizontal. `AntRenderer` ya precarga estas texturas (índices 0 y 4 de
+## `DIR_TEXTURES`); se referencian por nombre en vez de volver a precargarlas para no duplicar la
+## carga del recurso.
+const ANT_TEX_EAST: Texture2D = preload("res://view/sprites/ant/east.png")
+const ANT_TEX_WEST: Texture2D = preload("res://view/sprites/ant/west.png")
+## Tamaño de dibujo del sprite en el menú (px); con bob de caminata, igual de espíritu que
+## `AntRenderer.BOB_AMPLITUDE`/`BOB_FREQ` pero en tiempo real (`_process(delta)`), no por tick de
+## simulación, porque el menú no tiene una `Simulation` corriendo.
+const ANT_SPRITE_SIZE := 16.0
+const ANT_BOB_AMPLITUDE := 1.1
+const ANT_BOB_FREQ := 3.0
 const CLOUD_COLOR := Color(1.0, 1.0, 1.0, 0.85)
 const RAIN_COLOR := Color(0.65, 0.78, 0.92, 0.6)
 
@@ -178,61 +185,19 @@ func _draw_mound(base: Vector2) -> void:
 	draw_circle(base + Vector2(0.0, -h * 0.5), 4.0, GROUND_DARK)
 
 
-## Hormiga de perfil con cuerpo en 3 segmentos (cabeza/tórax/gáster, cada uno un óvalo propio en
-## vez de una silueta plana de un solo tono), patas en marcha de trípode (0 y 2 en fase, 1 en
-## contrafase) y antenas quebradas en dos tramos. `pos` es el punto de apoyo en el suelo; el
-## cuerpo se dibuja por encima. `dir` +1 mirando a la derecha, -1 a la izquierda. `leg_phase`
-## (0..1) mueve el ciclo de marcha.
-## Escala del dibujo entero respecto del tamaño "base" con el que se diseñó (pos sigue siendo el
-## punto de apoyo en el suelo, sin cambios: solo crece el cuerpo por encima de él).
-const ANT_SCALE := 1.5
-
+## Dibuja el sprite de hormiga del juego en vez de la silueta a mano que había antes. `pos` es el
+## punto de apoyo en el suelo; el sprite se ancla por su base, igual que `AntRenderer` ancla el
+## cuerpo sobre la celda. `dir` +1 mirando a la derecha (sprite "este"), -1 a la izquierda
+## ("oeste"). `leg_phase` (0..1, ya venía de la posición en `_draw()`) hace de fase del rebotecito
+## de caminata, mismo truco que `AntRenderer.BOB_AMPLITUDE` para disimular que no hay fotogramas
+## de marcha.
 func _draw_ant(pos: Vector2, dir: float, carrying: bool, leg_phase: float) -> void:
-	var s := dir
-	var k := ANT_SCALE
-	var gaster_c := pos + Vector2(s * -5.5, -3.0) * k
-	var thorax_c := pos + Vector2(s * -1.0, -3.4) * k
-	var head_c := pos + Vector2(s * 3.0, -3.6) * k
-
-	# Patas: 3 puntos de apoyo por lado a lo largo del cuerpo; cada una se "levanta" (knee más
-	# alto, pie más cerca del cuerpo) según su fase de marcha, dejando siempre al menos 3 patas
-	# firmes en el suelo como un trípode real.
-	var attach_x := [3.2, -0.8, -4.2]
-	for j in 3:
-		var group_phase := leg_phase if j != 1 else fmod(leg_phase + 0.5, 1.0)
-		var lift := maxf(0.0, sin(group_phase * TAU))
-		var attach := pos + Vector2(s * attach_x[j], -3.0) * k
-		var foot := pos + Vector2(s * attach_x[j] * k, -lift * 1.6 * k)
-		var knee := attach.lerp(foot, 0.5) + Vector2(0.0, 1.0) * k
-		draw_line(attach, knee, ANT_LIMB, k)
-		draw_line(knee, foot, ANT_LIMB, k)
-
-	# Antenas: dos tramos curvándose hacia adelante y arriba desde la cabeza.
-	var antenna_base := head_c + Vector2(s * 1.6, -1.0) * k
-	for sgn in [-1.0, 1.0]:
-		var mid := antenna_base + Vector2(s * 2.0, -2.0 + sgn * 0.7) * k
-		var tip := mid + Vector2(s * 1.6, -1.6 + sgn * 0.9) * k
-		draw_line(antenna_base, mid, ANT_LIMB, 0.8 * k)
-		draw_line(mid, tip, ANT_LIMB, 0.8 * k)
-
-	_draw_ellipse(gaster_c, 4.2 * k, 3.0 * k, ANT_GASTER)
-	_draw_ellipse(thorax_c, 2.6 * k, 2.1 * k, ANT_THORAX)
-	_draw_ellipse(head_c, 2.0 * k, 1.8 * k, ANT_HEAD)
-	draw_circle(gaster_c + Vector2(s * -1.2, -1.0) * k, 1.0 * k, ANT_GASTER_HILITE)
-	# Mandíbula: una línea corta hacia adelante desde la punta de la cabeza.
-	draw_line(head_c + Vector2(s * 1.6, 0.3) * k, head_c + Vector2(s * 2.8, 0.6) * k, ANT_LIMB, 0.8 * k)
-
+	var tex := ANT_TEX_EAST if dir > 0.0 else ANT_TEX_WEST
+	var bob := absf(sin(leg_phase * TAU * ANT_BOB_FREQ)) * ANT_BOB_AMPLITUDE
+	var rect := Rect2(pos - Vector2(ANT_SPRITE_SIZE * 0.5, ANT_SPRITE_SIZE - bob), Vector2(ANT_SPRITE_SIZE, ANT_SPRITE_SIZE))
+	draw_texture_rect(tex, rect, false)
 	if carrying:
-		draw_circle(pos + Vector2(s * 2.0, -8.0) * k, 2.2 * k, LEAF_COLOR)
-
-
-func _draw_ellipse(center: Vector2, rx: float, ry: float, color: Color) -> void:
-	const SEGMENTS := 10
-	var pts := PackedVector2Array()
-	for i in SEGMENTS:
-		var a := TAU * float(i) / SEGMENTS
-		pts.append(center + Vector2(cos(a) * rx, sin(a) * ry))
-	draw_colored_polygon(pts, color)
+		draw_circle(pos + Vector2(dir * ANT_SPRITE_SIZE * 0.3, -ANT_SPRITE_SIZE - bob), 2.2, LEAF_COLOR)
 
 
 func _draw_cloud(center: Vector2, r: float) -> void:
