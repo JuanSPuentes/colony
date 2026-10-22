@@ -43,6 +43,7 @@ convención de una prueba por fase. Existe justo para que el proyecto no se vuel
 17. [Fase 10: panel lateral del HUD y tutorial de "Juego normal"](#17-fase-10-panel-lateral-del-hud-y-tutorial-de-juego-normal)
 18. [Fase 11: árboles con sprite y mapa aleatorio en "Juego normal"](#18-fase-11-árboles-con-sprite-y-mapa-aleatorio-en-juego-normal)
 19. [Fase 12: guía rápida al entrar a "Juego normal"](#19-fase-12-guía-rápida-al-entrar-a-juego-normal)
+20. [Fase 13: las mejoras son progresivas de verdad](#20-fase-13-las-mejoras-son-progresivas-de-verdad)
 
 ---
 
@@ -661,10 +662,11 @@ condición de victoria real de este modo.
   porque la batalla ya se ganó. Al cerrar la 4ª: `game_over = true; victory = true`.
 - **Mejoras de colonia (`sim/colony/upgrades.gd`):** se compran con comida, mismo patrón de costo
   creciente que comprar un huevo (`cmd_buy_upgrade`). Cuatro stats (daño, vida, velocidad de
-  movimiento, velocidad de cavado); **solo afectan a las hormigas nuevas** desde que se compran,
-  no se recalculan las que ya viven. "Población máxima" quedó fuera a propósito: el modo
-  incremental no tiene techo de población hoy, inventar uno nuevo solo para "mejorarlo" después
-  sería una restricción nueva no pedida.
+  movimiento, velocidad de cavado), **progresivas de verdad: afectan a toda la colonia**, no solo
+  a las hormigas que nazcan después de comprar (ver corrección en sección 20 — vida era la única
+  excepción, por un detalle de implementación, no a propósito). "Población máxima" quedó fuera a
+  propósito: el modo incremental no tiene techo de población hoy, inventar uno nuevo solo para
+  "mejorarlo" después sería una restricción nueva no pedida.
 - **Vista:** las hormigas rivales reusan el mismo sprite que las del jugador
   (`view/sprites/ant/`), tintadas siempre de rojo oscuro (`AntRenderer.RIVAL_COLOR`) sin importar
   la capa de color activa, para distinguirlas de un vistazo. La reina rival
@@ -746,3 +748,23 @@ condición de victoria real de este modo.
   repetir el detalle que ya cubre `TutorialView` paso a paso mientras se juega.
 - Pruebas: `tools/test_app_menu.gd` ganó chequeos de que la guía aparece y pausa al entrar a
   Juego normal, que cerrarla despausa, y de que Modo infinito/Test nunca la muestran.
+
+## 20. Fase 13: las mejoras son progresivas de verdad
+
+El jugador reportó ver en la propia guía (sección 19) que la mejora de Vida decía "solo suben...
+las hormigas nuevas, no las que ya viven" y pidió que fuera progresiva de verdad — "por eso se
+llama progresivo". Al revisar el código, daño/velocidad/trabajo **ya eran progresivos sin querer**
+desde la Fase 9: `AntSystem`/`AntCasteAI` leen `damage_mult`/`speed_mult`/`work_mult` en vivo cada
+vez que una hormiga ataca, camina o cava, no los fijan una sola vez al nacer — así que ya subían
+para toda la colonia. **Vida era la única excepción real**: `hp[i] *= hp_mult` solo se aplicaba
+dentro de `AntSystem.add_ant_at()`, al nacer.
+
+Arreglado con `AntSystem.apply_hp_upgrade(ratio)` (nuevo): cuando se compra un nivel de la mejora
+de Vida, escala la vida de toda hormiga viva del bando del jugador por el cambio de multiplicador
+(nuevo/viejo) — una hormiga a la mitad de vida sigue a la mitad de vida en el nuevo máximo, no se
+cura de golpe a tope. Las hormigas rivales nunca se benefician de las mejoras del jugador, vivan
+ya o nazcan después (sin cambios ahí).
+
+- `tools/test_phase9.gd`: `_t_upgrades_raise_new_ants_stats` se renombró a
+  `_t_upgrades_are_colony_wide` (cambio intencional documentado) y ahora comprueba que una
+  hormiga que ya vivía también sube de vida al comprar, además de las nuevas.

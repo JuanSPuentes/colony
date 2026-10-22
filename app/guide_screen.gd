@@ -41,7 +41,7 @@ const SECTIONS := [
 	]],
 	["Mejoras", [
 		"Con comida sobrante, compra mejoras de colonia (sección Mejoras del panel).",
-		"Solo suben el daño/vida/velocidad de las hormigas nuevas, no las que ya viven.",
+		"Son progresivas: suben el daño/vida/velocidad/trabajo de toda la colonia, no solo de las hormigas nuevas.",
 	]],
 ]
 

@@ -2,9 +2,15 @@ class_name Upgrades
 extends RefCounted
 ## Fase 9: mejoras de la colonia del modo incremental, compradas con comida (mismo patrón de
 ## costo creciente que `IncrementalEconomy.buy_egg`). Cada nivel sube un multiplicador del bando
-## del jugador (daño, vida, velocidad de movimiento, velocidad de trabajo al cavar); solo afecta a
-## las hormigas nuevas desde que se compra — no se recalculan retroactivamente las que ya viven,
-## mismo principio de "lo nuevo no reescribe lo viejo en silencio" que el resto del proyecto.
+## del jugador (daño, vida, velocidad de movimiento, velocidad de trabajo al cavar) — progresivas
+## de verdad: afectan a TODA la colonia, no solo a las hormigas que nazcan después de comprar.
+## Daño/velocidad/trabajo ya eran así desde la Fase 9 sin querer: `AntSystem`/`AntCasteAI` leen
+## `damage_mult`/`speed_mult`/`work_mult` en vivo cada vez que una hormiga ataca, camina o cava, no
+## los fijan una sola vez al nacer. Vida era la única excepción (`hp[i] *= hp_mult` solo en
+## `add_ant_at`, Fase 13: se corrigió con `AntSystem.apply_hp_upgrade()`, que escala la vida de
+## toda hormiga viva del bando del jugador proporcional al cambio de multiplicador cuando se
+## compra un nivel — una hormiga a la mitad de vida sigue a la mitad de vida en el nuevo máximo,
+## no se cura de golpe).
 ##
 ## Población máxima quedó deliberadamente fuera de esta primera entrega: el modo incremental no
 ## tiene techo de población hoy, e inventar uno nuevo solo para "mejorarlo" después sería una
@@ -46,7 +52,9 @@ func buy(stat: int) -> bool:
 		Stat.DAMAGE:
 			damage_mult += cfg.inc_upgrade_damage_step
 		Stat.HP:
+			var old_mult := hp_mult
 			hp_mult += cfg.inc_upgrade_hp_step
+			sim.ants.apply_hp_upgrade(hp_mult / old_mult)
 		Stat.SPEED:
 			speed_mult += cfg.inc_upgrade_speed_step
 		Stat.WORK:

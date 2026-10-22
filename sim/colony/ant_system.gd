@@ -155,6 +155,16 @@ func add_ant_at(cell: Vector2i, ant_caste: int = CasteDefs.Caste.WORKER, ant_fac
 	return i
 
 
+## Fase 13: al comprar un nivel de mejora de vida, sube también la vida de toda hormiga viva del
+## bando del jugador (antes solo afectaba a las que nacieran después). `ratio` es el cambio del
+## multiplicador (nuevo/viejo): escala `hp[i]` proporcional en vez de curar de golpe, así una
+## hormiga a la mitad de vida sigue a la mitad de vida en el nuevo máximo.
+func apply_hp_upgrade(ratio: float) -> void:
+	for i in count:
+		if alive[i] == 1 and faction[i] == 0:
+			hp[i] *= ratio
+
+
 func _cell_index(p: Vector2) -> int:
 	var cpx := float(sim.cfg.cell_px)
 	var x := clampi(floori(p.x / cpx), 0, sim.world.w - 1)

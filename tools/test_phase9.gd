@@ -16,7 +16,7 @@ func _initialize() -> void:
 	_t_battle_won_when_rival_queen_dies()
 	_t_victory_after_four_seasons()
 	_t_classic_mode_unaffected()
-	_t_upgrades_raise_new_ants_stats()
+	_t_upgrades_are_colony_wide()
 	_t_save_load_keeps_season_state()
 	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
@@ -136,18 +136,26 @@ func _t_classic_mode_unaffected() -> void:
 		not sim.rival_colony.battle_active and sim.season_index == 0)
 
 
-func _t_upgrades_raise_new_ants_stats() -> void:
+## Fase 13: las mejoras son progresivas de verdad — afectan a toda la colonia, no solo a las
+## hormigas que nazcan después de comprar (antes solo la vida tenía esa limitación por accidente;
+## ver nota en upgrades.gd). Cambio intencional documentado: este test se llamaba
+## "_t_upgrades_raise_new_ants_stats" y afirmaba justo lo contrario para la vida.
+func _t_upgrades_are_colony_wide() -> void:
 	var sim := _inc(_cfg(), 8)
 	sim.colony.food = 999999.0
 	var baseline := sim.ants.add_ant_at(Vector2i(10, sim.cfg.surface_y - 1), CasteDefs.Caste.WORKER, 0)
 	var baseline_hp := sim.ants.hp[baseline]
+	var rival := sim.ants.add_ant_at(Vector2i(10, sim.cfg.surface_y - 1), CasteDefs.Caste.WORKER, 1)
+	var rival_hp := sim.ants.hp[rival]
 	_check("comprar la mejora de vida cuesta comida y sube el nivel",
 		sim.cmd_buy_upgrade(Upgrades.Stat.HP) and sim.upgrades.levels[Upgrades.Stat.HP] == 1)
+	_check("una hormiga que YA vivía también sube de vida al comprar la mejora (progresiva)",
+		sim.ants.hp[baseline] > baseline_hp, "antes=%.2f después=%.2f" % [baseline_hp, sim.ants.hp[baseline]])
 	var upgraded := sim.ants.add_ant_at(Vector2i(10, sim.cfg.surface_y - 1), CasteDefs.Caste.WORKER, 0)
 	_check("una hormiga nueva tras comprar la mejora de vida nace con más HP",
 		sim.ants.hp[upgraded] > baseline_hp, "antes=%.2f después=%.2f" % [baseline_hp, sim.ants.hp[upgraded]])
-	_check("una hormiga rival nueva NO se beneficia de las mejoras del jugador",
-		sim.ants.hp[sim.ants.add_ant_at(Vector2i(10, sim.cfg.surface_y - 1), CasteDefs.Caste.WORKER, 1)] == baseline_hp)
+	_check("una hormiga rival (ya viva o nueva) NO se beneficia de las mejoras del jugador",
+		sim.ants.hp[rival] == rival_hp and sim.ants.hp[sim.ants.add_ant_at(Vector2i(10, sim.cfg.surface_y - 1), CasteDefs.Caste.WORKER, 1)] == rival_hp)
 
 
 func _t_save_load_keeps_season_state() -> void:
