@@ -106,6 +106,10 @@ var _threat_header: Label
 ## Fase 9 (antes sin interfaz): mejoras de colonia, solo modo incremental.
 var _upgrade_section: Control
 var _upgrade_btns: Array[Button] = []
+## Fase 14: estadísticas reales por casta (vida/velocidad/daño) + cavar, a pedido del jugador —
+## antes solo se podía ver el % de vida de una hormiga al pasar el mouse por encima (ver
+## `_process`), no los números base ni cómo los mueven las mejoras compradas.
+var _stats_label: RichTextLabel
 ## Fase 9 (antes sin interfaz): estación actual + estado de la colonia rival, solo incremental.
 var _season_section: Control
 var _season_label: Label
@@ -214,6 +218,11 @@ func _ready() -> void:
 		_upgrade_btns.append(ub)
 		ub.pressed.connect(func() -> void: _m.sim.cmd_buy_upgrade(stat))
 		y += 8.0
+
+	_header(_upgrade_section, y, "ESTADÍSTICAS")
+	y += 7.0
+	_stats_label = _panel_rich(_upgrade_section, y, 22.0)
+	y += 22.0
 
 	# Fase 9: estación actual + estado de la colonia rival — tampoco tenía interfaz, solo
 	# `sim.season_index`/`sim.rival_colony` leídos por código. Solo incremental, mismo motivo que
@@ -605,6 +614,21 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 		var b := _upgrade_btns[stat]
 		b.text = "%s Nv.%d: %.0f" % [Upgrades.STAT_NAMES[stat], up.levels[stat], up.cost(stat)]
 		b.disabled = not up.can_buy(stat)
+
+	# Fase 14: estadísticas reales por casta, con las mejoras ya aplicadas — vida/velocidad/daño
+	# salen de CasteDefs * cfg, multiplicados por el stat de Upgrades correspondiente (mismo
+	# cálculo que usa AntSystem al nacer/moverse/atacar, ver sim/colony/upgrades.gd). "Cavar" es
+	# por colonia, no por casta: cfg.dig_seconds / work_mult es lo que tarda cualquier hormiga
+	# cavando una celda marcada, sin importar quién sea.
+	var stats_text := ""
+	for stat_caste in [CasteDefs.Caste.QUEEN, CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER]:
+		var base_hp: float = cfg.queen_hp_base if stat_caste == CasteDefs.Caste.QUEEN else cfg.ant_hp
+		var hp_val := base_hp * CasteDefs.HP_MULT[stat_caste] * up.hp_mult
+		var speed_val := cfg.ant_speed * CasteDefs.SPEED_MULT[stat_caste] * up.speed_mult
+		var dmg_val := CasteDefs.DAMAGE_PER_S[stat_caste] * up.damage_mult
+		stats_text += "%s: %.0f vida · %.1f vel · %.1f dmg/s\n" % [CasteDefs.NAMES[stat_caste], hp_val, speed_val, dmg_val]
+	stats_text += "Cavar: %.1fs/celda" % (cfg.dig_seconds / up.work_mult)
+	_stats_label.text = stats_text
 
 	# Fase 9 (antes sin interfaz): estación actual + colonia rival.
 	_season_label.text = "%s (día %d/%d)" % [
