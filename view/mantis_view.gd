@@ -34,3 +34,8 @@ func _dir_textures() -> Array[Texture2D]:
 func _body_size() -> Vector2:
 	var queen_size := AntRenderer.BODY_SIZE.x * CasteDefs.VISUAL_SCALE[CasteDefs.Caste.QUEEN]
 	return Vector2.ONE * queen_size * SIZE_MULT
+
+
+## Fase 16: color propio (el sprite viene en gris): verde hoja, camuflada entre las plantas.
+func _tint() -> Color:
+	return Color(0.55, 0.95, 0.4)

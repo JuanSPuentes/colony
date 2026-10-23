@@ -63,6 +63,10 @@ var coach: CoachView
 ## Lo pone `app.gd`. `main.tscn` abierto directo (pruebas viejas) la deja apagada: si no, la
 ## primera tarjeta pausaría la partida sola.
 var coach_enabled := false
+## Fase 15: nido cerrado + árboles al azar (`Simulation.spawn_incremental_start(true)`). Igual que
+## `coach_enabled`, solo lo prende `app.gd` para "Juego normal" desde el menú: `main.tscn` abierto
+## directo (las pruebas) sigue con el mapa de siempre.
+var fresh_layout_enabled := false
 var camera: Camera2D
 
 var speed := 1
@@ -203,7 +207,7 @@ func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> v
 		elif game_mode == "test":
 			sim.spawn_test_start()
 		else:
-			sim.spawn_incremental_start()
+			sim.spawn_incremental_start(fresh_layout_enabled)
 	terrain_view.setup(sim)
 	day_night_view.setup(sim)
 	plant_view.setup(sim)

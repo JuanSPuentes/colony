@@ -253,6 +253,19 @@ static func _can_buy_any_upgrade(sim: Simulation) -> bool:
 # goal (texto) + done(sim) -> bool, on_close(sim), button. Textos cortos: solo lo mínimo para
 # entender la idea; el detalle sale jugando.
 
+## Fase 15: antes cada feromona se mencionaba suelta en lecciones distintas, sin decir nunca quién
+## sigue cuál — el jugador reportó que era confuso. Una sola tarjeta con las cinco, en el mismo
+## orden en que se recorren con Q/E (`main.PHERO_FIELDS`).
+const PHEROMONES_TEXT := "Tecla 2, luego Q/E para elegir:\nComida → obreras a la planta\nHogar → «ya explorado»: buscan más lejos\nPeligro → todas se alejan\nAtaque → los soldados van ahí\nEvacuar → huyen de la zona"
+
+
+## Fase 15: ¿la colonia ya tiene salida a la superficie? El aire de arriba está conectado entre sí,
+## así que basta mirar una celda de aire: si `nest_dist` la alcanza, hay algún túnel abierto.
+static func _nest_open(sim: Simulation) -> bool:
+	var i := (sim.cfg.surface_y - 1) * sim.world.w + sim.cfg.nest_x
+	return sim.fields.nest_dist[i] < NestDistanceField.FAR
+
+
 func _level0_lessons() -> Array[Dictionary]:
 	var always := func(_s: Simulation) -> bool: return true
 	return [
@@ -272,6 +285,7 @@ func _level0_lessons() -> Array[Dictionary]:
 			"goal": "Pulsa 2 y arrastra con clic derecho", "done": func(s: Simulation) -> bool: return s.food_painted},
 		{"id": "harvest", "title": "Cosecha", "when": func(s: Simulation) -> bool: return s.delivered > 0, "focus": _nest, "zoom": Z_NEAR,
 			"text": "Cada hoja que llega al nido es comida. Las plantas rebrotan de día."},
+		{"id": "pheromones", "title": "Las 5 feromonas", "when": always, "text": PHEROMONES_TEXT},
 		{"id": "dig", "title": "Cavar", "when": always, "focus": _nest, "zoom": Z_NEAR,
 			"text": "Marca desde un túnel hacia la tierra; las obreras cavan. La roca gris no se cava.",
 			"goal": "Pulsa 1 y arrastra con clic derecho", "done": func(s: Simulation) -> bool: return s.dug > 0},
@@ -298,11 +312,17 @@ func _normal_lessons() -> Array[Dictionary]:
 	return [
 		{"id": "welcome", "title": "Juego normal", "when": func(_s: Simulation) -> bool: return true, "focus": _nest, "zoom": Z_WIDE,
 			"text": "Sobrevive a 4 estaciones. Clic izq. arrastra el mapa; clic derecho usa la herramienta."},
-		{"id": "phero", "title": "Consigue comida", "when": func(s: Simulation) -> bool: return _played_s(s) > 20.0 and not s.food_painted, "focus": _nearest_plant, "zoom": Z_WIDE,
+		# Fase 15: el nido arranca cerrado; abrirlo es lo primero y lo decide el jugador.
+		{"id": "open", "title": "Abre el nido", "when": func(s: Simulation) -> bool: return not _nest_open(s), "focus": _nest, "zoom": Z_NEAR,
+			"text": "El nido está cerrado. Marca un túnel desde la cámara hasta la superficie, por donde quieras salir.",
+			"goal": "Pulsa 1 y arrastra con clic derecho hasta arriba", "done": func(s: Simulation) -> bool: return _nest_open(s)},
+		{"id": "phero", "title": "Consigue comida", "when": func(s: Simulation) -> bool: return _nest_open(s) and _played_s(s) > 20.0 and not s.food_painted, "focus": _nearest_plant, "zoom": Z_WIDE,
 			"text": "Las obreras siguen rastros de feromona del nido a la planta.",
 			"goal": "Pulsa 2 y arrastra con clic derecho", "done": func(s: Simulation) -> bool: return s.food_painted},
 		{"id": "harvest", "title": "Cosecha", "when": func(s: Simulation) -> bool: return s.delivered > 0, "focus": _nest, "zoom": Z_NEAR,
 			"text": "Cada hoja es comida. Todas comen: que no llegue a 0."},
+		{"id": "pheromones", "title": "Las 5 feromonas", "when": func(s: Simulation) -> bool: return s.food_painted,
+			"text": PHEROMONES_TEXT},
 		{"id": "egg", "title": "Compra un huevo", "when": func(s: Simulation) -> bool: return s.econ.can_buy_egg() and s.eggs_bought == 0, "focus": _queen, "zoom": Z_CLOSE,
 			"text": "Nace obrera o soldado al azar. 9: auto-compra.",
 			"goal": "Tecla 7 o botón del panel", "done": func(s: Simulation) -> bool: return s.eggs_bought > 0},

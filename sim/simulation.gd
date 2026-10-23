@@ -170,8 +170,17 @@ func spawn_colony_court() -> void:
 
 ## Fase 3: arranque del modo incremental. Descarta las obreras de `cfg.initial_ants` que creó el
 ## constructor y empieza con una colonia mínima: reina, unas pocas obreras, un soldado y una larva.
-func spawn_incremental_start() -> void:
+##
+## Fase 15 (`fresh_layout`, solo lo activa `main.gd` para "Juego normal" de verdad): el nido
+## arranca cerrado, sin el pozo hacia la superficie — el jugador decide por dónde abrirlo — y los
+## árboles se reparten al azar (cantidad y distancias). Opcional a propósito: las pruebas y el
+## Nivel 0 siguen con el mapa de siempre (pozo abierto, árboles a distancias fijas), del que
+## dependen sus resultados y el orden de las lecciones.
+func spawn_incremental_start(fresh_layout := false) -> void:
 	incremental = true
+	if fresh_layout:
+		_seal_shaft()
+		_place_plants_random()
 	# Arranca el reloj ya pasado el amanecer (`DayNight.FADE`): a tick_count=0 el mundo se ve casi
 	# negro un instante (el amanecer empieza oscuro y se aclara), aunque `is_night()` ya dé "de
 	# día" — así la partida se ve a pleno día desde el primer frame, no a mitad de esa animación.
@@ -240,6 +249,47 @@ func _place_plants() -> void:
 		var x := clampi(cfg.nest_x + side * int(round(d)), 3, world.w - 4)
 		plants.append(Plant.new(Vector2i(x, cfg.surface_y - 1), cfg.leaves_per_plant))
 		total_leaves_left += cfg.leaves_per_plant
+
+
+## Fase 15: rellena con tierra el pozo inicial (de la superficie a la cámara), dejando la cámara
+## del nido cerrada. Las obreras no pueden salir hasta que el jugador marque por dónde cavar.
+func _seal_shaft() -> void:
+	for y in range(cfg.surface_y, cfg.surface_y + cfg.shaft_depth):
+		var i := y * world.w + cfg.nest_x
+		world.cells[i] = WorldGrid.Cell.DIRT
+		world.changed.append(i)
+	world.passable_version += 1
+	world.jobs_version += 1
+	fields.recompute_terrain()
+	fields.recompute_dig()
+
+
+## Fase 15: árboles al azar — cantidad, lado y distancia al nido sin un patrón fijo, solo con una
+## separación mínima para que no se encimen y sin tapar la superficie justo encima del nido.
+func _place_plants_random() -> void:
+	plants.clear()
+	total_leaves_left = 0
+	var n := cfg.plant_count + rng.randi_range(-2, 3)
+	var used: Array[int] = []
+	var tries := 0
+	while plants.size() < n and tries < 400:
+		tries += 1
+		var x := rng.randi_range(3, world.w - 4)
+		if absi(x - cfg.nest_x) < 6:
+			continue
+		var clash := false
+		for ux in used:
+			if absi(ux - x) < 4:
+				clash = true
+				break
+		if clash:
+			continue
+		used.append(x)
+		var leaves := cfg.leaves_per_plant + rng.randi_range(-10, 15)
+		plants.append(Plant.new(Vector2i(x, cfg.surface_y - 1), leaves))
+		total_leaves_left += leaves
+	econ.known_plants = PackedByteArray()
+	econ.known_plants.resize(plants.size())
 
 
 func time_s() -> float:

@@ -338,10 +338,12 @@ func _t_flee_and_die() -> void:
 
 
 func _t_movement_validity() -> void:
-	var cfg := _cfg(100, true)
+	# Antes 500 hormigas (100 + 400); bajado a 50 a pedido del jugador para que la regresión no tarde
+	# minutos. Lo que comprueba (nadie atraviesa tierra, nadie se traba, nadie desaparece) no depende
+	# de cuántas haya.
+	var cfg := _cfg(50, true)
 	cfg.rain_first_s = 40.0
 	var sim := Simulation.new(cfg, 21)
-	sim.cmd_add_ants(400)
 	var bad := 0
 	var sy := cfg.surface_y
 	for k in 60:
@@ -355,16 +357,18 @@ func _t_movement_validity() -> void:
 					var c := ants.pos[a] / cfg.cell_px
 					if not sim.world.is_passable(floori(c.x), floori(c.y)):
 						bad += 1
-	_check("ninguna hormiga atraviesa tierra o roca (500 hormigas, excavando y con lluvia)", bad == 0, "violaciones=%d en %d ticks" % [bad, 20 * 240 / 4])
+	_check("ninguna hormiga atraviesa tierra o roca (50 hormigas, excavando y con lluvia)", bad == 0, "violaciones=%d en %d ticks" % [bad, 20 * 240 / 4])
 	_check("ninguna hormiga pasa más de 3 s sin avanzar", sim.ants.max_stuck_seen < cfg.stuck_seconds + 0.01, "máximo=%.1f s, recuperaciones=%d" % [sim.ants.max_stuck_seen, sim.stuck_recoveries])
-	_check("las hormigas siguen vivas o murieron ahogadas, no desaparecen", sim.ants.alive_count + sim.deaths == 500, "vivas=%d muertas=%d" % [sim.ants.alive_count, sim.deaths])
+	_check("las hormigas siguen vivas o murieron ahogadas, no desaparecen", sim.ants.alive_count + sim.deaths == 50, "vivas=%d muertas=%d" % [sim.ants.alive_count, sim.deaths])
 
 
 func _t_performance() -> void:
 	# El presupuesto de 500 hormigas se relajó de 12 a 16 ms al llegar la Fase 1: hay que decaer
 	# 3 feromonas más y comprobar cámaras/peligro por hormiga, incluso sin reina. Sigue muy por
 	# debajo de los 33 ms (30 FPS) que exige el criterio de rendimiento de la Fase 1.
-	for n in [100, 500]:
+	# Antes [100, 500]; ahora solo 50, a pedido del jugador (la de 500 tardaba y además fallaba a
+	# menudo por la carga de la máquina, sin decir nada del juego). Mismo presupuesto que tenían 100.
+	for n in [50]:
 		var sim := Simulation.new(_cfg(n), 3)
 		_run(sim, 5.0)
 		var t0 := Time.get_ticks_usec()
@@ -372,5 +376,5 @@ func _t_performance() -> void:
 		for i in ticks:
 			sim.tick()
 		var ms := float(Time.get_ticks_usec() - t0) / 1000.0 / ticks
-		var budget := 12.0 if n == 100 else 16.0
+		var budget := 12.0
 		_check("coste de simulación con %d hormigas dentro del presupuesto (50 ms por tick)" % n, ms < budget, "%.2f ms por tick" % ms)

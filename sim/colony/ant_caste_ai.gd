@@ -115,14 +115,23 @@ static func think_soldier(ants, i: int, cx: int, cy: int, ci: int, think_dt: flo
 		ants.state[i] = AntSystem.State.ATTACK
 		ants._step(i, cx, cy, ci, AntSystem.Mode.PLANT, threat.pos)
 		return
-	var here: float = sim.attack.data[ci]
-	var best := here
-	for k in 8:
-		best = maxf(best, sim.attack.get_v(cx + AntSystem.DX[k], cy + AntSystem.DY[k]))
-	if best > 0.02:
-		ants.state[i] = AntSystem.State.ATTACK
-		ants._step(i, cx, cy, ci, AntSystem.Mode.TOWARD, sim.attack)
-		return
+	# Fase 15: antes un soldado sin enemigo a la vista subía el rastro de Ataque hasta la punta y se
+	# quedaba ahí (o dando vueltas por el rastro mientras se desvanecía) más de un minuto, sin nadie
+	# a quien pegarle — el jugador lo vio como soldados "bugueados" amontonados. Ahora, al llegar a la
+	# punta sin amenaza, "da por cumplida" la orden: ignora ese rastro un rato (mismo `ignore_until`
+	# que usan las obreras con el de Comida; los soldados no lo usaban para nada más) y patrulla.
+	if sim.tick_count >= ants.ignore_until[i]:
+		var here: float = sim.attack.data[ci]
+		var best := here
+		for k in 8:
+			best = maxf(best, sim.attack.get_v(cx + AntSystem.DX[k], cy + AntSystem.DY[k]))
+		if best > 0.02:
+			if best <= here + 0.001:
+				ants.ignore_until[i] = sim.tick_count + int(cfg.ignore_trail_seconds * cfg.tick_rate)
+			else:
+				ants.state[i] = AntSystem.State.ATTACK
+				ants._step(i, cx, cy, ci, AntSystem.Mode.TOWARD, sim.attack)
+				return
 	# Sin amenaza, el soldado patrulla libre en vez de volver a pararse junto al nido: se mueve
 	# igual que una obrera explorando (misma puntuación de `Mode.EXPLORE`), solo que sin cortar
 	# hojas ni cavar. Pedido explícito: antes quedaba plantado cerca de la entrada.

@@ -307,8 +307,16 @@ func _dig_progress(i: int, dt: float) -> void:
 		world.complete_dig(j)
 		sim.dug += 1
 		job[i] = -1
-		state[i] = State.IDLE
-		timer[i] = 0.0
+		# Fase 15: si quedan celdas marcadas, sigue cavando la siguiente en vez de pasar a IDLE —
+		# IDLE la mandaba de vuelta al nido a descansar después de CADA celda (`_think_idle`), así
+		# que un túnel largo se cavaba en un ir y volver constante. Ahora sigue hasta terminarlo;
+		# `_think_dig` la saca sola a IDLE si ya no hay nada alcanzable que cavar.
+		if world.marked_count > 0:
+			timer[i] = 0.0
+			next_think[i] = sim.tick_count
+		else:
+			state[i] = State.IDLE
+			timer[i] = 0.0
 
 
 func _move(i: int, dt: float, lv: float) -> void:
@@ -641,8 +649,11 @@ func _think_dig(i: int, cx: int, cy: int, ci: int) -> void:
 					job[i] = ni
 					target[i] = pos[i]
 					return
-		state[i] = State.IDLE  # otra hormiga se adelantó
-		timer[i] = 0.0
+		# Otra hormiga se adelantó con la celda de al lado. Fase 15: antes esto la mandaba a IDLE (y
+		# de vuelta al nido a descansar); en un túnel de una celda de ancho solo cabe una excavadora
+		# en el frente, así que la segunda iba y volvía sin parar. Ahora espera ahí su turno: cuando
+		# la otra termina, el frente avanza y `dig_dist` la lleva a la celda siguiente.
+		target[i] = pos[i]
 		return
 	_step(i, cx, cy, ci, Mode.DIG, null)
 

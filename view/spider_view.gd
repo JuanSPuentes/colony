@@ -36,3 +36,8 @@ func _dir_textures() -> Array[Texture2D]:
 func _body_size() -> Vector2:
 	var queen_size := AntRenderer.BODY_SIZE.x * CasteDefs.VISUAL_SCALE[CasteDefs.Caste.QUEEN]
 	return Vector2.ONE * queen_size * SIZE_MULT
+
+
+## Fase 16: color propio (el sprite viene en gris): violeta oscuro, como una tarántula.
+func _tint() -> Color:
+	return Color(0.62, 0.42, 0.78)

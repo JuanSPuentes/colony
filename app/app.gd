@@ -72,6 +72,8 @@ func _start_game(incremental: bool) -> void:
 	# Fase 14: en vez de la guía de una pantalla al empezar (Fase 12), "Juego normal" explica
 	# cada cosa la primera vez que aparece (`CoachView`). La guía sigue en el menú ("Cómo jugar").
 	game.coach_enabled = incremental
+	# Fase 15: "Juego normal" arranca con el nido cerrado y árboles al azar (ver `main.gd`).
+	game.fresh_layout_enabled = incremental
 	game.start(seed_value, null, "incremental" if incremental else "historia")
 
 

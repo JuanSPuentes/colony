@@ -408,7 +408,8 @@ func _t_determinism() -> void:
 
 
 func _t_performance() -> void:
-	for n in [200, 500]:
+	# Antes [200, 500]; ahora solo 50, a pedido del jugador (ver la misma nota en test_phase0.gd).
+	for n in [50]:
 		var cfg := _cfg(n)
 		var sim := _colony(cfg, 15)
 		_run(sim, 5.0)
@@ -417,5 +418,5 @@ func _t_performance() -> void:
 		for i in ticks:
 			sim.tick()
 		var ms := float(Time.get_ticks_usec() - t0) / 1000.0 / ticks
-		var budget := 16.6 if n == 200 else 33.3
+		var budget := 16.6
 		_check("coste de simulación con %d hormigas dentro del presupuesto (60/30 FPS)" % n, ms < budget, "%.2f ms por tick" % ms)

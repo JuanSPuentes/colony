@@ -36,3 +36,8 @@ func _dir_textures() -> Array[Texture2D]:
 
 func _body_size() -> Vector2:
 	return Vector2.ONE * AntRenderer.BODY_SIZE.x * SIZE_MULT
+
+
+## Fase 16: color propio (el sprite viene en gris): rojo anaranjado, como un ciempiés gigante.
+func _tint() -> Color:
+	return Color(1.0, 0.5, 0.3)

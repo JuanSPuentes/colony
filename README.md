@@ -852,3 +852,24 @@ solo. El piso se guarda con F6 (`food_floor`/`home_floor`); los guardados viejos
 **Cartel de fin de partida.** Era un texto suelto de tamaño fijo y letra gigante: el motivo largo
 del Nivel 0 se salía por los costados. Ahora es una tarjeta centrada en el mapa con el título,
 el motivo en letra normal (con salto de línea) y cómo seguir.
+
+## 22. Fase 15: nido cerrado, excavación continua, árboles al azar y feromonas más claras
+
+- **Nido cerrado al empezar "Juego normal"** (`Simulation.spawn_incremental_start(true)`, prendido
+  desde `app.gd` con `main.fresh_layout_enabled`): no hay pozo hacia la superficie; el jugador decide
+  por dónde abrirlo. La guía (`CoachView`) lo pide como primera lección ("Abre el nido"). Las pruebas,
+  el Nivel 0 y `main.tscn` directo siguen con el pozo abierto de siempre.
+- **Árboles al azar** (mismo modo): cantidad, distancia al nido y hojas variables, con separación
+  mínima. Más grandes (46 px de base) y cada uno de un tamaño propio (`PlantView._size_for_cell`, hash
+  de la celda: no cambia el guardado).
+- **Excavación continua:** al terminar una celda la obrera sigue con la siguiente en vez de volver al
+  nido a descansar, y si otra ya tomó la celda del frente, espera su turno. Antes, un túnel de 7 celdas
+  hasta la superficie no se terminaba en 120 s; ahora en ~32 s.
+- **Soldados en rastros de Ataque vacíos:** al llegar a la punta sin enemigo, ignoran ese rastro un
+  rato y patrullan (antes seguían en ATAQUE más de un minuto, amontonados). Con un enemigo al final
+  siguen yendo a pelear.
+- **Tarjeta "Las 5 feromonas"** en la guía de Juego normal y del Nivel 0: a quién afecta cada una.
+  Hogar no hace volver al nido: marca "ya explorado" para que busquen más lejos.
+- Pruebas: `tools/test_phase15.gd` (21). Las pruebas de rendimiento/movimiento de `test_phase0` y
+  `test_phase1` pasaron de 500 a 50 hormigas, a pedido del jugador (tardaban minutos y fallaban por
+  carga de la máquina).
