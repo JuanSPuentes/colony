@@ -10,11 +10,15 @@ extends CanvasLayer
 ## porque son la posición en el menú, no el modo; `app.gd._ready()` decide a qué modo de
 ## `_start_game()` apunta cada una.
 
+## Fase 14: Nivel 0, el tutorial jugable (ver `sim/colony/tutorial_level.gd`).
+signal play_tutorial
 signal play_normal
 signal play_infinite
 ## Fase 6: sandbox para probar amenazas y castas sin que una partida real se corte.
 signal play_test
 signal open_options
+## Fase 14: la guía de una pantalla (`GuideScreen`) ya no sale sola al empezar; queda aquí.
+signal open_guide
 signal quit_requested
 
 const GOLD := Color("ffd43c")
@@ -64,14 +68,16 @@ func _ready() -> void:
 
 	var box := VBoxContainer.new()
 	box.set_anchors_preset(Control.PRESET_CENTER)
-	box.position = Vector2(-140, -60)
+	box.position = Vector2(-140, -110)
 	box.custom_minimum_size = Vector2(280, 0)
 	box.add_theme_constant_override("separation", 16)
 	root.add_child(box)
 
+	_option(box, "Nivel 0 (tutorial)", "Aprende a jugar paso a paso y gana tu primera batalla.", play_tutorial.emit)
 	_option(box, "Juego normal", "Crece sin límite: compra obreras y soldados con comida.", play_normal.emit)
 	_option(box, "Modo infinito", "Reina, cámaras, araña: la colonia completa de la Fase 1.", play_infinite.emit)
 	_option(box, "Test", "Entorno de pruebas: hormigas y amenazas a voluntad, sin victoria ni derrota.", play_test.emit)
+	_option(box, "Cómo jugar", "Resumen de las reglas en una pantalla.", open_guide.emit)
 	_option(box, "Opciones", "Controles, volumen y brillo.", open_options.emit)
 	_option(box, "Salir", "Cierra el juego.", quit_requested.emit)
 

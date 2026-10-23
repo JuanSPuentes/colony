@@ -57,9 +57,11 @@ func _screen(cell: Vector2i) -> Vector2:
 	return _main.world_vp.get_canvas_transform() * world_point
 
 
-func _drag(from: Vector2i, to: Vector2i, button := MOUSE_BUTTON_LEFT) -> void:
+## Fase 14: las acciones van con clic derecho (Shift + derecho borra); el izquierdo mueve el mapa.
+func _drag(from: Vector2i, to: Vector2i, button := MOUSE_BUTTON_RIGHT, shift := false) -> void:
 	var down := InputEventMouseButton.new()
 	down.button_index = button
+	down.shift_pressed = shift
 	down.pressed = true
 	down.position = _screen(from)
 	root.push_input(down)
@@ -108,7 +110,8 @@ func _run() -> void:
 	var expected_total := 1 + cfg.inc_start_workers + cfg.inc_start_soldiers
 	_check("la escena principal arranca con la colonia inicial y todas las vistas", sim.incremental and sim.ants.alive_count == expected_total and _main.terrain_view != null and _main.ant_renderer != null and _main.overlay != null and _main.hud != null and _main.day_night_view != null, "esperado=%d real=%d" % [expected_total, sim.ants.alive_count])
 	# Fase 3: la semilla ya no se muestra; en su lugar va el día (y si es de día o de noche).
-	_check("el HUD muestra los datos en español", _main.hud._top.text.contains("Hormigas: %d" % expected_total) and _main.hud._top.text.contains("Día 1") and not _main.hud._top.text.contains("Semilla") and _main.hud._top.text.contains("FPS:") and _main.hud._top.text.contains("Vel:") and _main.hud._weather.text.length() > 0, _main.hud._top.text + " | " + _main.hud._weather.text)
+	# Fase 14: panel en tarjetas, "Vel: x1" pasó a "Velocidad x1" y "FPS: 46" a "46 FPS".
+	_check("el HUD muestra los datos en español", _main.hud._top.text.contains("Hormigas: %d" % expected_total) and _main.hud._top.text.contains("Día 1") and not _main.hud._top.text.contains("Semilla") and _main.hud._top.text.contains("FPS") and _main.hud._top.text.contains("Velocidad") and _main.hud._weather.text.length() > 0, _main.hud._top.text + " | " + _main.hud._weather.text)
 
 	# Fase 3: 7 compra un huevo (la casta nace al azar, 8 ya no hace nada en este modo), 9 cambia
 	# la auto-compra (y el botón del panel también compra).
@@ -156,18 +159,18 @@ func _run() -> void:
 	await _key(KEY_1)
 	var cells: Array[Vector2i] = [Vector2i(cfg.nest_x + 1, sy + 2), Vector2i(cfg.nest_x + 2, sy + 2), Vector2i(cfg.nest_x + 3, sy + 2)]
 	await _drag(cells[0], cells[2])
-	_check("clic izquierdo y arrastrar con Cavar marca celdas", _main.sim.world.marked_count == 3, "marcadas=%d" % _main.sim.world.marked_count)
+	_check("clic derecho y arrastrar con Cavar marca celdas", _main.sim.world.marked_count == 3, "marcadas=%d" % _main.sim.world.marked_count)
 	await _drag(Vector2i(30, sy + 10), Vector2i(32, sy + 10))
 	_check("no se marcan celdas sin espacio abierto al lado", _main.sim.world.type_at(31, sy + 10) == WorldGrid.Cell.DIRT)
-	await _drag(cells[1], cells[2], MOUSE_BUTTON_RIGHT)
-	_check("clic derecho desmarca", _main.sim.world.marked_count == 1)
+	await _drag(cells[1], cells[2], MOUSE_BUTTON_RIGHT, true)
+	_check("Shift + clic derecho desmarca", _main.sim.world.marked_count == 1)
 	await _key(KEY_2)
 	await _drag(Vector2i(cfg.nest_x, sy - 1), Vector2i(cfg.nest_x - 20, sy - 1))
 	var near: float = _main.sim.food.get_v(cfg.nest_x - 3, sy - 1)
 	var far: float = _main.sim.food.get_v(cfg.nest_x - 18, sy - 1)
 	_check("la herramienta Feromona pinta un rastro con dirección (más fuerte al final)", far > near and near > 0.0, "cerca=%.2f lejos=%.2f" % [near, far])
-	await _drag(Vector2i(cfg.nest_x - 12, sy - 1), Vector2i(cfg.nest_x - 12, sy - 1), MOUSE_BUTTON_RIGHT)
-	_check("clic derecho con Feromona borra", _main.sim.food.get_v(cfg.nest_x - 12, sy - 1) == 0.0)
+	await _drag(Vector2i(cfg.nest_x - 12, sy - 1), Vector2i(cfg.nest_x - 12, sy - 1), MOUSE_BUTTON_RIGHT, true)
+	_check("Shift + clic derecho con Feromona borra", _main.sim.food.get_v(cfg.nest_x - 12, sy - 1) == 0.0)
 
 	# Cámara.
 	var cam: Camera2D = _main.camera

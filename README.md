@@ -44,6 +44,7 @@ convención de una prueba por fase. Existe justo para que el proyecto no se vuel
 18. [Fase 11: árboles con sprite y mapa aleatorio en "Juego normal"](#18-fase-11-árboles-con-sprite-y-mapa-aleatorio-en-juego-normal)
 19. [Fase 12: guía rápida al entrar a "Juego normal"](#19-fase-12-guía-rápida-al-entrar-a-juego-normal)
 20. [Fase 13: las mejoras son progresivas de verdad](#20-fase-13-las-mejoras-son-progresivas-de-verdad)
+21. [Fase 14: controles de cámara, guía contextual y Nivel 0](#21-fase-14-controles-de-cámara-guía-contextual-y-nivel-0)
 
 ---
 
@@ -74,13 +75,15 @@ volumen, brillo) o te deja salir, sin perder la partida (vuelve exactamente a do
 | **2** | Feromona (Q/E cambia el tipo: Comida, Hogar, Peligro, Ataque, Evacuar) |
 | **3** | Cámara (Q/E cambia el tipo: Guardería, Almacén, Real) |
 | **4** | Borrar (quita marca de excavar, cámara y las 5 feromonas bajo el pincel) |
-| **5** | Mover reina: clic izquierdo la manda a caminar hasta esa celda, clic derecho cancela la orden |
-| Clic izquierdo / derecho, arrastrar | Pintar / borrar con la herramienta activa |
+| **5** | Mover reina: clic derecho la manda a caminar hasta esa celda, Shift + clic derecho cancela la orden |
+| Clic derecho, arrastrar | Usar la herramienta activa (cavar, pintar, cámara, mover reina) |
+| Shift + clic derecho, arrastrar | Borrar / desmarcar con la herramienta activa (con 5: cancelar la orden) |
+| Clic izquierdo, arrastrar | Mover la cámara (al soltar sigue un poco y frena sola) |
 | **7** | Modo normal: comprar un huevo con comida (también con el botón del panel; qué nace es al azar) |
 | **9** | Modo normal: auto-compra de huevos, apagada/encendida (compra sola en cuanto alcanza, dejando una reserva) |
 | **Espacio** | Pausa / reanudar |
 | **F1 / F2 / F3** | Velocidad x1 / x2 / x4 |
-| **WASD** | Mover la cámara |
+| **WASD / flechas** | Mover la cámara (con **Shift**, más rápido) |
 | Rueda del mouse | Zoom en pasos fijos |
 | **H** | Saltar a la reina |
 | **F5** | Reiniciar con el mismo mapa |
@@ -345,9 +348,10 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | `Godot --headless --path . --script tools/test_app_menu.gd` | El menú (`app/`): arranca mostrando el menú, Opciones desde el menú vuelve al menú, Opciones desde la tuerca en partida vuelve a la partida (pausada) y no al menú, Juego normal arranca en modo incremental (comida/compra), Modo infinito arranca en modo Historia con la colonia completa, Test arranca el modo sandbox con 50 hormigas, F5 conserva el modo, volumen/brillo se guardan, Salir pide confirmación en vez de cerrar directo. |
 | `Godot --headless --path . --script tools/test_phase10.gd` | Tutorial de "Juego normal" (sección 17): la lista de pasos propia del modo incremental progresa en orden (cavar, comida, comprar huevo, comprar mejora), `cmd_buy_egg`/`cmd_buy_upgrade` incrementan los contadores que lee, el modo historia sigue con su propia lista sin mezclarse, el modo Test nunca muestra la burbuja, reiniciar partida reinicia el progreso. |
 | (sección 18, sin suite propia) | Mapa aleatorio en "Juego normal": cubierto dentro de `tools/test_app_menu.gd` (dos partidas sucesivas caen en semillas distintas; Modo infinito sigue fijo). |
+| `Godot --headless --path . --script tools/test_phase14.gd` | Fase 14 (sección 21): clic izquierdo arrastra el mapa y no usa la herramienta, clic derecho sí, Shift + derecho borra, flechas/WASD con Shift más rápido, teclas combinadas y diagonal normalizada, la guía contextual (orden de lecciones, pausa y acercamiento, objetivos que se cumplen solos), el Nivel 0 (sin araña/lluvia/estaciones automáticas, batalla pedida por la guía, las hormigas dañan a la reina rival, victoria al matarla, guardar/cargar). **34 pruebas.** |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
-**Última ejecución verificada (2026-10-20, Godot 4.7.2):** las siete suites en 34/34 (Fase 0),
+**Última ejecución verificada (2026-10-22, Godot 4.7.2):** las 13 suites de la tabla pasan, incluida `test_phase14` (34/34). Antes (2026-10-20): las siete suites en 34/34 (Fase 0),
 44/44 (Fase 1), 12/12 (Fase 2), 30/30 (Fase 3), 7/7 (Fase 4), 26/26 (ui_test) y 11/11 (menú).
 
 ### Notas para escribir pruebas
@@ -768,3 +772,83 @@ ya o nazcan después (sin cambios ahí).
 - `tools/test_phase9.gd`: `_t_upgrades_raise_new_ants_stats` se renombró a
   `_t_upgrades_are_colony_wide` (cambio intencional documentado) y ahora comprueba que una
   hormiga que ya vivía también sube de vida al comprar, además de las nuevas.
+
+## 21. Fase 14: controles de cámara, guía contextual y Nivel 0
+
+Pedido del jugador: (1) arrastrar el mapa con clic izquierdo y hacer las acciones con el derecho,
+con un WASD más cómodo; (2) en vez de instrucciones solo al principio, explicar cada cosa la primera
+vez que se puede hacer, acercando la cámara; (3) un "Nivel 0" que lo enseñe todo en orden de
+importancia y termine derrotando a un ejército chico, como el final de una estación.
+
+**Controles (`main.gd`).** Clic izquierdo (o medio) arrastra el mapa, con un poco de inercia al
+soltar. Clic derecho usa la herramienta activa; **Shift + clic derecho** hace lo que antes hacía
+el clic derecho (borrar, desmarcar, cancelar la orden de la reina). WASD y flechas se combinan bien
+(se guarda qué teclas siguen apretadas: antes soltar A con D apretada frenaba la cámara), la
+diagonal ya no va más rápido y Shift multiplica la velocidad (`PAN_FAST_MULT`). Cambio
+intencional: `tools/ui_test.gd` arrastra ahora con clic derecho y borra con Shift + derecho.
+
+**Guía contextual (`view/coach_view.gd`, `CoachView`).** Una tarjeta con título y texto, la
+partida pausada detrás y la cámara acercándose a lo que se explica (`main.focus_on`, reusa la
+animación de zoom). Se cierra con "Entendido" o Enter. Si la lección pide hacer algo, queda un
+objetivo arriba que se cumple solo con lo que el jugador hace. Solo actúa si
+`main.coach_enabled` (lo pone `app.gd`), así `main.tscn` abierto directo, como en las pruebas
+viejas, se comporta igual que antes. Con la guía activa, la burbuja vieja (`TutorialView`) se
+oculta en esos modos para no repetir lo mismo; en Modo infinito sigue igual.
+- **Juego normal:** ya no abre la guía de una pantalla al empezar (Fase 12). Ahora salta un
+  consejo la primera vez que pasa cada cosa: bienvenida, conseguir comida, la primera cosecha,
+  ya alcanza para un huevo, ampliar el nido, la primera noche, mejoras disponibles, la lluvia, la
+  primera araña y el ataque de fin de estación. Hay al menos 8 s de juego entre un consejo y otro
+  para que no se encadenen. La guía de una pantalla sigue en el menú ("Cómo jugar"). Cambio
+  intencional: `tools/test_app_menu.gd` comprueba ahora la primera tarjeta en vez de la guía.
+- **Nivel 0** (botón "Nivel 0 (tutorial)" del menú, modo `"tutorial"`): 14 lecciones en orden
+  fijo, de lo más importante a lo menos: bienvenida, la reina, la comida, las castas, mover la
+  cámara, feromona de comida, la cosecha, cavar, huevos y cría, día y noche, mejoras, amenazas y
+  la batalla de fin de estación. Cada una espera a que se cumpla el objetivo de la anterior.
+
+**Nivel 0 en la simulación (`sim/colony/tutorial_level.gd`, `Simulation.spawn_tutorial_start`).**
+Es el modo incremental con `tutorial_level = true`: más comida al empezar (`tut_start_food`), sin
+lluvia automática, sin araña y sin estaciones automáticas. La guía pide la batalla final
+(`cmd_start_tutorial_battle`): un ejército chico (`tut_rival_ants`, reina con
+`tut_rival_strength`) más `tut_bonus_soldiers` soldados de refuerzo para que siempre se pueda
+ganar. Matar a la reina rival termina el nivel con victoria. `tutorial_level` y
+`tutorial_battle_started` se guardan con F6.
+
+**Bug arreglado de paso:** la reina rival no estaba en `AntSystem._nearest_threat()`, así que
+ninguna hormiga podía dañarla. La batalla de fin de estación de Juego normal solo se ganaba en
+`tools/test_phase9.gd`, que la mata a mano. Ahora cuenta como cualquier otra amenaza mientras
+hay una batalla en curso.
+
+**Panel lateral en tarjetas (`view/hud.gd`).** Antes cada línea del panel iba en una altura fija,
+así que el texto largo se cortaba o se encimaba con la sección de abajo. Ahora cada sección es una
+tarjeta dentro de una columna con scroll, con espacio entre tarjetas, y la altura sale del
+contenido. Las líneas largas se parten en varias, las mejoras van en una cuadrícula de 2×2, las
+estadísticas en una tabla, y la tarjeta de Avisos solo aparece si hay alguno. Cambio intencional:
+`tools/ui_test.gd` busca "Velocidad"/"FPS" en vez de "Vel:"/"FPS:".
+
+**Mapa a pantalla completa, guía al costado y barra de arriba.**
+- Ningún nivel de zoom deja ver más allá del mapa: `main.min_zoom()` calcula el zoom que llena
+  justo el área del mundo según el tamaño real de la ventana, y `main.zoom_at(i)` nunca baja de
+  ahí. Antes, con 0.5 aparecían franjas negras alrededor del mapa. Si la ventana cambia o se
+  pliega el panel, se corrige solo.
+- La guía (`CoachView`) ya no pausa ni tapa el centro: es una tarjeta chica pegada al costado
+  derecho del mapa, con textos mínimos. Si la lección pide algo, muestra el objetivo (▶) y pasa
+  sola a la siguiente al cumplirlo; si solo informa, tiene "Siguiente" (o Enter).
+- Barra de arriba del mapa (`Hud._update_top_bar`), con símbolos y números: 🐜 hormigas,
+  🍃 comida, 👑 vida de la reina, ☀/🌙 cuánto falta para que cambie el día, 📅 día, estación
+  (🌱☀🍂❄ n/4), ⚔ días hasta la batalla de fin de estación (o la vida de la reina rival durante
+  la batalla), 🌧 lluvia y ⏸/⏩ pausa o velocidad. Los íconos son emojis que Godot dibuja con la
+  fuente de emojis del sistema (Windows, la plataforma objetivo).
+
+**Rastros pintados que no se desgastan (`PheromoneField.paint`).** Antes, un rastro pintado
+arrancaba en 0.30 y perdía 1,2 % por segundo: a los ~2,5 min las hormigas dejaban de verlo, y
+mucho antes la diferencia de intensidad entre celdas era tan chica que perdía contra el azar al
+caminar ("se traban"). Ahora el pincel fija un piso que no decae en Comida y Hogar: lo pintado por
+el jugador dura hasta que lo borra (Shift + clic derecho) y conserva su pendiente. Lo que
+depositan las hormigas va encima y sigue desgastándose igual. Peligro, Ataque y Evacuar siguen
+siendo avisos que se apagan solos. Una hormiga que llega al final de un rastro sin comida sigue
+borrando la punta (también lo pintado), así un rastro hacia una planta agotada se va comiendo
+solo. El piso se guarda con F6 (`food_floor`/`home_floor`); los guardados viejos cargan sin él.
+
+**Cartel de fin de partida.** Era un texto suelto de tamaño fijo y letra gigante: el motivo largo
+del Nivel 0 se salía por los costados. Ahora es una tarjeta centrada en el mapa con el título,
+el motivo en letra normal (con salto de línea) y cómo seguir.

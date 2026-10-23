@@ -78,8 +78,8 @@ static func apply_at(main, c: Vector2i) -> void:
 				var f: PheromoneField = sim.get(field_name)
 				sim.cmd_erase_phero(f, c.x, c.y)
 		5:
-			# Clic izquierdo: ordena a la reina caminar hasta ahí. Clic derecho: cancela la orden en
-			# curso (se queda donde esté parada, no vuelve atrás).
+			# Clic derecho: ordena a la reina caminar hasta ahí. Shift + clic derecho: cancela la orden
+			# en curso (se queda donde esté parada, no vuelve atrás).
 			if main._erasing:
 				sim.queen_goal_cell = -1
 			else:

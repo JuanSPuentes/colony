@@ -611,7 +611,7 @@ func _think_food(i: int, cx: int, cy: int, ci: int) -> void:
 	elif here >= best + 0.002:
 		# Fin del rastro sin comida a la vista: la hormiga borra la punta (la feromona de un
 		# rastro agotado se va comiendo desde el final) y deja de fiarse de él un rato.
-		sim.food.data[ci] = 0.0
+		sim.food.clear_cell(ci)  # también lo pintado: un rastro a una planta agotada se va comiendo igual
 		ignore_until[i] = sim.tick_count + int(cfg.ignore_trail_seconds * cfg.tick_rate)
 		state[i] = State.EXPLORE
 		_step(i, cx, cy, ci, Mode.EXPLORE, null)
@@ -671,7 +671,11 @@ func _think_nurse(i: int, cx: int, cy: int, ci: int) -> void:
 func _nearest_threat(p: Vector2, max_range: float):
 	var best = null
 	var best_d := max_range
-	for t in [sim.spider, sim.centipede, sim.mantis]:
+	# Fase 14: la reina rival también es una amenaza (misma forma `.pos`/`.alive`/`.take_damage()`).
+	# Antes no estaba en esta lista y ninguna hormiga podía dañarla: la batalla de fin de estación
+	# solo se ganaba en las pruebas, que la matan a mano.
+	var rq: RivalQueen = sim.rival_colony.queen if sim.rival_colony != null and sim.rival_colony.battle_active else null
+	for t in [sim.spider, sim.centipede, sim.mantis, rq]:
 		if t != null and t.alive:
 			var d: float = p.distance_to(t.pos)
 			if d <= best_d:

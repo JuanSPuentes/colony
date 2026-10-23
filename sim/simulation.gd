@@ -22,6 +22,8 @@ enum Era { FOUNDATION, YOUNG, MATURE }
 const EraSystem = preload("res://sim/colony/era_system.gd")
 ## Mismo motivo que `EraSystem`: evitar el ciclo de resolución.
 const SeasonSystem = preload("res://sim/colony/season_system.gd")
+## Fase 14: mismo motivo.
+const TutorialLevel = preload("res://sim/colony/tutorial_level.gd")
 
 var cfg: SimConfig
 var rng := RandomNumberGenerator.new()
@@ -53,6 +55,9 @@ var incremental := false
 ## Fase 6: false salvo que se llame a `spawn_test_start()`. Sandbox sin victoria/derrota (ver
 ## `tick()`), para probar amenazas y castas a voluntad sin que una partida real se corte.
 var test_mode := false
+## Fase 14: Nivel 0 (tutorial jugable). false salvo `spawn_tutorial_start()`; implica `incremental`.
+var tutorial_level := false
+var tutorial_battle_started := false
 var econ: IncrementalEconomy
 ## Fase 9: mejoras de colonia del modo incremental (siempre existe, como el resto de los sistemas
 ## "siempre creados"; solo se puede comprar algo en `sim.incremental`, ver `Upgrades.can_buy`).
@@ -189,6 +194,20 @@ func spawn_incremental_start() -> void:
 	ants._recount()
 
 
+## Fase 14: Nivel 0. La misma colonia mínima que "Juego normal", sin lluvia automática ni araña
+## (ver `tick()`) y con más comida al empezar; el final lo decide `TutorialLevel`, no las estaciones.
+func spawn_tutorial_start() -> void:
+	spawn_incremental_start()
+	tutorial_level = true
+	colony.food = cfg.tut_start_food
+	rain_start_tick = -1
+
+
+## Fase 14: la guía pide la batalla final del Nivel 0 (ver `sim/colony/tutorial_level.gd`).
+func cmd_start_tutorial_battle() -> bool:
+	return TutorialLevel.start_battle(self)
+
+
 ## Fase 6: arranque del modo Test (sandbox, sin victoria/derrota — ver `test_mode` en `tick()`).
 ## Reina + 20 obreras + 20 soldados + 9 zánganos (50 en total), igual composición fija cada vez
 ## que se reinicia. Mismo truco de reloj que `spawn_incremental_start()` para arrancar ya a pleno
@@ -267,12 +286,15 @@ func tick() -> void:
 		econ.tick(dt)
 		econ.regrow_plants(dt)
 		brood.tick(dt)
-		if tick_count % 3 == 0:
+		if tick_count % 3 == 0 and not tutorial_level:
 			_update_spider(dt * 3.0, cfg.inc_spider_first_population)
 		_check_game_over()
 		# Fase 9: estaciones + colonia rival — decide game_over/victory de este modo (reemplaza la
-		# condición de la Fase 8, retirada).
-		SeasonSystem.update(self)
+		# condición de la Fase 8, retirada). Fase 14: el Nivel 0 tiene su propio final.
+		if tutorial_level:
+			TutorialLevel.update(self)
+		else:
+			SeasonSystem.update(self)
 	elif queen_id >= 0:
 		colony.tick(self, dt)
 		brood.tick(dt)
@@ -461,13 +483,22 @@ func cmd_paint_food(x: int, y: int, value: float) -> bool:
 func cmd_paint_phero(field: PheromoneField, x: int, y: int, value: float) -> bool:
 	if not world.is_passable(x, y):
 		return false
-	field.set_max(y * world.w + x, value)
+	# Fase 14: lo que pinta el jugador en Comida y Hogar (los rastros a seguir) no se desgasta;
+	# Peligro/Ataque/Evacuar siguen siendo avisos que se apagan solos, a propósito.
+	if field == food or field == home:
+		field.paint(y * world.w + x, value)
+	else:
+		field.set_max(y * world.w + x, value)
+	# Fase 14: el pincel real (`main_input_tools.gd`) pinta por aquí, no por `cmd_paint_food`, así
+	# que el objetivo "pinta Comida" del tutorial nunca se cumplía jugando.
+	if field == food:
+		food_painted = true
 	return true
 
 
 func cmd_erase_phero(field: PheromoneField, x: int, y: int) -> void:
 	if world.in_bounds(x, y):
-		field.data[y * world.w + x] = 0.0
+		field.clear_cell(y * world.w + x)
 
 
 func cmd_assign_room(x: int, y: int, room_type: int) -> bool:

@@ -33,13 +33,16 @@ const OUTLINE := 3
 ## los dos lados para que quede claro por qué tienen que ir de la mano.
 const SIDEBAR_W_PX := 300.0
 ## Ancho del panel expresado en las mismas unidades "baseline" (8px) que usa el resto del layout,
-## para poder reusar los helpers `_panel_label`/`_header`/etc. sin tocarlos: `PANEL_W * S` da
+## para que `PANEL_W * S` dé
 ## siempre `SIDEBAR_W_PX` exacto.
 const PANEL_W := SIDEBAR_W_PX / S
 ## Margen interno de los paneles (en las mismas unidades de 8px que el resto del layout).
 const MARGIN_X := 4.0
 const MARGIN_Y := 3.0
 const CONTENT_W := PANEL_W - MARGIN_X * 2.0
+## Fase 14: alto de la barra de estadísticas de arriba del mapa (píxeles reales de ventana). La
+## guía (`CoachView`) y la insignia de feromona se ubican debajo de ella.
+const TOPBAR_H := 36.0
 ## Columnas de la barra de controles: encabezado y pares [tecla, qué hace]. Si se agrega una tecla
 ## nueva en main.gd, se agrega aquí también para que el jugador la vea.
 ## Fase 5: COLONIA (comprar/ir a la reina) y PARTIDA (guardar/reiniciar) se quitaron de esta lista
@@ -48,9 +51,9 @@ const CONTENT_W := PANEL_W - MARGIN_X * 2.0
 ## siguen funcionando igual en `main.gd`; solo se dejaron de documentar aquí.
 const CONTROLS := [
 	["HERRAMIENTAS", [["1", "Cavar túneles"], ["2 / 3", "Feromona / Cámara"], ["4", "Borrar todo bajo el pincel"],
-		["5", "Mover reina (clic der. cancela la orden)"],
-		["Q / E", "Cambiar subtipo"], ["Clic izq / der", "Pintar / quitar"]]],
-	["CÁMARA Y TIEMPO", [["WASD / clic medio", "Mover la cámara"], ["Rueda", "Zoom"], ["Espacio", "Pausa"],
+		["5", "Mover reina (Shift + clic der. cancela)"],
+		["Q / E", "Cambiar subtipo"], ["Clic derecho", "Usar la herramienta"], ["Shift + clic der.", "Borrar / quitar"]]],
+	["CÁMARA Y TIEMPO", [["Clic izq. y arrastrar", "Mover la cámara"], ["WASD / flechas", "Mover la cámara (Shift: rápido)"], ["Rueda", "Zoom"], ["Espacio", "Pausa"],
 		["F1 / F2 / F3", "Velocidad x1 / x2 / x4"], ["I", "Plegar / desplegar panel"]]],
 ]
 
@@ -81,6 +84,8 @@ var _threats: Label
 var _ratio: Label
 var _log: RichTextLabel
 var _defeat: Label
+var _end_panel: PanelContainer
+var _end_reason: Label
 ## Fase 5: tooltip al pasar el mouse sobre una hormiga (casta, vida) o una cámara (tipo, válida).
 var _tooltip: Label
 ## Fase 5: panel visible mientras el juego está en pausa (Espacio), para que una persona nueva
@@ -96,7 +101,7 @@ var _phero_label: Label
 var _test_panel: PanelContainer
 
 ## Fase 3: botones de compra (huevo, auto-compra) del modo incremental.
-var _buy_row: VBoxContainer
+var _buy_row: HBoxContainer
 var _buy_btns: Array[Button] = []
 ## Fase 5: sliders de reparto de castas (modo clásico). Mismo lugar que `_buy_row`: nunca se
 ## muestran a la vez (uno es del modo incremental, el otro de la colonia con reina).
@@ -114,6 +119,14 @@ var _stats_label: RichTextLabel
 var _season_section: Control
 var _season_label: Label
 var _rival_label: Label
+## Fase 14: piezas del panel en columna (ver `_ready`).
+const SIDE_PAD := 3.0 * S
+var _scroll: ScrollContainer
+var _log_card: PanelContainer
+var _last_header: Label
+## Fase 14: barra de arriba del mapa: símbolos y números de lo más importante, de un vistazo.
+var _topbar: PanelContainer
+var _topbar_row: HBoxContainer
 
 
 func _ready() -> void:
@@ -132,125 +145,146 @@ func _ready() -> void:
 	_sidebar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_sidebar)
 
-	var y := 0.0
 	# El botón de plegar vive FUERA del panel (hijo de `root`, no de `_sidebar`): si colgara del
 	# panel, se escondería con él al plegarlo y ya no habría forma de volver a abrirlo con el mouse.
 	_build_fold_button(root)
-	y += 9.0
-	_top = _panel_label(_sidebar, y)
-	y += 9.0
 
-	_header(_sidebar, y, "COLONIA")
-	y += 7.0
-	_colony = _panel_rich(_sidebar, y)
-	y += 7.0
-	_resources = _panel_label(_sidebar, y)
-	y += 10.0
+	# Fase 14 (orden del panel, a pedido del jugador: "todo está pegado"): antes cada línea iba en
+	# una `y` fija, así que el texto largo se cortaba o se encimaba con la sección de abajo. Ahora
+	# cada sección es una tarjeta dentro de una columna con scroll: las alturas salen del contenido
+	# (sin `clip_text`, que era lo que hacía colapsar las filas dentro de un contenedor) y siempre
+	# queda aire entre secciones.
+	_scroll = ScrollContainer.new()
+	_scroll.position = Vector2(0.0, (MARGIN_Y + 9.0) * S)
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_sidebar.add_child(_scroll)
+	var pad := MarginContainer.new()
+	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pad.add_theme_constant_override("margin_left", int(SIDE_PAD))
+	pad.add_theme_constant_override("margin_right", int(SIDE_PAD))
+	pad.add_theme_constant_override("margin_bottom", int(SIDE_PAD))
+	_scroll.add_child(pad)
+	var col := VBoxContainer.new()
+	col.custom_minimum_size = Vector2(PANEL_W * S - 2.0 * SIDE_PAD, 0.0)
+	col.add_theme_constant_override("separation", int(3 * S))
+	pad.add_child(col)
 
-	_header(_sidebar, y, "CLIMA")
-	y += 7.0
-	_weather = _panel_label(_sidebar, y)
-	y += 10.0
+	var top_card := _card(col)
+	_top = _line(top_card)
 
-	_threat_header = _header(_sidebar, y, "AMENAZAS")
-	y += 7.0
-	_threats = _panel_label(_sidebar, y)
-	y += 10.0
+	var colony := _section(col, "COLONIA")
+	_colony = _rich(colony)
+	_resources = _line(colony)
 
-	_header(_sidebar, y, "HERRAMIENTA")
-	y += 7.0
-	_tools = _panel_label(_sidebar, y)
-	y += 7.0
-	_legend = _panel_rich(_sidebar, y, 8.0)
-	y += 11.0
+	var weather := _section(col, "CLIMA")
+	_weather = _line(weather)
 
-	_header(_sidebar, y, "REPARTO / COMPRA")
-	y += 7.0
-	_ratio = _panel_label(_sidebar, y)
-	y += 7.0
-	_buy_row = VBoxContainer.new()
-	_buy_row.position = Vector2(MARGIN_X, MARGIN_Y + y) * S
-	_buy_row.size = Vector2(CONTENT_W, 8.0) * S
+	var threats := _section(col, "AMENAZAS")
+	_threat_header = _last_header
+	_threats = _line(threats)
+
+	var tools := _section(col, "HERRAMIENTA")
+	_tools = _line(tools)
+	_legend = _rich(tools)
+
+	var buy := _section(col, "REPARTO / COMPRA")
+	_ratio = _line(buy)
+	_buy_row = HBoxContainer.new()
 	_buy_row.add_theme_constant_override("separation", int(2 * S))
-	_sidebar.add_child(_buy_row)
+	buy.add_child(_buy_row)
 	for k in 2:
 		var b := _buy_button()
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.custom_minimum_size = Vector2(0.0, 9.0 * S)
 		_buy_row.add_child(b)
 		_buy_btns.append(b)
 	_buy_btns[0].pressed.connect(func() -> void: _m.sim.cmd_buy_egg())
 	_buy_btns[1].pressed.connect(func() -> void: _m.sim.cmd_cycle_auto_buy())
 
 	_caste_row = VBoxContainer.new()
-	_caste_row.position = Vector2(MARGIN_X, MARGIN_Y + y) * S
-	_caste_row.size = Vector2(CONTENT_W, 8.0) * S
 	_caste_row.add_theme_constant_override("separation", int(2 * S))
-	_sidebar.add_child(_caste_row)
+	buy.add_child(_caste_row)
 	var castes := [CasteDefs.Caste.WORKER, CasteDefs.Caste.NURSE, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE]
 	for c in castes:
 		var s := HSlider.new()
 		s.min_value = 0.05
 		s.max_value = 0.9
 		s.step = 0.01
-		s.custom_minimum_size = Vector2(CONTENT_W, 8.0) * S
+		s.custom_minimum_size = Vector2(0.0, 8.0) * S
+		s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		s.modulate = CasteDefs.COLORS[c]
 		_caste_row.add_child(s)
 		_caste_sliders.append(s)
 		s.value_changed.connect(func(v: float) -> void: _m.sim.cmd_set_caste_target(c, v))
-	y += 9.0 * 2  # dos filas posibles (compra de huevo es 2 botones, reparto es 4 sliders).
 
-	# Fase 9: mejoras de colonia — antes solo accesibles por código (`cmd_buy_upgrade`), ahora con
-	# un botón por stat. Solo tiene sentido en el modo incremental (`Upgrades`/`cmd_buy_upgrade`
-	# están atados a `sim.incremental`, ver `sim/colony/upgrades.gd`); se oculta entero en los
-	# demás modos (`update_info`). Un `Control` simple, no un `*Container`: estos no auto-posicionan
-	# a sus hijos (a diferencia de `_buy_row`/`_caste_row`, que sí lo necesitan para las filas de
-	# botones/sliders), así que las posiciones explícitas de `_header`/`_panel_label` valen tal cual
-	# — un `VBoxContainer` aquí recalcula el tamaño mínimo de cada `Label` y, con `clip_text=true`,
-	# lo reporta como 0 y colapsa la fila entera (headers invisibles: bug real visto en pantalla).
-	_upgrade_section = Control.new()
-	_upgrade_section.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_sidebar.add_child(_upgrade_section)
-	_header(_upgrade_section, y, "MEJORAS")
-	y += 7.0
+	# Fase 9: mejoras de colonia, un botón por stat. Solo existen en el modo incremental
+	# (`Upgrades`/`cmd_buy_upgrade` atados a `sim.incremental`); se ocultan enteras en los demás
+	# modos (`update_info`), junto con las estadísticas que esas mejoras mueven.
+	var up_box := VBoxContainer.new()
+	up_box.add_theme_constant_override("separation", int(3 * S))
+	col.add_child(up_box)
+	_upgrade_section = up_box
+	var upgrades := _section(up_box, "MEJORAS")
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", int(2 * S))
+	grid.add_theme_constant_override("v_separation", int(2 * S))
+	upgrades.add_child(grid)
 	for stat in Upgrades.STAT_COUNT:
 		var ub := _buy_button()
-		ub.position = Vector2(MARGIN_X, MARGIN_Y + y) * S
-		_upgrade_section.add_child(ub)
+		ub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ub.custom_minimum_size = Vector2(0.0, 13.0 * S)
+		grid.add_child(ub)
 		_upgrade_btns.append(ub)
 		ub.pressed.connect(func() -> void: _m.sim.cmd_buy_upgrade(stat))
-		y += 8.0
+	var stats := _section(up_box, "ESTADÍSTICAS")
+	_stats_label = _rich(stats)
 
-	_header(_upgrade_section, y, "ESTADÍSTICAS")
-	y += 7.0
-	_stats_label = _panel_rich(_upgrade_section, y, 22.0)
-	y += 22.0
+	# Fase 9: estación actual + estado de la colonia rival, solo incremental (mismo motivo).
+	_season_section = _section_card(col, "ESTACIÓN")
+	var season := _season_section.get_child(0) as VBoxContainer
+	_season_label = _line(season)
+	_rival_label = _line(season)
 
-	# Fase 9: estación actual + estado de la colonia rival — tampoco tenía interfaz, solo
-	# `sim.season_index`/`sim.rival_colony` leídos por código. Solo incremental, mismo motivo que
-	# Mejoras (`sim/colony/season_system.gd` solo corre en ese modo). Mismo `Control` simple que
-	# `_upgrade_section`, por el mismo motivo.
-	_season_section = Control.new()
-	_season_section.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_sidebar.add_child(_season_section)
-	_header(_season_section, y, "ESTACIÓN")
-	y += 7.0
-	_season_label = _panel_label(_season_section, y)
-	y += 7.0
-	_rival_label = _panel_label(_season_section, y)
-	y += 7.0
+	_log_card = _section_card(col, "AVISOS")
+	_log = _rich(_log_card.get_child(0) as VBoxContainer)
 
-	y += 3.0
-	_log = _panel_rich(_sidebar, y, 28.0)
-
+	_build_top_bar(root)
 	_build_gear_button(root)
 	_build_phero_badge(root)
 
+	# Fase 14: el final de partida era un `Label` suelto de tamaño fijo con todo el texto en letra
+	# gigante: un motivo largo (el del Nivel 0) se salía de la pantalla por los costados. Ahora es
+	# una tarjeta: título grande, el motivo en letra normal con salto de línea y cómo seguir.
+	_end_panel = PanelContainer.new()
+	var end_style := _panel_style(0.94)
+	end_style.content_margin_left = 28.0
+	end_style.content_margin_right = 28.0
+	end_style.content_margin_top = 18.0
+	end_style.content_margin_bottom = 18.0
+	_end_panel.add_theme_stylebox_override("panel", end_style)
+	_end_panel.visible = false
+	root.add_child(_end_panel)
+	var end_box := VBoxContainer.new()
+	end_box.add_theme_constant_override("separation", 10)
+	_end_panel.add_child(end_box)
 	_defeat = Label.new()
-	_defeat.add_theme_font_size_override("font_size", FONT * 2.0)
-	_defeat.add_theme_color_override("font_outline_color", Color.BLACK)
-	_defeat.add_theme_constant_override("outline_size", OUTLINE + 1)
+	_defeat.add_theme_font_size_override("font_size", 34)
 	_defeat.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_defeat.visible = false
-	root.add_child(_defeat)
+	end_box.add_child(_defeat)
+	_end_reason = Label.new()
+	_end_reason.add_theme_font_size_override("font_size", 17)
+	_end_reason.add_theme_color_override("font_color", Color("f4ecd8"))
+	_end_reason.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_end_reason.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_end_reason.custom_minimum_size = Vector2(440, 0)
+	end_box.add_child(_end_reason)
+	var end_hint := Label.new()
+	end_hint.text = "F5: jugar de nuevo   ·   ⚙: salir al menú"
+	end_hint.add_theme_font_size_override("font_size", 14)
+	end_hint.add_theme_color_override("font_color", Color(0.75, 0.72, 0.68))
+	end_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	end_box.add_child(end_hint)
 
 	_build_pause_panel(root)
 	_build_test_panel(root)
@@ -263,6 +297,88 @@ func _ready() -> void:
 	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tooltip.visible = false
 	root.add_child(_tooltip)
+
+
+func _build_top_bar(root: Control) -> void:
+	_topbar = PanelContainer.new()
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.07, 0.06, 0.08, 0.78)
+	st.set_corner_radius_all(4)
+	st.content_margin_left = 10.0
+	st.content_margin_right = 10.0
+	_topbar.add_theme_stylebox_override("panel", st)
+	_topbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_topbar)
+	_topbar_row = HBoxContainer.new()
+	_topbar_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_topbar_row.add_theme_constant_override("separation", 22)
+	_topbar.add_child(_topbar_row)
+
+
+## Cada dato: [símbolo, texto, tooltip]. Rehace las etiquetas solo si cambió cuántas hay.
+func _set_top_items(items: Array) -> void:
+	while _topbar_row.get_child_count() < items.size():
+		var l := Label.new()
+		l.add_theme_font_size_override("font_size", 17)
+		l.add_theme_color_override("font_color", Color("f4ecd8"))
+		l.mouse_filter = Control.MOUSE_FILTER_PASS
+		_topbar_row.add_child(l)
+	for i in _topbar_row.get_child_count():
+		var l := _topbar_row.get_child(i) as Label
+		l.visible = i < items.size()
+		if l.visible:
+			l.text = "%s %s" % [items[i][0], items[i][1]]
+			l.tooltip_text = items[i][2]
+
+
+func _fmt_time(sec: float) -> String:
+	var t := maxi(0, ceili(sec))
+	return "%d:%02d" % [t / 60, t % 60]
+
+
+func _update_top_bar(m: Node, sim: Simulation) -> void:
+	var cfg := sim.cfg
+	var items := []
+	var mine := 0
+	for i in sim.ants.count:
+		if sim.ants.alive[i] == 1 and sim.ants.faction[i] == 0:
+			mine += 1
+	items.append(["🐜", str(mine), "Hormigas de tu colonia"])
+	items.append(["🍃", "%.0f" % sim.colony.food, "Comida"])
+	if sim.queen_id >= 0:
+		var q_max := cfg.queen_hp_base * CasteDefs.HP_MULT[CasteDefs.Caste.QUEEN]
+		var q_hp := sim.ants.hp[sim.queen_id] if sim.ants.alive[sim.queen_id] == 1 else 0.0
+		items.append(["👑", "%d%%" % int(100.0 * q_hp / maxf(q_max, 0.01)), "Vida de la reina"])
+	if sim.incremental or sim.test_mode:
+		var night := sim.is_night()
+		items.append(["🌙" if night else "☀", _fmt_time(DayNight.seconds_to_change(sim.time_s(), cfg)),
+			"Falta para que amanezca" if night else "Falta para que anochezca"])
+		items.append(["📅", "Día %d" % sim.day_number(), "Día actual"])
+	else:
+		items.append(["💧", "%.0f" % sim.colony.water, "Agua"])
+		items.append(["🏛", ERA_NAMES[sim.era], "Era de la colonia"])
+	if sim.incremental and not sim.tutorial_level and sim.season_index < SeasonSystem.SEASON_COUNT:
+		var icons := ["🌱", "☀", "🍂", "❄"]
+		items.append([icons[sim.season_index], "%s %d/%d" % [SeasonSystem.SEASON_NAMES[sim.season_index], sim.season_index + 1, SeasonSystem.SEASON_COUNT], "Estación"])
+	var rival := sim.rival_colony
+	if sim.incremental and rival.battle_active:
+		items.append(["⚔", "¡Batalla! %d%%" % int(100.0 * rival.queen.hp / maxf(rival.queen.max_hp, 0.01)), "Vida de la reina rival"])
+	elif sim.incremental and not sim.tutorial_level and sim.season_index < SeasonSystem.SEASON_COUNT:
+		# La batalla empieza al llegar al último día de la estación (`SeasonSystem.update`).
+		var day_in := (sim.day_number() - 1) % cfg.season_length_days
+		var left := cfg.season_length_days - 1 - day_in
+		items.append(["⚔", "Hoy" if left <= 0 else ("en %d %s" % [left, "día" if left == 1 else "días"]), "Próxima batalla de fin de estación"])
+	if sim.weather != Simulation.Weather.CLEAR:
+		items.append(["🌧", "¡%ds!" % ceili(sim.rain_eta_s()) if sim.weather == Simulation.Weather.WARNING else "Lloviendo", "Lluvia"])
+	if m.paused:
+		items.append(["⏸", "Pausa", "Espacio para seguir"])
+	elif m.speed > 1:
+		items.append(["⏩", "x%d" % m.speed, "Velocidad"])
+	_set_top_items(items)
+	var r := _world_rect(m)
+	var gear_w := 15.0 * S
+	_topbar.position = r.position + Vector2(8.0, 6.0)
+	_topbar.size = Vector2(r.size.x - 16.0 - gear_w, TOPBAR_H)
 
 
 ## Botón "ocultar / mostrar" el panel lateral, fijo en la esquina superior izquierda de la ventana
@@ -463,6 +579,8 @@ func _layout() -> void:
 	_sidebar_btn.text = "ocultar panel (I)" if sidebar_open else "mostrar panel (I)"
 	var h := get_viewport().get_visible_rect().size.y if get_viewport() != null else 270.0 * S
 	_sidebar.size.y = maxf(h, 270.0 * S)
+	if _scroll != null:
+		_scroll.size = Vector2(PANEL_W * S, _sidebar.size.y - _scroll.position.y)
 
 
 ## Mismo fondo oscuro y borde dorado en todos los recuadros de la interfaz (paneles, botones de
@@ -477,45 +595,71 @@ func _panel_style(bg_alpha: float = 0.92) -> StyleBoxFlat:
 	return style
 
 
-## Como `_label`, pero en letra chica, con el margen del panel ya aplicado, y en coordenadas
-## internas de un panel (en unidades de 8px, para no tener que recalcular todo si cambia `S`).
-## `w` es el ancho útil en esas mismas unidades (ya descontado el margen).
-func _panel_label(parent: Control, y: float, w: float = CONTENT_W) -> Label:
+## Fase 14: piezas del panel lateral en columna (ver `_ready`). Cada sección es una tarjeta con
+## fondo un poco más claro que el panel, encabezado en `HEADER_COLOR` y su contenido debajo.
+func _card_style() -> StyleBoxFlat:
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.12, 0.11, 0.13, 1.0)
+	st.set_corner_radius_all(int(2 * S))
+	st.content_margin_left = 3.0 * S
+	st.content_margin_right = 3.0 * S
+	st.content_margin_top = 2.0 * S
+	st.content_margin_bottom = 2.5 * S
+	return st
+
+
+## Tarjeta sin encabezado; devuelve la columna donde van sus líneas.
+func _card(parent: Control) -> VBoxContainer:
+	var pc := PanelContainer.new()
+	pc.add_theme_stylebox_override("panel", _card_style())
+	pc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(pc)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", int(1.5 * S))
+	pc.add_child(box)
+	return box
+
+
+## Tarjeta con encabezado; devuelve la tarjeta entera (para poder ocultarla de una).
+func _section_card(parent: Control, title: String) -> PanelContainer:
+	var box := _card(parent)
+	var h := Label.new()
+	h.text = title
+	h.add_theme_font_size_override("font_size", int(PANEL_FONT * 0.85))
+	h.add_theme_color_override("font_color", HEADER_COLOR)
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(h)
+	_last_header = h
+	return box.get_parent() as PanelContainer
+
+
+## Tarjeta con encabezado; devuelve la columna del contenido.
+func _section(parent: Control, title: String) -> VBoxContainer:
+	return _section_card(parent, title).get_child(0) as VBoxContainer
+
+
+func _line(parent: Control) -> Label:
 	var l := Label.new()
-	l.position = Vector2(MARGIN_X, MARGIN_Y + y) * S
 	l.add_theme_font_size_override("font_size", PANEL_FONT)
 	l.add_theme_color_override("font_color", Color("f4ecd8"))
-	l.add_theme_color_override("font_outline_color", Color.BLACK)
-	l.add_theme_constant_override("outline_size", 2)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	l.clip_text = true
-	l.custom_minimum_size = Vector2(w, 0) * S
-	l.size = Vector2(w, 7) * S
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	parent.add_child(l)
 	return l
 
 
-func _panel_rich(parent: Control, y: float, h: float = 7.0, w: float = CONTENT_W) -> RichTextLabel:
+func _rich(parent: Control) -> RichTextLabel:
 	var l := RichTextLabel.new()
 	l.bbcode_enabled = true
 	l.fit_content = true
 	l.scroll_active = false
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	l.position = Vector2(MARGIN_X, MARGIN_Y + y) * S
-	l.size = Vector2(w, h) * S
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.add_theme_font_size_override("normal_font_size", PANEL_FONT)
-	l.add_theme_constant_override("outline_size", 2)
-	l.add_theme_color_override("font_outline_color", Color.BLACK)
+	l.add_theme_font_size_override("bold_font_size", PANEL_FONT)
+	l.add_theme_color_override("default_color", Color("f4ecd8"))
 	parent.add_child(l)
-	return l
-
-
-## Encabezado de sección corto, en un color distinto para que se note sin necesitar negrita.
-func _header(parent: Control, y: float, text: String) -> Label:
-	var l := _panel_label(parent, y)
-	l.text = text
-	l.add_theme_color_override("font_color", HEADER_COLOR)
 	return l
 
 
@@ -546,9 +690,9 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 	var cfg := sim.cfg
 	var t := sim.time_s()
 	var night := sim.is_night()
-	_top.text = "Día %d · %s   Hormigas: %d   Vel: %s   FPS: %d" % [
-		sim.day_number(), "Noche" if night else "Día", sim.ants.alive_count,
-		"PAUSA" if m.paused else "x%d" % m.speed, Engine.get_frames_per_second()]
+	_top.text = "Día %d · %s\nHormigas: %d   ·   %s   ·   %d FPS" % [
+		sim.day_number(), "de noche" if night else "de día", sim.ants.alive_count,
+		"En pausa" if m.paused else "Velocidad x%d" % m.speed, Engine.get_frames_per_second()]
 
 	var c := sim.ants.count_by_caste([CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER])
 	var queen_alive := sim.ants.alive[sim.queen_id] == 1
@@ -558,17 +702,17 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 		CasteDefs.COLORS[CasteDefs.Caste.WORKER].to_html(false), _plural(c[CasteDefs.Caste.WORKER], "obrera", "obreras"),
 		CasteDefs.COLORS[CasteDefs.Caste.SOLDIER].to_html(false), _plural(c[CasteDefs.Caste.SOLDIER], "soldado", "soldados"),
 		CasteDefs.COLORS[CasteDefs.Caste.QUEEN].to_html(false), int(100.0 * queen_hp / maxf(queen_hp_max, 0.01))]
-	_resources.text = "Comida %.0f / %.0f   +%.0f/min hojas · −%.0f/min consumo%s" % [
+	_resources.text = "Comida: %.0f / %.0f\n+%.0f/min por hojas · −%.0f/min de consumo%s" % [
 		sim.colony.food, sim.colony.food_cap, sim.econ.income_per_min, sim.econ.upkeep_per_min,
-		"   ¡HAMBRE!" if sim.colony.starving else ""]
+		"\n¡HAMBRE!" if sim.colony.starving else ""]
 
 	var change := ceili(DayNight.seconds_to_change(t, cfg))
 	var weather := ("De noche: amanece en %d s" if night else "De día: anochece en %d s") % change
 	match sim.weather:
 		Simulation.Weather.WARNING:
-			weather += "   · ¡Lluvia en %d s!" % ceili(sim.rain_eta_s())
+			weather += "\n¡Lluvia en %d s!" % ceili(sim.rain_eta_s())
 		Simulation.Weather.RAINING:
-			weather += "   · Lloviendo"
+			weather += "\nLloviendo"
 	_weather.text = weather
 
 	# Cría en camino, por casta (lo que el jugador compró y aún no nació). La casta de cada huevo
@@ -587,7 +731,7 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 	if coming[CasteDefs.Caste.WORKER] + coming[CasteDefs.Caste.SOLDIER] == 0:
 		_threats.text = "Nada en camino: compra un huevo abajo"
 	else:
-		_threats.text = "En camino: %s y %s   (larva %d · pupa %d)" % [
+		_threats.text = "En camino: %s y %s\nLarvas: %d   ·   Pupas: %d" % [
 			_plural(coming[CasteDefs.Caste.WORKER], "obrera", "obreras"),
 			_plural(coming[CasteDefs.Caste.SOLDIER], "soldado", "soldados"),
 			st[BroodSystem.Stage.LARVA], st[BroodSystem.Stage.PUPA]]
@@ -612,7 +756,7 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 	var up := sim.upgrades
 	for stat in Upgrades.STAT_COUNT:
 		var b := _upgrade_btns[stat]
-		b.text = "%s Nv.%d: %.0f" % [Upgrades.STAT_NAMES[stat], up.levels[stat], up.cost(stat)]
+		b.text = "%s\nNv.%d · %.0f comida" % [Upgrades.STAT_NAMES[stat], up.levels[stat], up.cost(stat)]
 		b.disabled = not up.can_buy(stat)
 
 	# Fase 14: estadísticas reales por casta, con las mejoras ya aplicadas — vida/velocidad/daño
@@ -620,14 +764,17 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 	# cálculo que usa AntSystem al nacer/moverse/atacar, ver sim/colony/upgrades.gd). "Cavar" es
 	# por colonia, no por casta: cfg.dig_seconds / work_mult es lo que tarda cualquier hormiga
 	# cavando una celda marcada, sin importar quién sea.
-	var stats_text := ""
+	# Tabla: la casta a la izquierda y una columna por número, para leerlos de un vistazo.
+	var dim := "[color=#9a94a0]%s[/color]"
+	var stats_text := "[table=4][cell][/cell][cell]%s  [/cell][cell]%s  [/cell][cell]%s[/cell]" % [dim % "Vida", dim % "Vel.", dim % "Daño/s"]
 	for stat_caste in [CasteDefs.Caste.QUEEN, CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER]:
 		var base_hp: float = cfg.queen_hp_base if stat_caste == CasteDefs.Caste.QUEEN else cfg.ant_hp
 		var hp_val := base_hp * CasteDefs.HP_MULT[stat_caste] * up.hp_mult
 		var speed_val := cfg.ant_speed * CasteDefs.SPEED_MULT[stat_caste] * up.speed_mult
 		var dmg_val := CasteDefs.DAMAGE_PER_S[stat_caste] * up.damage_mult
-		stats_text += "%s: %.0f vida · %.1f vel · %.1f dmg/s\n" % [CasteDefs.NAMES[stat_caste], hp_val, speed_val, dmg_val]
-	stats_text += "Cavar: %.1fs/celda" % (cfg.dig_seconds / up.work_mult)
+		stats_text += "[cell][color=#%s]●[/color] %s  [/cell][cell]%.0f[/cell][cell]%.1f[/cell][cell]%.1f[/cell]" % [
+			CasteDefs.COLORS[stat_caste].to_html(false), CasteDefs.NAMES[stat_caste], hp_val, speed_val, dmg_val]
+	stats_text += "[/table]\n" + dim % ("Cavar una celda: %.1f s" % (cfg.dig_seconds / up.work_mult))
 	_stats_label.text = stats_text
 
 	# Fase 9 (antes sin interfaz): estación actual + colonia rival.
@@ -682,8 +829,8 @@ func _process(_delta: float) -> void:
 func update_info(m: Node) -> void:
 	var sim: Simulation = m.sim
 	_layout()  # barato; sigue el alto real de la ventana si cambia de tamaño
-	_top.text = "Hormigas: %d   Vel: %s   Semilla: %d   FPS: %d" % [
-		sim.ants.alive_count, "PAUSA" if m.paused else "x%d" % m.speed, sim.rng.seed, Engine.get_frames_per_second()]
+	_top.text = "Hormigas: %d   ·   %s   ·   %d FPS\nSemilla: %d" % [
+		sim.ants.alive_count, "En pausa" if m.paused else "Velocidad x%d" % m.speed, Engine.get_frames_per_second(), sim.rng.seed]
 
 	# --- Clima: despejado, aviso de lluvia o lluvia. (La sequía llega en una fase futura.)
 	var weather := "Sin novedades"
@@ -751,6 +898,7 @@ func update_info(m: Node) -> void:
 		_resources.text = ""
 		_ratio.text = ""
 		_log.text = ""
+	_log_card.visible = _log.text != ""
 
 	# Fase 3: en el modo incremental el mismo panel cuenta otra cosa (pisa los textos de arriba).
 	_m = m
@@ -779,15 +927,15 @@ func update_info(m: Node) -> void:
 		sub = " · %s (Q/E)" % OverlayView.LAYER_NAMES[m.phero_index + 1]
 	elif m.tool == 3:
 		sub = " · %s (Q/E)" % WorldGrid.ROOM_NAMES[m.ROOM_TYPES[m.room_index]]
-	_tools.text = "Herramienta: %s%s   Capa: %s   Zoom: %sx   Marcadas: %d" % [
-		tool_names[m.tool], sub, OverlayView.LAYER_NAMES[m.overlay.layer], str(m.ZOOM_LEVELS[m.zoom_index]), sim.world.marked_count]
+	_tools.text = "%s%s\nCapa: %s\nZoom %sx   ·   Marcadas: %d" % [
+		tool_names[m.tool], sub, OverlayView.LAYER_NAMES[m.overlay.layer], "%.2f" % m.camera.zoom.x, sim.world.marked_count]
 
 	_phero_badge.visible = m.tool == 2
 	if _phero_badge.visible:
 		_phero_swatch.color = OverlayView.PHERO_COLORS[m.phero_index]
 		var name: String = OverlayView.LAYER_NAMES[m.phero_index + 1]
 		_phero_label.text = name[0].to_upper() + name.substr(1)
-		_phero_badge.position = world_rect.position + Vector2((world_rect.size.x - _phero_badge.size.x) * 0.5, 3.0 * S)
+		_phero_badge.position = world_rect.position + Vector2((world_rect.size.x - _phero_badge.size.x) * 0.5, TOPBAR_H + 12.0)
 
 	if m.overlay.layer == OverlayView.Layer.STATES:
 		var parts := ""
@@ -804,13 +952,15 @@ func update_info(m: Node) -> void:
 	else:
 		_legend.text = ""
 
+	_update_top_bar(m, sim)
+
 	_defeat.visible = sim.game_over
+	_end_panel.visible = sim.game_over
 	if sim.game_over:
-		if sim.victory:
-			_defeat.text = "¡LA COLONIA PROSPERÓ!\n%s\n\nF5 para reiniciar" % sim.game_over_reason
-			_defeat.add_theme_color_override("font_color", Color("7fe08a"))
-		else:
-			_defeat.text = "LA COLONIA CAYÓ\n%s\n\nF5 para reiniciar" % sim.game_over_reason
-			_defeat.add_theme_color_override("font_color", Color("ff6a6a"))
-		_defeat.size = Vector2(400, 120) * S / 2.0
-		_defeat.position = world_rect.position + world_rect.size * 0.5 - _defeat.size * 0.5
+		var won := sim.victory
+		_defeat.text = ("¡VICTORIA!" if sim.tutorial_level else "¡LA COLONIA PROSPERÓ!") if won else "LA COLONIA CAYÓ"
+		_defeat.add_theme_color_override("font_color", Color("7fe08a") if won else Color("ff6a6a"))
+		_end_reason.text = sim.game_over_reason
+		_end_reason.custom_minimum_size.x = clampf(world_rect.size.x - 160.0, 280.0, 520.0)
+		_end_panel.reset_size()
+		_end_panel.position = world_rect.position + (world_rect.size - _end_panel.size) * 0.5

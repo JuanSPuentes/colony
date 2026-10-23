@@ -63,12 +63,14 @@ func _run() -> void:
 	await _frames(3)
 	_check("Juego normal arranca en modo incremental (comida/compra)", _app.game != null and _app.game.sim.incremental, "" if _app.game == null else "incremental=%s" % _app.game.sim.incremental)
 
-	# Fase 12: la guía rápida aparece sola al entrar a Juego normal, con la partida pausada detrás,
-	# y nunca en los otros modos (se comprueba más abajo, al arrancar Historia y Test).
-	_check("la guía aparece al entrar a Juego normal, con la partida pausada", _app.guide.visible and _app.game.paused)
-	_app.guide.closed.emit()
+	# Fase 14: la guía de una pantalla (Fase 12) ya no sale sola; en su lugar, la guía contextual
+	# (`CoachView`) abre su primera tarjeta con la partida pausada detrás. Nunca en los otros modos
+	# (se comprueba más abajo, al arrancar Historia y Test).
+	_check("Juego normal ya no abre la guía de una pantalla", not _app.guide.visible)
+	_check("la guía contextual abre su primera tarjeta sin pausar la partida", _app.game.coach.is_showing() and not _app.game.paused)
+	_app.game.coach.close_card()
 	await _frames(1)
-	_check("cerrar la guía la oculta y despausa la partida", not _app.guide.visible and not _app.game.paused)
+	_check("la tarjeta se cierra", not _app.game.coach.is_showing() and not _app.game.paused)
 
 	# La tuerca durante la partida: abre Opciones y pausa; la flecha debe volver al juego, no al menú.
 	_app.game.menu_requested.emit()

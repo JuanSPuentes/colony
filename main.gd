@@ -58,6 +58,11 @@ var rival_queen_view: RivalQueenView
 var day_night_view: DayNightView
 var hud: Hud
 var tutorial: TutorialView
+## Fase 14: guía contextual (Nivel 0 y Juego normal). Solo actúa si `coach_enabled`.
+var coach: CoachView
+## Lo pone `app.gd`. `main.tscn` abierto directo (pruebas viejas) la deja apagada: si no, la
+## primera tarjeta pausaría la partida sola.
+var coach_enabled := false
 var camera: Camera2D
 
 var speed := 1
@@ -100,6 +105,18 @@ var _jump_to := Vector2.ZERO
 ## aceleración limitada para que arrancar/frenar se sienta gradual, no digital.
 const PAN_ACCEL := 10.0
 var _pan_vel := Vector2.ZERO
+## Fase 14: el teclado mueve la cámara con WASD o flechas; Shift multiplica la velocidad. Se
+## guarda qué teclas siguen apretadas (antes se pisaba `_pan` con cada tecla, y soltar A con D
+## apretada dejaba la cámara quieta). La diagonal se normaliza para no ir más rápido en diagonal.
+const PAN_SPEED := 200.0
+const PAN_FAST_MULT := 2.5
+var _held := {}
+var _pan_fast := false
+## Fase 14: clic izquierdo arrastra el mapa (antes pintaba; ahora las acciones van con el derecho).
+## Al soltar, la cámara sigue un poco con la velocidad del arrastre y frena sola.
+const DRAG_FRICTION := 6.0
+var _drag_vel := Vector2.ZERO
+var _drag_last_ms := 0
 
 
 func _ready() -> void:
@@ -146,6 +163,8 @@ func _ready() -> void:
 	_resize_world_container()
 	tutorial = TutorialView.new()
 	add_child(tutorial)
+	coach = CoachView.new()
+	add_child(coach)
 	if auto_start:
 		start(seed_value)
 
@@ -174,11 +193,13 @@ func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> v
 		game_mode = mode
 	if loaded_sim != null:
 		sim = loaded_sim
-		game_mode = "test" if loaded_sim.test_mode else ("incremental" if loaded_sim.incremental else "historia")
+		game_mode = "test" if loaded_sim.test_mode else ("tutorial" if loaded_sim.tutorial_level else ("incremental" if loaded_sim.incremental else "historia"))
 	else:
 		sim = Simulation.new(cfg, seed_value)
 		if game_mode == "historia":
 			sim.spawn_colony_court()
+		elif game_mode == "tutorial":
+			sim.spawn_tutorial_start()
 		elif game_mode == "test":
 			sim.spawn_test_start()
 		else:
@@ -195,6 +216,7 @@ func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> v
 	mantis_view.setup(sim)
 	rival_queen_view.setup(sim)
 	tutorial.step = 0
+	coach.reset(sim)
 	_acc = 0.0
 	_painting = false
 	if sim.queen_id >= 0 and sim.ants.alive[sim.queen_id] == 1:
@@ -261,6 +283,10 @@ func _process(delta: float) -> void:
 	if sim == null:
 		return
 	_resize_world_container()  # barato; `root.size` puede tardar un frame en reflejar el cambio
+	# Fase 14: si la ventana creció o se plegó el panel, el zoom actual puede dejar de llenar la
+	# pantalla; se corrige al vuelo (sin esperar a que el jugador toque la rueda).
+	if _zoom_t >= 1.0 and camera.zoom.x < min_zoom() - 0.0001:
+		_apply_camera()
 	if _zoom_t < 1.0:
 		_zoom_t = minf(1.0, _zoom_t + delta / ZOOM_DURATION)
 		var e := smoothstep(0.0, 1.0, _zoom_t)
@@ -275,7 +301,13 @@ func _process(delta: float) -> void:
 		_clamp_camera(camera.zoom.x)
 	_pan_vel = _pan_vel.move_toward(_pan, PAN_ACCEL * delta)
 	if _pan_vel != Vector2.ZERO:
-		camera.position += _pan_vel * (160.0 / camera.zoom.x) * delta
+		var mult := PAN_FAST_MULT if _pan_fast else 1.0
+		camera.position += _pan_vel * (PAN_SPEED * mult / camera.zoom.x) * delta
+		_clamp_camera(camera.zoom.x)
+		coach.camera_moved = true
+	if not _panning and _drag_vel != Vector2.ZERO:
+		camera.position += _drag_vel * delta
+		_drag_vel = _drag_vel.move_toward(Vector2.ZERO, _drag_vel.length() * DRAG_FRICTION * delta + 1.0)
 		_clamp_camera(camera.zoom.x)
 	if not paused and not sim.game_over:
 		_acc += delta
@@ -302,12 +334,35 @@ func _process(delta: float) -> void:
 	ant_renderer.color_by_caste = not ant_renderer.color_by_state
 	ant_renderer.update(clampf(_acc / sim.dt, 0.0, 1.0) if not paused else 1.0, _frame_start_pos)
 	hud.update_info(self)
-	tutorial.update(sim)
+	# Fase 14: con la guía contextual activa, la burbuja vieja de Juego normal sobra (dirían lo
+	# mismo dos veces). En Modo infinito, o sin guía, sigue igual que antes.
+	if coach_enabled and coach.lessons.size() > 0:
+		tutorial._panel.visible = false
+		coach.update(self)
+	else:
+		tutorial.update(sim)
 
 
 func _apply_camera() -> void:
-	camera.zoom = Vector2(ZOOM_LEVELS[zoom_index], ZOOM_LEVELS[zoom_index])
-	_clamp_camera(ZOOM_LEVELS[zoom_index])
+	var z := zoom_at(zoom_index)
+	camera.zoom = Vector2(z, z)
+	_clamp_camera(z)
+
+
+## Fase 14: el zoom más alejado que todavía llena toda el área del mundo. Con la ventana real y el
+## panel lateral, 0.5 mostraba más de lo que mide el mapa (960x560 px) y quedaban franjas negras
+## alrededor; ningún nivel puede quedar por debajo de esto.
+func min_zoom() -> float:
+	if sim == null or world_vp == null:
+		return ZOOM_LEVELS[0]
+	var vp := Vector2(world_vp.size)
+	var world := Vector2(sim.world.w, sim.world.h) * cfg.cell_px
+	return maxf(vp.x / world.x, vp.y / world.y)
+
+
+## Zoom real del nivel `i`: el de `ZOOM_LEVELS`, salvo que deje ver más allá del mapa.
+func zoom_at(i: int) -> float:
+	return maxf(ZOOM_LEVELS[clampi(i, 0, ZOOM_LEVELS.size() - 1)], min_zoom())
 
 
 ## Separado de `_apply_camera` para que la animación de zoom (`_zoom_t` en `_process`) pueda
@@ -366,12 +421,19 @@ func _unhandled_input(event: InputEvent) -> void:
 			MOUSE_BUTTON_WHEEL_DOWN:
 				if mb.pressed:
 					_set_zoom(zoom_index - 1, mb.position)
-			MOUSE_BUTTON_MIDDLE:
+			# Fase 14: clic izquierdo (o medio) arrastra el mapa; clic derecho usa la herramienta
+			# activa, y con Shift borra/cancela (lo que antes hacía el clic derecho).
+			MOUSE_BUTTON_LEFT, MOUSE_BUTTON_MIDDLE:
 				_panning = mb.pressed
-			MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT:
+				if mb.pressed:
+					_drag_vel = Vector2.ZERO
+					_drag_last_ms = Time.get_ticks_msec()
+				elif Time.get_ticks_msec() - _drag_last_ms > 80:
+					_drag_vel = Vector2.ZERO  # se quedó quieto antes de soltar: sin inercia
+			MOUSE_BUTTON_RIGHT:
 				if mb.pressed:
 					_painting = true
-					_erasing = mb.button_index == MOUSE_BUTTON_RIGHT
+					_erasing = mb.shift_pressed
 					_stroke_n = 0
 					_last_cell = Vector2i(-1, -1)
 					_apply_at(_world_cell(_to_world(mb.position)))
@@ -380,9 +442,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion:
 		var mm := event as InputEventMouseMotion
 		if _panning:
-			camera.position -= mm.relative * _outer_to_inner_scale() / ZOOM_LEVELS[zoom_index]
+			var d := mm.relative * _outer_to_inner_scale() / camera.zoom.x
+			camera.position -= d
 			_apply_camera()
-		elif _painting:
+			var now := Time.get_ticks_msec()
+			var el := maxf(1.0, float(now - _drag_last_ms)) / 1000.0
+			_drag_vel = _drag_vel.lerp(-d / el, 0.5)
+			_drag_last_ms = now
+			if d != Vector2.ZERO:
+				coach.camera_moved = true
+		if _painting:
 			var cell := _world_cell(_to_world(mm.position))
 			_apply_line(_last_cell, cell)
 
@@ -393,14 +462,14 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	var down := k.pressed
 	match k.keycode:
-		KEY_W:
-			_pan.y = -1.0 if down else (0.0 if _pan.y < 0.0 else _pan.y)
-		KEY_S:
-			_pan.y = 1.0 if down else (0.0 if _pan.y > 0.0 else _pan.y)
-		KEY_A:
-			_pan.x = -1.0 if down else (0.0 if _pan.x < 0.0 else _pan.x)
-		KEY_D:
-			_pan.x = 1.0 if down else (0.0 if _pan.x > 0.0 else _pan.x)
+		KEY_W, KEY_S, KEY_A, KEY_D, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT:
+			if down:
+				_held[k.keycode] = true
+			else:
+				_held.erase(k.keycode)
+			_update_pan()
+		KEY_SHIFT:
+			_pan_fast = down
 	if not down or sim == null:
 		return
 	match k.keycode:
@@ -473,12 +542,41 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			load_game()
 
 
+func _update_pan() -> void:
+	var v := Vector2.ZERO
+	if _held.has(KEY_W) or _held.has(KEY_UP):
+		v.y -= 1.0
+	if _held.has(KEY_S) or _held.has(KEY_DOWN):
+		v.y += 1.0
+	if _held.has(KEY_A) or _held.has(KEY_LEFT):
+		v.x -= 1.0
+	if _held.has(KEY_D) or _held.has(KEY_RIGHT):
+		v.x += 1.0
+	_pan = v.normalized()
+
+
+## Fase 14: la guía contextual acerca la cámara a lo que explica. Reusa la transición de zoom
+## (`_zoom_t`), que anima zoom y posición juntos.
+func focus_on(world_pos: Vector2, zi: int) -> void:
+	_drag_vel = Vector2.ZERO
+	_jump_t = 1.0
+	_zoom_from_z = camera.zoom.x
+	_zoom_from_pos = camera.position
+	zoom_index = clampi(zi, 0, ZOOM_LEVELS.size() - 1)
+	_zoom_to_z = zoom_at(zoom_index)
+	_zoom_to_pos = world_pos
+	_zoom_t = 0.0
+
+
 ## `anchor_screen_pos`, si se pasa, es el punto de pantalla (mouse) que debe quedar fijo en el
 ## mundo tras el cambio de zoom (en vez de que todo se corra alrededor del centro de cámara).
 ## El cambio no se aplica de golpe: arranca una transición corta (`_zoom_t` en `_process`) desde
 ## el zoom/posición actuales (que pueden venir a mitad de una transición anterior) al destino.
 func _set_zoom(i: int, anchor_screen_pos: Vector2 = Vector2.INF) -> void:
 	var new_index := clampi(i, 0, ZOOM_LEVELS.size() - 1)
+	# Alejar más allá de lo que llena la pantalla no cambia nada: no gastar un paso de rueda en eso.
+	while new_index < zoom_index and new_index < ZOOM_LEVELS.size() - 1 and zoom_at(new_index) >= zoom_at(zoom_index) - 0.0001:
+		new_index += 1
 	if new_index == zoom_index:
 		return
 	var has_anchor := is_finite(anchor_screen_pos.x) and sim != null
@@ -486,7 +584,7 @@ func _set_zoom(i: int, anchor_screen_pos: Vector2 = Vector2.INF) -> void:
 	_zoom_from_z = camera.zoom.x
 	_zoom_from_pos = camera.position
 	zoom_index = new_index
-	_zoom_to_z = ZOOM_LEVELS[zoom_index]
+	_zoom_to_z = zoom_at(zoom_index)
 	if has_anchor:
 		camera.zoom = Vector2(_zoom_to_z, _zoom_to_z)
 		var after := _to_world(anchor_screen_pos)

@@ -273,6 +273,16 @@ extends Resource
 @export var inc_upgrade_speed_step := 0.08
 @export var inc_upgrade_work_step := 0.12
 
+## Fase 14: Nivel 0 (tutorial jugable, ver `sim/colony/tutorial_level.gd`).
+@export_group("Fase 14: Nivel 0")
+## Comida inicial: más que `inc_start_food` para que el primer huevo se pueda comprar pronto.
+@export var tut_start_food := 60.0
+## Ejército rival del final del nivel: chico a propósito, es una demostración.
+@export var tut_rival_ants := 3
+@export var tut_rival_strength := 0.4
+## Soldados que nacen al empezar esa batalla para que siempre se pueda ganar.
+@export var tut_bonus_soldiers := 3
+
 @export_group("Fase 4: victoria")
 ## Cuánto tiempo de simulación hay que sobrevivir en Colonia madura (con la reina viva) para ganar.
 ## Valor inicial sin playtesting real todavía (ver README sección 9c): 3 minutos de simulación

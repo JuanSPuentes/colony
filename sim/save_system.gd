@@ -48,6 +48,9 @@ static func to_dict(sim: Simulation) -> Dictionary:
 	d["incremental"] = sim.incremental
 	# Fase 6: modo Test (sandbox, sin victoria/derrota).
 	d["test_mode"] = sim.test_mode
+	# Fase 14: Nivel 0.
+	d["tutorial_level"] = sim.tutorial_level
+	d["tutorial_battle_started"] = sim.tutorial_battle_started
 	d["econ"] = {
 		"bought_eggs": sim.econ.bought_eggs,
 		"auto_mode": sim.econ.auto_mode,
@@ -71,6 +74,9 @@ static func to_dict(sim: Simulation) -> Dictionary:
 	for name in ["food", "home", "danger", "attack", "evacuate"]:
 		var field: PheromoneField = sim.get(name)
 		d[name] = Array(field.data)
+		# Fase 14: piso pintado por el jugador (ver `PheromoneField.paint`), solo si existe.
+		if not field.floor_v.is_empty():
+			d[name + "_floor"] = Array(field.floor_v)
 
 	d["water"] = {
 		"level": Array(sim.water.level),
@@ -213,6 +219,9 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	sim.incremental = bool(d.get("incremental", false))
 	# Fase 6. Ausente en guardados de antes de esta fase: no es un guardado de un entorno de pruebas.
 	sim.test_mode = bool(d.get("test_mode", false))
+	# Fase 14. Ausente en guardados viejos: no es una partida del Nivel 0.
+	sim.tutorial_level = bool(d.get("tutorial_level", false))
+	sim.tutorial_battle_started = bool(d.get("tutorial_battle_started", false))
 	if d.has("econ"):
 		var ed: Dictionary = d["econ"]
 		sim.econ.bought_eggs = int(ed.get("bought_eggs", 0))
@@ -237,6 +246,7 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	for name in ["food", "home", "danger", "attack", "evacuate"]:
 		var field: PheromoneField = sim.get(name)
 		field.data = PackedFloat32Array(d[name])
+		field.floor_v = PackedFloat32Array(d.get(name + "_floor", []))
 
 	var wtd: Dictionary = d["water"]
 	sim.water.level = PackedFloat32Array(wtd["level"])

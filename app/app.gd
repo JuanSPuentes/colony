@@ -26,10 +26,12 @@ func _ready() -> void:
 	# Papeles invertidos a propósito (ver nota en main_menu.gd): "Juego normal" es ahora la
 	# economía de comida/compra (antes "Modo infinito") y "Modo infinito" es la colonia con reina,
 	# castas y araña (antes "Juego normal"). `_start_game(incremental)` no cambió de significado.
+	menu.play_tutorial.connect(_start_tutorial)
 	menu.play_normal.connect(func() -> void: _start_game(true))
 	menu.play_infinite.connect(func() -> void: _start_game(false))
 	menu.play_test.connect(_start_test_game)
 	menu.open_options.connect(func() -> void: _open_options("menu"))
+	menu.open_guide.connect(_open_guide)
 	menu.quit_requested.connect(_ask_quit)
 
 	options = OptionsScreen.new()
@@ -67,13 +69,27 @@ func _start_game(incremental: bool) -> void:
 	# depurar ese modo con un mapa reproducible. F5 dentro de una partida sigue reiniciando con la
 	# MISMA semilla que ya estaba (ver `main.gd::start`); solo Shift+F5 sortea una nueva a mano.
 	var seed_value: int = randi() if incremental else game.cfg.world_seed
+	# Fase 14: en vez de la guía de una pantalla al empezar (Fase 12), "Juego normal" explica
+	# cada cosa la primera vez que aparece (`CoachView`). La guía sigue en el menú ("Cómo jugar").
+	game.coach_enabled = incremental
 	game.start(seed_value, null, "incremental" if incremental else "historia")
-	# Fase 12: guía rápida solo para "Juego normal" (a pedido del jugador), una vez por partida
-	# nueva — no al reiniciar con F5 (eso llama a `game.start()` directo, no pasa por acá) ni en
-	# Modo infinito/Test (esos modos no la pidieron). Pausa la partida detrás hasta cerrarla.
-	if incremental:
-		game.paused = true
-		guide.visible = true
+
+
+## Fase 14: Nivel 0. Mapa fijo (`cfg.world_seed`), para que la explicación sea la misma siempre.
+func _start_tutorial() -> void:
+	menu.visible = false
+	game = load(MAIN_SCENE).instantiate()
+	game.auto_start = false
+	add_child(game)
+	game.set_brightness(settings.brightness)
+	game.menu_requested.connect(func() -> void: _open_options("game"))
+	game.coach_enabled = true
+	game.start(game.cfg.world_seed, null, "tutorial")
+
+
+func _open_guide() -> void:
+	menu.visible = false
+	guide.visible = true
 
 
 ## Fase 6: igual que `_start_game`, pero en el modo Test (sandbox, sin victoria/derrota). Función
@@ -102,6 +118,8 @@ func _on_guide_closed() -> void:
 	guide.visible = false
 	if game != null:
 		game.paused = false
+	else:
+		menu.visible = true
 
 
 func _on_options_back() -> void:
