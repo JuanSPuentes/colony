@@ -1,0 +1,9 @@
+# Godot escribe sus archivos con finales de línea LF. Sin esto, con core.autocrlf=true en Windows
+# el checkout los deja en CRLF y cada vez que se abre el editor aparecen decenas de
+# .import/project.godot "modificados" sin ningún cambio real.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ogg binary
+*.wav binary
+*.ttf binary
