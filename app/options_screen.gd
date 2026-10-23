@@ -16,6 +16,8 @@ signal quit_requested
 signal save_requested
 signal new_game_requested
 signal main_menu_requested
+## Fase 18: "Cómo jugar" salió del menú principal y vive aquí, dentro de la partida.
+signal how_to_play_requested
 
 const BG := Color(0.05, 0.04, 0.04, 1.0)
 const GOLD := Color("ffd43c")
@@ -87,6 +89,7 @@ func _ready() -> void:
 	row.add_child(_action_button("Guardar partida", func() -> void: save_requested.emit()))
 	row.add_child(_action_button("Nueva partida", func() -> void: new_game_requested.emit()))
 	row.add_child(_action_button("Menú principal", func() -> void: main_menu_requested.emit()))
+	game_body.add_child(_action_button("Cómo jugar", func() -> void: how_to_play_requested.emit()))
 	_save_status = Label.new()
 	_save_status.add_theme_font_size_override("font_size", 14)
 	_save_status.add_theme_color_override("font_color", Color(0.55, 0.9, 0.55))

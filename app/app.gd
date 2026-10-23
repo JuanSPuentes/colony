@@ -16,6 +16,12 @@ var game: Node2D
 ## A dónde vuelve la flecha de Opciones: "menu" (se abrió desde el menú) o "game" (desde la tuerca).
 var _return_to := "menu"
 var confirm_dialog: ConfirmationDialog
+var tutorial_dialog: ConfirmationDialog
+## Fase 18: el Nivel 0 se empezó desde "Nueva partida": al ganarlo se pasa solo a la partida normal.
+var _chain_to_normal := false
+var _chain_wait := 0.0
+const CHAIN_DELAY_S := 4.0
+var _guide_from_options := false
 var _pending: Callable
 
 
@@ -64,6 +70,27 @@ func _ready() -> void:
 	options.main_menu_requested.connect(func() -> void: _confirm(
 		"¿Volver al menú principal? Se pierde lo que no hayas guardado.", "Menú principal", _back_to_main_menu))
 	menu.play_continue.connect(_continue_game)
+
+	# Fase 18: "Nueva partida" pregunta si se quiere el tutorial (Nivel 0) primero; al ganarlo, la
+	# partida normal arranca sola (`_process`). "Cómo jugar" se abre desde las opciones de la partida.
+	menu.play_new.connect(_ask_tutorial)
+	tutorial_dialog = ConfirmationDialog.new()
+	tutorial_dialog.title = "Nueva partida"
+	tutorial_dialog.dialog_text = "¿Quieres hacer el tutorial primero?\nAl terminarlo empieza la partida normal."
+	tutorial_dialog.ok_button_text = "Hacer el tutorial"
+	tutorial_dialog.cancel_button_text = "Cancelar"
+	tutorial_dialog.add_button("Jugar directo", false, "direct")
+	add_child(tutorial_dialog)
+	tutorial_dialog.confirmed.connect(func() -> void:
+		_chain_to_normal = true
+		_start_tutorial())
+	tutorial_dialog.custom_action.connect(func(action: StringName) -> void:
+		if action == &"direct":
+			tutorial_dialog.hide()
+			_start_game(true))
+	options.how_to_play_requested.connect(func() -> void:
+		_guide_from_options = true
+		guide.visible = true)
 	confirm_dialog = ConfirmationDialog.new()
 	confirm_dialog.title = "Confirmar"
 	confirm_dialog.cancel_button_text = "Cancelar"
@@ -136,6 +163,9 @@ func _open_options(return_to: String) -> void:
 
 func _on_guide_closed() -> void:
 	guide.visible = false
+	if _guide_from_options:
+		_guide_from_options = false  # vuelve a las Opciones, que siguen abiertas debajo
+		return
 	if game != null:
 		game.paused = false
 	else:
@@ -186,6 +216,8 @@ func _on_save_requested() -> void:
 
 ## Cierra la partida actual (sin guardar). Deja `game` en null.
 func _close_game() -> void:
+	_chain_to_normal = false
+	_chain_wait = 0.0
 	if game != null:
 		game.queue_free()
 		game = null
@@ -201,11 +233,13 @@ func _back_to_main_menu() -> void:
 ## Nueva partida en el mismo modo que se estaba jugando (Juego normal sortea mapa nuevo).
 func _restart_same_mode() -> void:
 	var mode: String = game.game_mode if game != null else "incremental"
+	var chain := _chain_to_normal
 	_close_game()
 	match mode:
 		"historia":
 			_start_game(false)
 		"tutorial":
+			_chain_to_normal = chain
 			_start_tutorial()
 		"test":
 			_start_test_game()
@@ -224,3 +258,26 @@ func _continue_game() -> void:
 	game.load_game()
 	if game.sim == null:  # no había partida o el archivo no se pudo leer
 		_back_to_main_menu()
+
+
+# --- Fase 18: Nueva partida con tutorial opcional ------------------------------------------------
+
+func _ask_tutorial() -> void:
+	tutorial_dialog.popup_centered()
+
+
+## Si el Nivel 0 se empezó desde "Nueva partida", al ganarlo (y tras unos segundos para ver el
+## cartel de victoria) arranca la partida normal sola.
+func _process(delta: float) -> void:
+	if not _chain_to_normal or game == null or game.sim == null:
+		return
+	if not game.sim.tutorial_level:
+		_chain_to_normal = false
+		return
+	if game.sim.game_over and game.sim.victory:
+		_chain_wait += delta
+		if _chain_wait >= CHAIN_DELAY_S:
+			_chain_to_normal = false
+			_chain_wait = 0.0
+			_close_game()
+			_start_game(true)

@@ -141,6 +141,7 @@ func _run() -> void:
 	_check("Test no muestra la guía de Juego normal", not _app.guide.visible and not _app.game.paused)
 
 	await _t_game_actions()
+	await _t_new_game_flow()
 
 	# Salir: el botón debe pedir confirmación, no cerrar directo.
 	var closed := false
@@ -229,3 +230,59 @@ func _t_game_actions() -> void:
 		f.close()
 	elif FileAccess.file_exists(save_path):
 		DirAccess.remove_absolute(save_path)
+
+
+## Fase 18: menú final (Continuar / Nueva partida / Opciones / Salir), tutorial opcional al pulsar
+## Nueva partida que pasa solo a la partida normal al ganarlo, y "Cómo jugar" desde Opciones.
+func _t_new_game_flow() -> void:
+	if _app.game != null:
+		_app.game.queue_free()
+	await _frames(1)
+	_app = load("res://app/app.tscn").instantiate()
+	root.add_child(_app)
+	await _frames(2)
+	var labels: Array[String] = []
+	for b in _app.menu.find_children("*", "Button", true, false):
+		if b.visible:
+			labels.append(b.text)
+	_check("el menú tiene Nueva partida, Opciones y Salir", labels.has("Nueva partida") and labels.has("Opciones") and labels.has("Salir"), str(labels))
+	_check("\"Cómo jugar\" y \"Nivel 0\" ya no están en el menú", not labels.has("Cómo jugar") and not labels.has("Nivel 0 (tutorial)"), str(labels))
+	# Corriendo desde el editor (como estas pruebas) se ven las de desarrollo; en una build exportada no.
+	_check("Modo infinito y Test solo se ven corriendo desde el editor",
+		labels.has("Modo infinito") == OS.has_feature("editor") and labels.has("Test") == OS.has_feature("editor"))
+
+	_app.menu.play_new.emit()
+	await _frames(1)
+	_check("Nueva partida pregunta si se quiere el tutorial", _app.tutorial_dialog.visible)
+	_app.tutorial_dialog.custom_action.emit(&"direct")
+	await _frames(3)
+	_check("\"Jugar directo\" arranca la partida normal", _app.game != null and _app.game.sim.incremental and not _app.game.sim.tutorial_level)
+
+	_app._close_game()
+	await _frames(1)
+	_app.menu.play_new.emit()
+	await _frames(1)
+	_app.tutorial_dialog.confirmed.emit()
+	_app.tutorial_dialog.hide()
+	await _frames(3)
+	_check("\"Hacer el tutorial\" arranca el Nivel 0", _app.game != null and _app.game.sim.tutorial_level)
+	_app.game.sim.game_over = true
+	_app.game.sim.victory = true
+	var t0 := Time.get_ticks_msec()
+	while (Time.get_ticks_msec() - t0) < (_app.CHAIN_DELAY_S + 2.0) * 1000.0 and _app.game != null and _app.game.sim != null and _app.game.sim.tutorial_level:
+		await process_frame
+	await _frames(3)
+	_check("al ganar el tutorial empieza sola la partida normal", _app.game != null and _app.game.sim != null
+		and _app.game.sim.incremental and not _app.game.sim.tutorial_level)
+
+	_app.game.menu_requested.emit()
+	await _frames(1)
+	_app.options.how_to_play_requested.emit()
+	await _frames(1)
+	_check("\"Cómo jugar\" se abre desde las Opciones de la partida", _app.guide.visible)
+	_app.guide.closed.emit()
+	await _frames(1)
+	_check("cerrar \"Cómo jugar\" vuelve a las Opciones (la partida sigue en pausa)",
+		not _app.guide.visible and _app.options.visible and _app.game.paused)
+	_app.options.back_pressed.emit()
+	await _frames(1)

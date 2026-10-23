@@ -22,6 +22,8 @@ signal open_options
 ## Fase 14: la guía de una pantalla (`GuideScreen`) ya no sale sola al empezar; queda aquí.
 signal open_guide
 signal quit_requested
+## Fase 18: "Nueva partida" — `app.gd` pregunta si se quiere hacer el tutorial antes.
+signal play_new
 
 const GOLD := Color("ffd43c")
 const CREAM := Color("f4ecd8")
@@ -75,13 +77,16 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 16)
 	root.add_child(box)
 
+	# Fase 18: menú final pedido por el jugador — Continuar (si hay guardada) / Nueva partida /
+	# Opciones / Salir. El tutorial se ofrece al pulsar Nueva partida y "Cómo jugar" pasó a las
+	# opciones de la partida. Modo infinito y Test son herramientas de desarrollo: solo se ven
+	# corriendo desde el editor de Godot, nunca en una build exportada.
 	_continue_btn = _option(box, "Continuar partida", "Retoma la última partida guardada.", play_continue.emit)
 	refresh_continue()
-	_option(box, "Nivel 0 (tutorial)", "Aprende a jugar paso a paso y gana tu primera batalla.", play_tutorial.emit)
-	_option(box, "Juego normal", "Crece sin límite: compra obreras y soldados con comida.", play_normal.emit)
-	_option(box, "Modo infinito", "Reina, cámaras, araña: la colonia completa de la Fase 1.", play_infinite.emit)
-	_option(box, "Test", "Entorno de pruebas: hormigas y amenazas a voluntad, sin victoria ni derrota.", play_test.emit)
-	_option(box, "Cómo jugar", "Resumen de las reglas en una pantalla.", open_guide.emit)
+	_option(box, "Nueva partida", "Empieza una colonia nueva (con tutorial si quieres).", play_new.emit)
+	if OS.has_feature("editor"):
+		_option(box, "Modo infinito", "(desarrollo) Colonia completa con reina y castas.", play_infinite.emit)
+		_option(box, "Test", "(desarrollo) Hormigas y amenazas a voluntad.", play_test.emit)
 	_option(box, "Opciones", "Controles, volumen y brillo.", open_options.emit)
 	_option(box, "Salir", "Cierra el juego.", quit_requested.emit)
 
