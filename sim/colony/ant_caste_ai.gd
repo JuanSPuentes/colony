@@ -105,6 +105,8 @@ static func think_soldier(ants, i: int, cx: int, cy: int, ci: int, think_dt: flo
 	var sim: Simulation = ants.sim
 	var cfg := sim.cfg
 	var threat = ants._nearest_threat(ants.pos[i], cfg.soldier_sight_px)
+	if threat != null and not ants.can_reach(ants.pos[i], threat.pos):
+		threat = null  # Fase 16: la ve a través de la tierra pero no puede llegar
 	if threat != null:
 		var d: float = ants.pos[i].distance_to(threat.pos)
 		if d <= cfg.soldier_melee_range_px:

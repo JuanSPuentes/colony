@@ -390,6 +390,8 @@ func _think(i: int, cx: int, cy: int, ci: int) -> void:
 	# cría; el Soldado sigue con su propio `_think_soldier` (ya reacciona a esto de siempre).
 	if caste[i] != CasteDefs.Caste.NURSE and caste[i] != CasteDefs.Caste.SOLDIER and state[i] != State.FLEE_WATER:
 		var threat = _nearest_threat(pos[i], cfg.soldier_sight_px)
+		if threat != null and not can_reach(pos[i], threat.pos):
+			threat = null  # Fase 16: la ve a través de la tierra pero no hay camino (ver `can_reach`)
 		if threat != null:
 			if state[i] != State.ATTACK:
 				_release_job(i)
@@ -616,10 +618,16 @@ func _think_food(i: int, cx: int, cy: int, ci: int) -> void:
 	if sim.tick_count < ignore_until[i] or maxf(here, best) < cfg.food_follow_threshold:
 		state[i] = State.EXPLORE
 		_step(i, cx, cy, ci, Mode.EXPLORE, null)
-	elif here >= best + 0.002:
+	elif cy < cfg.surface_y and here >= best + 0.002:
 		# Fin del rastro sin comida a la vista: la hormiga borra la punta (la feromona de un
-		# rastro agotado se va comiendo desde el final) y deja de fiarse de él un rato.
-		sim.food.clear_cell(ci)  # también lo pintado: un rastro a una planta agotada se va comiendo igual
+		# rastro agotado se va comiendo desde el final) y deja de fiarse de él un rato. Solo en la
+		# superficie (Fase 16): bajo tierra el "pico" es el pozo del nido, no el final de un rastro.
+		if sim.incremental:
+			# Fase 16: en Juego normal las plantas rebrotan; borrar lo que pintó el jugador lo
+			# dejaba sin camino cuando la planta volvía a tener hojas. Se borra solo lo depositado.
+			sim.food.clear_deposit(ci)
+		else:
+			sim.food.clear_cell(ci)  # también lo pintado: un rastro a una planta agotada se va comiendo igual
 		ignore_until[i] = sim.tick_count + int(cfg.ignore_trail_seconds * cfg.tick_rate)
 		state[i] = State.EXPLORE
 		_step(i, cx, cy, ci, Mode.EXPLORE, null)
@@ -747,6 +755,20 @@ func _tick_rival(i: int, cx: int, cy: int, ci: int, dt: float) -> void:
 ## `tick()`) defendiendo la colmena: igual de simple que el Soldado (acercarse y pegar), pero con
 ## el daño de su propia casta (`CasteDefs.DAMAGE_PER_S`), bastante menor. Decisión en `AntCasteAI`.
 ## `threat` sin tipar: puede ser `Spider` o `Centipede` (ver `_nearest_threat`).
+## Fase 16: ¿hay camino entre dos puntos? La amenaza se detecta en línea recta (a través de la tierra);
+## sin esto, con el nido todavía cerrado y una araña arriba, las obreras de adentro soltaban la
+## excavación para "ir a pelear" sin poder llegar, y volvían a cavar en cuanto la araña se alejaba un
+## poco — en bucle, sin terminar nunca el túnel. Aproximación barata con `nest_dist`: los dos puntos
+## están del mismo lado si ambos están conectados al nido o ninguno de los dos lo está (p.ej. los dos
+## en la superficie con el nido cerrado).
+func can_reach(a: Vector2, b: Vector2) -> bool:
+	var ia := _cell_index(a)
+	var ib := _cell_index(b)
+	if ia < 0 or ib < 0 or ia >= sim.fields.nest_dist.size() or ib >= sim.fields.nest_dist.size():
+		return true
+	return (sim.fields.nest_dist[ia] < FAR) == (sim.fields.nest_dist[ib] < FAR)
+
+
 func _think_defend(i: int, cx: int, cy: int, ci: int, threat, think_dt: float) -> void:
 	AntCasteAI.think_defend(self, i, cx, cy, ci, threat, think_dt)
 
@@ -796,7 +818,16 @@ func _step(i: int, cx: int, cy: int, ci: int, mode: int, extra: Variant) -> void
 					s -= 2.0  # no meterse al nido por azar
 				s -= 3.0 * lw
 			Mode.FOOD:
-				s = cfg.w_food * (sim.food.data[ni] - sim.food.data[ci]) * 10.0
+				if on_surface:
+					s = cfg.w_food * (sim.food.data[ni] - sim.food.data[ci]) * 10.0
+				else:
+					# Fase 16: bajo tierra, salir hacia la superficie en vez de seguir el gradiente de
+					# Comida. Todas las que vuelven cargadas pasan por el pozo del nido y lo llenan de
+					# feromona: el pozo terminaba siendo lo más fuerte del mapa (0.66 contra ~0.3 del
+					# rastro pintado afuera), así que las que salían a buscar comida se metían más
+					# adentro del nido y se quedaban dando vueltas en un valor parejo, sin salir nunca
+					# aunque el rastro de afuera siguiera intacto. La comida siempre está arriba.
+					s = cfg.w_outward * float(f.surface_dist[ci] - f.surface_dist[ni]) * 2.0
 				s += cfg.w_persist * head.dot(_dirs[k]) + 0.3 * rng.randf()
 				if on_surface and ny >= cfg.surface_y:
 					s -= 2.0

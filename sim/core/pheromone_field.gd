@@ -51,6 +51,11 @@ func clear_cell(i: int) -> void:
 		floor_v[i] = 0.0
 
 
+## Fase 16: borra solo lo depositado por las hormigas; lo pintado por el jugador (el piso) queda.
+func clear_deposit(i: int) -> void:
+	data[i] = 0.0 if floor_v.is_empty() else floor_v[i]
+
+
 ## `mult` > 1 acelera el decaimiento (lluvia).
 func decay(dt: float, mult: float) -> void:
 	var f := exp(-decay_per_s * mult * dt)

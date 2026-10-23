@@ -15,6 +15,9 @@ func _initialize() -> void:
 	_t_soldiers_release_empty_attack_trail()
 	_t_soldiers_still_answer_real_threat()
 	_t_coach_lessons()
+	_t_foragers_leave_the_shaft()
+	_t_painted_trail_survives_in_normal_game()
+	_t_unreachable_threat_does_not_stop_digging()
 	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -159,3 +162,87 @@ func _t_coach_lessons() -> void:
 	normal_sim.spawn_incremental_start()
 	_check("y no se muestra si el nido ya tiene salida", not (open_lesson["when"] as Callable).call(normal_sim))
 	cv.free()
+
+
+## Fase 16: el pozo del nido se llenaba de feromona de Comida (por ahí pasan todas las que vuelven
+## cargadas) y las que salían a buscar comida se quedaban atrapadas dentro, en un valor parejo, aunque
+## el rastro de afuera siguiera intacto. Ahora bajo tierra salen hacia la superficie.
+func _paint_trail_to_nearest(sim: Simulation) -> Plant:
+	var cfg := sim.cfg
+	var plant: Plant = sim.plants[0]
+	for p in sim.plants:
+		if absi(p.cell.x - cfg.nest_x) < absi(plant.cell.x - cfg.nest_x):
+			plant = p
+	var dir := signi(plant.cell.x - cfg.nest_x)
+	for k in range(0, absi(plant.cell.x - cfg.nest_x) + 1):
+		for dy in [-1, 0]:
+			sim.cmd_paint_phero(sim.food, cfg.nest_x + dir * k, cfg.surface_y - 1 + dy, minf(1.0, cfg.paint_start + cfg.paint_ramp * k))
+	return plant
+
+
+func _t_foragers_leave_the_shaft() -> void:
+	var sim := Simulation.new(_cfg(), 4)
+	sim.spawn_incremental_start()
+	for k in 12:
+		sim.ants.add_ant_at(Vector2i(sim.cfg.nest_x, sim.cfg.surface_y + sim.cfg.shaft_depth + 1), CasteDefs.Caste.WORKER)
+	var plant := _paint_trail_to_nearest(sim)
+	plant.leaves = 2000
+	plant.max_leaves = 2000
+	sim.total_leaves_left += 2000
+	for i in int(120.0 * sim.cfg.tick_rate):
+		sim.tick()
+	var stuck := 0
+	for a in sim.ants.count:
+		if sim.ants.alive[a] == 1 and sim.ants.state[a] == AntSystem.State.GO_TO_FOOD:
+			var c := Vector2i(sim.ants.pos[a] / sim.cfg.cell_px)
+			if c.y >= sim.cfg.surface_y:
+				stuck += 1
+	var d0 := sim.delivered
+	for i in int(60.0 * sim.cfg.tick_rate):
+		sim.tick()
+	_check("las que buscan comida no se quedan atrapadas bajo tierra", stuck <= 3, "bajo tierra en GO_TO_FOOD: %d" % stuck)
+	_check("con el rastro pintado siguen llegando hojas (sin lluvia)", sim.delivered - d0 >= 20, "hojas en 60 s: %d" % (sim.delivered - d0))
+
+
+func _t_painted_trail_survives_in_normal_game() -> void:
+	var sim := Simulation.new(_cfg(), 4)
+	sim.spawn_incremental_start()
+	var plant := _paint_trail_to_nearest(sim)
+	plant.leaves = 0  # planta agotada: antes las obreras se comían también lo pintado
+	sim.total_leaves_left = 0
+	for p in sim.plants:
+		if p != plant:
+			sim.total_leaves_left += p.leaves
+	for i in int(90.0 * sim.cfg.tick_rate):
+		sim.tick()
+	var painted_left := 0
+	var dir := signi(plant.cell.x - sim.cfg.nest_x)
+	for k in range(0, absi(plant.cell.x - sim.cfg.nest_x) + 1):
+		var i := (sim.cfg.surface_y - 1) * sim.world.w + sim.cfg.nest_x + dir * k
+		if sim.food.floor_v[i] > 0.0:
+			painted_left += 1
+	_check("en Juego normal lo pintado no se borra aunque la planta se agote (rebrota)",
+		painted_left == absi(plant.cell.x - sim.cfg.nest_x) + 1, "celdas pintadas que quedan: %d" % painted_left)
+
+
+## Fase 16: con el nido cerrado y una araña arriba, las obreras de adentro la veían "a través de la
+## tierra", soltaban la excavación para ir a pelear sin poder llegar y volvían a cavar en bucle (160
+## cambios en 120 s, el túnel no se terminaba). Ahora solo defienden si hay camino hasta la amenaza.
+func _t_unreachable_threat_does_not_stop_digging() -> void:
+	var sim := Simulation.new(_cfg(), 5)
+	sim.spawn_incremental_start(true)
+	for y in range(sim.cfg.surface_y, sim.cfg.surface_y + sim.cfg.shaft_depth):
+		sim.cmd_mark(sim.cfg.nest_x, y)
+	sim.cmd_force_spider()
+	var opened_at := -1.0
+	for t in int(90.0 * sim.cfg.tick_rate):
+		sim.spider.pos = Vector2((sim.cfg.nest_x + 2) * sim.cfg.cell_px, (sim.cfg.surface_y - 1) * sim.cfg.cell_px)
+		sim.tick()
+		if sim.fields.nest_dist[_top_air(sim)] < NestDistanceField.FAR:
+			opened_at = t * sim.dt
+			break
+	_check("con una araña arriba y el nido cerrado, igual terminan el túnel", opened_at >= 0.0 and opened_at < 60.0,
+		"abierto a los %.1f s" % opened_at)
+	_check("can_reach: dentro del nido cerrado no se alcanza la superficie",
+		not sim.ants.can_reach(Vector2(sim.cfg.nest_x * 8, (sim.cfg.surface_y + sim.cfg.shaft_depth + 1) * 8), Vector2(sim.cfg.nest_x * 8 + 40, (sim.cfg.surface_y - 1) * 8))
+		or opened_at >= 0.0)
