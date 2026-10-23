@@ -15,6 +15,8 @@ var quit_dialog: ConfirmationDialog
 var game: Node2D
 ## A dónde vuelve la flecha de Opciones: "menu" (se abrió desde el menú) o "game" (desde la tuerca).
 var _return_to := "menu"
+var confirm_dialog: ConfirmationDialog
+var _pending: Callable
 
 
 func _ready() -> void:
@@ -54,6 +56,21 @@ func _ready() -> void:
 	quit_dialog.cancel_button_text = "Cancelar"
 	add_child(quit_dialog)
 	quit_dialog.confirmed.connect(func() -> void: get_tree().quit())
+
+	# Fase 17: guardar / nueva partida / volver al menú desde las opciones de la partida.
+	options.save_requested.connect(_on_save_requested)
+	options.new_game_requested.connect(func() -> void: _confirm(
+		"¿Empezar una partida nueva? Se pierde lo que no hayas guardado.", "Nueva partida", _restart_same_mode))
+	options.main_menu_requested.connect(func() -> void: _confirm(
+		"¿Volver al menú principal? Se pierde lo que no hayas guardado.", "Menú principal", _back_to_main_menu))
+	menu.play_continue.connect(_continue_game)
+	confirm_dialog = ConfirmationDialog.new()
+	confirm_dialog.title = "Confirmar"
+	confirm_dialog.cancel_button_text = "Cancelar"
+	add_child(confirm_dialog)
+	confirm_dialog.confirmed.connect(func() -> void:
+		if _pending.is_valid():
+			_pending.call())
 
 
 func _start_game(incremental: bool) -> void:
@@ -112,6 +129,7 @@ func _open_options(return_to: String) -> void:
 	if game != null and return_to == "game":
 		game.paused = true
 	options.set_values(settings.volume, settings.brightness)
+	options.set_in_game(game != null and return_to == "game")
 	options.visible = true
 	menu.visible = false
 
@@ -147,3 +165,62 @@ func _on_brightness_changed(b: float) -> void:
 
 func _ask_quit() -> void:
 	quit_dialog.popup_centered()
+
+
+# --- Fase 17: partida en curso desde Opciones, y "Continuar partida" en el menú ------------------
+
+func _confirm(text: String, ok_text: String, action: Callable) -> void:
+	_pending = action
+	confirm_dialog.dialog_text = text
+	confirm_dialog.ok_button_text = ok_text
+	confirm_dialog.popup_centered()
+
+
+func _on_save_requested() -> void:
+	if game == null:
+		return
+	game.save_game()
+	var ok := FileAccess.file_exists(game.SAVE_PATH)
+	options.show_save_status("Partida guardada." if ok else "No se pudo guardar.")
+
+
+## Cierra la partida actual (sin guardar). Deja `game` en null.
+func _close_game() -> void:
+	if game != null:
+		game.queue_free()
+		game = null
+	options.visible = false
+
+
+func _back_to_main_menu() -> void:
+	_close_game()
+	menu.refresh_continue()
+	menu.visible = true
+
+
+## Nueva partida en el mismo modo que se estaba jugando (Juego normal sortea mapa nuevo).
+func _restart_same_mode() -> void:
+	var mode: String = game.game_mode if game != null else "incremental"
+	_close_game()
+	match mode:
+		"historia":
+			_start_game(false)
+		"tutorial":
+			_start_tutorial()
+		"test":
+			_start_test_game()
+		_:
+			_start_game(true)
+
+
+func _continue_game() -> void:
+	menu.visible = false
+	game = load(MAIN_SCENE).instantiate()
+	game.auto_start = false
+	add_child(game)
+	game.set_brightness(settings.brightness)
+	game.menu_requested.connect(func() -> void: _open_options("game"))
+	game.coach_enabled = true
+	game.load_game()
+	if game.sim == null:  # no había partida o el archivo no se pudo leer
+		_back_to_main_menu()

@@ -11,6 +11,11 @@ signal back_pressed
 signal volume_changed(v: float)
 signal brightness_changed(b: float)
 signal quit_requested
+## Fase 17: acciones de la partida en curso, solo visibles si Opciones se abrió desde el juego
+## (`set_in_game(true)`). `app.gd` decide qué hacer y pide confirmación donde se pierde progreso.
+signal save_requested
+signal new_game_requested
+signal main_menu_requested
 
 const BG := Color(0.05, 0.04, 0.04, 1.0)
 const GOLD := Color("ffd43c")
@@ -21,6 +26,8 @@ var _volume_slider: HSlider
 var _volume_value: Label
 var _brightness_slider: HSlider
 var _brightness_value: Label
+var _game_card: PanelContainer
+var _save_status: Label
 
 
 func _ready() -> void:
@@ -71,6 +78,21 @@ func _ready() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(title)
 
+	_game_card = _card("Partida")
+	content.add_child(_game_card)
+	var game_body := _game_card.get_meta("body") as VBoxContainer
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	game_body.add_child(row)
+	row.add_child(_action_button("Guardar partida", func() -> void: save_requested.emit()))
+	row.add_child(_action_button("Nueva partida", func() -> void: new_game_requested.emit()))
+	row.add_child(_action_button("Menú principal", func() -> void: main_menu_requested.emit()))
+	_save_status = Label.new()
+	_save_status.add_theme_font_size_override("font_size", 14)
+	_save_status.add_theme_color_override("font_color", Color(0.55, 0.9, 0.55))
+	game_body.add_child(_save_status)
+	_game_card.visible = false
+
 	var settings_card := _card("Ajustes")
 	content.add_child(settings_card)
 	var settings_body := settings_card.get_meta("body") as VBoxContainer
@@ -103,6 +125,29 @@ func _ready() -> void:
 	quit_btn.position = Vector2(-200, -60)
 	quit_btn.pressed.connect(func() -> void: quit_requested.emit())
 	root.add_child(quit_btn)
+
+
+func _action_button(text: String, cb: Callable) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.custom_minimum_size = Vector2(170, 40)
+	b.add_theme_font_size_override("font_size", 16)
+	b.add_theme_color_override("font_color", CREAM)
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	b.pressed.connect(cb)
+	return b
+
+
+## Fase 17: la tarjeta "Partida" solo tiene sentido con una partida abierta detrás.
+func set_in_game(in_game: bool) -> void:
+	_game_card.visible = in_game
+	_save_status.text = ""
+	_save_status.visible = false
+
+
+func show_save_status(text: String) -> void:
+	_save_status.text = text
+	_save_status.visible = true
 
 
 ## Tarjeta con el mismo look que los paneles del HUD (`hud.gd._build_gear_button`/`_make_panel`):

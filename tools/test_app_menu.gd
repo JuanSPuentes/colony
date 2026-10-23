@@ -140,6 +140,8 @@ func _run() -> void:
 	_check("la colonia de Test arranca con 50 hormigas", _app.game.sim.ants.alive_count == 50, "real=%d" % _app.game.sim.ants.alive_count)
 	_check("Test no muestra la guía de Juego normal", not _app.guide.visible and not _app.game.paused)
 
+	await _t_game_actions()
+
 	# Salir: el botón debe pedir confirmación, no cerrar directo.
 	var closed := false
 	auto_accept_quit = false
@@ -160,3 +162,70 @@ func _run() -> void:
 
 	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
+
+
+## Fase 17: guardar / nueva partida / volver al menú desde las opciones de la partida, y
+## "Continuar partida" en el menú. Respalda la partida guardada real (si existe) y la restaura.
+func _t_game_actions() -> void:
+	var save_path := "user://save1.json"
+	var had_save := FileAccess.file_exists(save_path)
+	var save_backup := ""
+	if had_save:
+		save_backup = FileAccess.get_file_as_string(save_path)
+		DirAccess.remove_absolute(save_path)
+
+	_app.game.queue_free()
+	await _frames(1)
+	_app = load("res://app/app.tscn").instantiate()
+	root.add_child(_app)
+	await _frames(2)
+	_check("sin partida guardada, el menú no muestra \"Continuar partida\"", not _app.menu._continue_btn.visible)
+	_app.menu.open_options.emit()
+	await _frames(1)
+	_check("Opciones desde el menú no muestra las acciones de la partida", not _app.options._game_card.visible)
+	_app.options.back_pressed.emit()
+	await _frames(1)
+
+	_app.menu.play_normal.emit()
+	await _frames(3)
+	var day_food: float = _app.game.sim.colony.food
+	_app.game.menu_requested.emit()
+	await _frames(1)
+	_check("Opciones desde la partida muestra Guardar / Nueva partida / Menú principal", _app.options._game_card.visible)
+	_app.options.save_requested.emit()
+	await _frames(1)
+	_check("Guardar partida escribe el archivo y lo confirma", FileAccess.file_exists(save_path)
+		and _app.options._save_status.text == "Partida guardada.", _app.options._save_status.text)
+
+	_app.options.new_game_requested.emit()
+	await _frames(1)
+	_check("Nueva partida pide confirmación", _app.confirm_dialog.visible)
+	var old_seed: int = _app.game.seed_value
+	_app.confirm_dialog.confirmed.emit()
+	_app.confirm_dialog.hide()
+	await _frames(3)
+	_check("Nueva partida repite el modo (Juego normal) con un mapa nuevo",
+		_app.game != null and _app.game.sim.incremental and _app.game.seed_value != old_seed and not _app.options.visible)
+
+	_app.game.menu_requested.emit()
+	await _frames(1)
+	_app.options.main_menu_requested.emit()
+	await _frames(1)
+	_app.confirm_dialog.confirmed.emit()
+	_app.confirm_dialog.hide()
+	await _frames(2)
+	_check("Menú principal cierra la partida y vuelve al menú", _app.game == null and _app.menu.visible)
+	_check("con una partida guardada, el menú muestra \"Continuar partida\"", _app.menu._continue_btn.visible)
+
+	_app.menu.play_continue.emit()
+	await _frames(3)
+	_check("Continuar partida carga la guardada (Juego normal)", _app.game != null and _app.game.sim != null
+		and _app.game.sim.incremental and absf(_app.game.sim.colony.food - day_food) < 5.0,
+		"" if _app.game == null or _app.game.sim == null else "comida %.1f (guardada ~%.1f)" % [_app.game.sim.colony.food, day_food])
+
+	if had_save:
+		var f := FileAccess.open(save_path, FileAccess.WRITE)
+		f.store_string(save_backup)
+		f.close()
+	elif FileAccess.file_exists(save_path):
+		DirAccess.remove_absolute(save_path)

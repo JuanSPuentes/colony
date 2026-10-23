@@ -11,6 +11,8 @@ extends CanvasLayer
 ## `_start_game()` apunta cada una.
 
 ## Fase 14: Nivel 0, el tutorial jugable (ver `sim/colony/tutorial_level.gd`).
+## Fase 17: retoma la partida guardada (`main.SAVE_PATH`). Solo se ve si hay una guardada.
+signal play_continue
 signal play_tutorial
 signal play_normal
 signal play_infinite
@@ -73,6 +75,8 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 16)
 	root.add_child(box)
 
+	_continue_btn = _option(box, "Continuar partida", "Retoma la última partida guardada.", play_continue.emit)
+	refresh_continue()
 	_option(box, "Nivel 0 (tutorial)", "Aprende a jugar paso a paso y gana tu primera batalla.", play_tutorial.emit)
 	_option(box, "Juego normal", "Crece sin límite: compra obreras y soldados con comida.", play_normal.emit)
 	_option(box, "Modo infinito", "Reina, cámaras, araña: la colonia completa de la Fase 1.", play_infinite.emit)
@@ -85,7 +89,7 @@ func _ready() -> void:
 ## `hint` queda sin usarse por ahora (el usuario pidió sacar las descripciones del menú el
 ## 2026-10-20); se deja el parámetro para no tener que tocar cada `_option(...)` cuando se
 ## reactiven.
-func _option(parent: Control, label: String, _hint: String, cb: Callable) -> void:
+func _option(parent: Control, label: String, _hint: String, cb: Callable) -> Button:
 	var btn := Button.new()
 	btn.text = label
 	btn.custom_minimum_size = Vector2(280, 46)
@@ -104,3 +108,14 @@ func _option(parent: Control, label: String, _hint: String, cb: Callable) -> voi
 	btn.add_theme_stylebox_override("pressed", hover)
 	btn.pressed.connect(cb)
 	parent.add_child(btn)
+	return btn
+
+
+var _continue_btn: Button
+
+
+## Fase 17: muestra "Continuar partida" solo si existe una partida guardada. `app.gd` lo llama al
+## volver al menú, por si se acaba de guardar desde las opciones de la partida.
+func refresh_continue() -> void:
+	if _continue_btn != null:
+		_continue_btn.visible = FileAccess.file_exists("user://save1.json")
