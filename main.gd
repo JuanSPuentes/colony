@@ -56,6 +56,9 @@ var centipede_view: CentipedeView
 var mantis_view: MantisView
 var rival_queen_view: RivalQueenView
 var day_night_view: DayNightView
+## Fase 16: cielo vivo (detrás de todo) y lluvia visible (delante de plantas y criaturas).
+var sky_view: SkyView
+var rain_view: RainView
 var hud: Hud
 var tutorial: TutorialView
 ## Fase 14: guía contextual (Nivel 0 y Juego normal). Solo actúa si `coach_enabled`.
@@ -153,7 +156,9 @@ func _ready() -> void:
 	mantis_view = MantisView.new()
 	rival_queen_view = RivalQueenView.new()
 	day_night_view = DayNightView.new()
-	for n in [terrain_view, plant_view, corpse_view, brood_view, overlay, ant_renderer, spider_view, centipede_view, mantis_view, rival_queen_view, day_night_view]:
+	sky_view = SkyView.new()
+	rain_view = RainView.new()
+	for n in [sky_view, terrain_view, plant_view, corpse_view, brood_view, overlay, ant_renderer, spider_view, centipede_view, mantis_view, rival_queen_view, rain_view, day_night_view]:
 		world_vp.add_child(n)
 	camera = Camera2D.new()
 	world_vp.add_child(camera)
@@ -219,6 +224,8 @@ func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> v
 	centipede_view.setup(sim)
 	mantis_view.setup(sim)
 	rival_queen_view.setup(sim)
+	sky_view.setup(sim)
+	rain_view.setup(sim, sky_view)
 	tutorial.step = 0
 	coach.reset(sim)
 	_acc = 0.0

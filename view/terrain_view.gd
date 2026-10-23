@@ -43,6 +43,10 @@ func refresh() -> void:
 func _draw() -> void:
 	if sim == null:
 		return
+	# Fase 16: el cielo lo dibuja `SkyView` (degradado, sol, nubes); este rectángulo plano solo queda
+	# si no hay SkyView detrás (p.ej. una escena de prueba que arme las vistas a mano).
+	if get_parent() != null and get_parent().get_child(0) is SkyView:
+		return
 	var cpx := sim.cfg.cell_px
 	draw_rect(Rect2(0, 0, sim.world.w * cpx, sim.cfg.surface_y * cpx), SKY)
 
