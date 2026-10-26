@@ -191,16 +191,25 @@ func _t_foragers_leave_the_shaft() -> void:
 	sim.total_leaves_left += 2000
 	for i in int(120.0 * sim.cfg.tick_rate):
 		sim.tick()
+	# Fase 16: antes se contaban las obreras bajo tierra en GO_TO_FOOD en un solo instante (<= 3), y
+	# eso incluye a las que van subiendo por el pozo en ese momento: cualquier cambio que moviera los
+	# números al azar podía dar 4 sin que ninguna estuviera atrapada (medido: en promedio ~2, ninguna
+	# más de 3 s seguidos). Ahora se mide lo que de verdad importa: que ninguna se quede bajo tierra
+	# buscando comida más de 10 s seguidos.
+	var streak := {}
 	var stuck := 0
-	for a in sim.ants.count:
-		if sim.ants.alive[a] == 1 and sim.ants.state[a] == AntSystem.State.GO_TO_FOOD:
-			var c := Vector2i(sim.ants.pos[a] / sim.cfg.cell_px)
-			if c.y >= sim.cfg.surface_y:
-				stuck += 1
 	var d0 := sim.delivered
 	for i in int(60.0 * sim.cfg.tick_rate):
 		sim.tick()
-	_check("las que buscan comida no se quedan atrapadas bajo tierra", stuck <= 3, "bajo tierra en GO_TO_FOOD: %d" % stuck)
+		if i % sim.cfg.tick_rate != 0:
+			continue
+		for a in sim.ants.count:
+			var under := false
+			if sim.ants.alive[a] == 1 and sim.ants.state[a] == AntSystem.State.GO_TO_FOOD:
+				under = int(sim.ants.pos[a].y / sim.cfg.cell_px) >= sim.cfg.surface_y
+			streak[a] = streak.get(a, 0) + 1 if under else 0
+			stuck = maxi(stuck, streak[a])
+	_check("las que buscan comida no se quedan atrapadas bajo tierra", stuck <= 10, "racha más larga bajo tierra en GO_TO_FOOD: %d s" % stuck)
 	_check("con el rastro pintado siguen llegando hojas (sin lluvia)", sim.delivered - d0 >= 20, "hojas en 60 s: %d" % (sim.delivered - d0))
 
 
