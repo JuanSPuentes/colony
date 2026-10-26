@@ -346,7 +346,7 @@ func _update_top_bar(m: Node, sim: Simulation) -> void:
 	items.append(["🐜", str(mine), "Hormigas de tu colonia"])
 	items.append(["🍃", "%.0f" % sim.colony.food, "Comida"])
 	if sim.queen_id >= 0:
-		var q_max := cfg.queen_hp_base * CasteDefs.HP_MULT[CasteDefs.Caste.QUEEN]
+		var q_max := sim.ants.max_hp(sim.queen_id)
 		var q_hp := sim.ants.hp[sim.queen_id] if sim.ants.alive[sim.queen_id] == 1 else 0.0
 		items.append(["👑", "%d%%" % int(100.0 * q_hp / maxf(q_max, 0.01)), "Vida de la reina"])
 	if sim.incremental or sim.test_mode:
@@ -365,8 +365,7 @@ func _update_top_bar(m: Node, sim: Simulation) -> void:
 		items.append(["⚔", "¡Batalla! %d%%" % int(100.0 * rival.queen.hp / maxf(rival.queen.max_hp, 0.01)), "Vida de la reina rival"])
 	elif sim.incremental and not sim.tutorial_level and sim.season_index < SeasonSystem.SEASON_COUNT:
 		# La batalla empieza al llegar al último día de la estación (`SeasonSystem.update`).
-		var day_in := (sim.day_number() - 1) % cfg.season_length_days
-		var left := cfg.season_length_days - 1 - day_in
+		var left := SeasonSystem.season_length(sim) - 1 - SeasonSystem.day_in_season(sim)
 		items.append(["⚔", "Hoy" if left <= 0 else ("en %d %s" % [left, "día" if left == 1 else "días"]), "Próxima batalla de fin de estación"])
 	if sim.weather != Simulation.Weather.CLEAR:
 		items.append(["🌧", "¡%ds!" % ceili(sim.rain_eta_s()) if sim.weather == Simulation.Weather.WARNING else "Lloviendo", "Lluvia"])
@@ -697,7 +696,7 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 	var c := sim.ants.count_by_caste([CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE])
 	var queen_alive := sim.ants.alive[sim.queen_id] == 1
 	var queen_hp := sim.ants.hp[sim.queen_id] if queen_alive else 0.0
-	var queen_hp_max := cfg.queen_hp_base * CasteDefs.HP_MULT[CasteDefs.Caste.QUEEN]
+	var queen_hp_max := sim.ants.max_hp(sim.queen_id)
 	# Fase 14: zánganos también en Juego normal.
 	_colony.text = "[color=#%s]●[/color] %s   [color=#%s]●[/color] %s   [color=#%s]●[/color] %s\n[color=#%s]●[/color] Reina %d%%" % [
 		CasteDefs.COLORS[CasteDefs.Caste.WORKER].to_html(false), _plural(c[CasteDefs.Caste.WORKER], "obrera", "obreras"),
@@ -782,8 +781,8 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 
 	# Fase 9 (antes sin interfaz): estación actual + colonia rival.
 	_season_label.text = "%s (día %d/%d)" % [
-		SeasonSystem.SEASON_NAMES[sim.season_index], (sim.day_number() - 1) % sim.cfg.season_length_days + 1,
-		sim.cfg.season_length_days] if sim.season_index < SeasonSystem.SEASON_COUNT else "¡Las 4 estaciones superadas!"
+		SeasonSystem.SEASON_NAMES[sim.season_index], maxi(1, SeasonSystem.day_in_season(sim) + 1),
+		SeasonSystem.season_length(sim)] if sim.season_index < SeasonSystem.SEASON_COUNT else "¡Las 4 estaciones superadas!"
 	var rival := sim.rival_colony
 	if rival.battle_active:
 		_rival_label.text = "¡Batalla! Reina rival %d%%" % int(100.0 * rival.queen.hp / maxf(rival.queen.max_hp, 0.01))
@@ -819,9 +818,8 @@ func _process(_delta: float) -> void:
 				nearest = i
 		if nearest >= 0:
 			var nc: int = sim.ants.caste[nearest]
-			var base_hp: float = sim.cfg.queen_hp_base if nc == CasteDefs.Caste.QUEEN else sim.cfg.ant_hp
 			text = "%s   %d%% vida" % [CasteDefs.NAMES[nc],
-				int(100.0 * sim.ants.hp[nearest] / maxf(base_hp * CasteDefs.HP_MULT[nc], 0.01))]
+				int(100.0 * sim.ants.hp[nearest] / maxf(sim.ants.max_hp(nearest), 0.01))]
 	if text == "" and sim.world.in_bounds(cell.x, cell.y):
 		var room_type: int = sim.world.room[cell.y * sim.world.w + cell.x]
 		if room_type != WorldGrid.Room.NONE:
@@ -877,7 +875,7 @@ func _update_classic(m: Node, sim: Simulation) -> void:
 		var c := sim.ants.count_by_caste([CasteDefs.Caste.WORKER, CasteDefs.Caste.NURSE, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE])
 		var queen_alive := sim.ants.alive[sim.queen_id] == 1
 		var queen_hp := sim.ants.hp[sim.queen_id] if queen_alive else 0.0
-		var queen_hp_max := sim.cfg.queen_hp_base * CasteDefs.HP_MULT[CasteDefs.Caste.QUEEN]
+		var queen_hp_max := sim.ants.max_hp(sim.queen_id)
 		# El bullet de cada casta usa el mismo color con el que se ve en el mundo.
 		_colony.text = "[color=#%s]●[/color]%d [color=#%s]●[/color]%d [color=#%s]●[/color]%d [color=#%s]●[/color]%d [color=#%s]●[/color]%d%%   %s" % [
 			CasteDefs.COLORS[CasteDefs.Caste.WORKER].to_html(false), c[CasteDefs.Caste.WORKER],

@@ -33,7 +33,7 @@ static func think_drone(ants, i: int, cx: int, cy: int, ci: int) -> void:
 			ants.carry_egg[i] = -1
 		ants.state[i] = AntSystem.State.ATTACK
 		if ants.pos[i].distance_to(guard.pos) > sim.cfg.soldier_melee_range_px:
-			ants._step(i, cx, cy, ci, AntSystem.Mode.PLANT, guard.pos)
+			ants.step_along(i, cx, cy, ci, ants.path_field(ants._cell_index(guard.pos)))
 		else:
 			ants.target[i] = ants.pos[i]  # el golpe lo da `AntSystem.tick()` cada tick, como siempre
 		return
@@ -59,7 +59,9 @@ static func think_drone(ants, i: int, cx: int, cy: int, ci: int) -> void:
 			ants.carry_egg[i] = -1
 			ants.target[i] = ants.pos[i]
 		else:
-			ants.target[i] = dest
+			# Fase 17: por los túneles. Antes el destino era el punto final y caminaba en línea recta,
+			# atravesando la tierra.
+			ants.step_along(i, cx, cy, ci, ants.path_field(nursery_cell))
 		return
 	# Sin huevo en upa: busca el más cercano que nadie esté cargando y que no esté ya en una
 	# Guardería (si ya llegó, no hace falta tocarlo de nuevo).
@@ -79,10 +81,15 @@ static func think_drone(ants, i: int, cx: int, cy: int, ci: int) -> void:
 		ants.state[i] = AntSystem.State.IDLE
 		escort_queen(ants, i, cx, cy, ci)
 		return
-	brood.claimed[best] = i
-	ants.carry_egg[i] = best
+	# Fase 17: lo recoge recién al llegar a su lado. Antes lo "cargaba" apenas lo elegía, y como el
+	# huevo sigue al zángano que lo carga, saltaba de golpe hasta él; y además iba en línea recta.
 	ants.state[i] = AntSystem.State.CARRY_EGG
-	ants.target[i] = brood.pos[best]
+	if ants.pos[i].distance_to(brood.pos[best]) <= sim.cfg.soldier_melee_range_px:
+		brood.claimed[best] = i
+		ants.carry_egg[i] = best
+		ants.target[i] = ants.pos[i]
+	else:
+		ants.step_along(i, cx, cy, ci, ants.path_field(ants._cell_index(brood.pos[best])))
 
 
 ## La amenaza cerca de la reina contra la que salen los zánganos, o null. Fase 17: "cerca" se mide
@@ -115,28 +122,8 @@ static func escort_queen(ants, i: int, cx: int, cy: int, ci: int) -> void:
 	if ants.pos[i].distance_to(q) <= 3.0 * sim.cfg.cell_px:
 		ants.target[i] = ants.pos[i]
 		return
-	# Por los túneles, no en línea recta (en línea recta se trababa contra la tierra): sigue un campo
-	# de distancias hasta la celda de la reina, compartido por todos los zánganos.
-	var dist: PackedInt32Array = ants.queen_field()
-	var w: int = sim.world.w
-	var best_k := -1
-	var best_d: int = dist[ci]
-	for k in 8:
-		var nx: int = cx + AntSystem.DX[k]
-		var ny: int = cy + AntSystem.DY[k]
-		if not sim.world.is_passable(nx, ny):
-			continue
-		if AntSystem.DX[k] != 0 and AntSystem.DY[k] != 0:
-			if not sim.world.is_passable(cx + AntSystem.DX[k], cy) or not sim.world.is_passable(cx, cy + AntSystem.DY[k]):
-				continue
-		var nd: int = dist[ny * w + nx]
-		if nd < best_d:
-			best_d = nd
-			best_k = k
-	if best_k < 0:
-		ants.target[i] = ants.pos[i]
-		return
-	ants.target[i] = ants._center(cx + AntSystem.DX[best_k], cy + AntSystem.DY[best_k])
+	# Por los túneles, no en línea recta (en línea recta se trababa contra la tierra).
+	ants.step_along(i, cx, cy, ci, ants.queen_field())
 
 
 static func think_nurse(ants, i: int, cx: int, cy: int, ci: int) -> void:

@@ -253,7 +253,9 @@ extends Resource
 @export_group("Fase 9: estaciones y colonia rival")
 ## Días de simulación (`DayNight.day_number`) que dura cada estación antes de que ataque la
 ## colonia rival de esa estación.
-@export var season_length_days := 5
+## Fase 17: una duración por estación (Primavera, Verano, Otoño, Invierno), en días de juego. La
+## batalla llega el último día de cada una. Antes era un solo número (5) para las cuatro.
+@export var season_days: Array[int] = [20, 15, 25, 15]
 ## Oleada de la primera estación: esta cantidad de hormigas rivales. Cada estación siguiente suma
 ## `rival_wave_ants_growth` más.
 @export var rival_wave_base_ants := 6

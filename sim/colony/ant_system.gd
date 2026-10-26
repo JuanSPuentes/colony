@@ -66,9 +66,12 @@ var carry_egg := PackedInt32Array()
 var patrol_x := PackedInt32Array()
 ## Fase 14: distancias por los túneles hasta la celda de la reina, para que los zánganos la escolten
 ## (`AntCasteAI.escort_queen`). Se recalcula solo si la reina cambia de celda o cambia el terreno.
-var _queen_field := PackedInt32Array()
-var _queen_field_cell := -1
-var _queen_field_terrain := -1
+## Fase 17: campos de distancia POR LOS TÚNELES hasta una celda destino (`path_field`), para las
+## hormigas que van a un punto concreto del nido (zánganos: Guardería, un huevo, la reina, una
+## amenaza). Caché por celda destino; se vacía si cambia el terreno o si junta demasiados.
+var _paths := {}
+var _paths_terrain := -1
+const PATH_CACHE_MAX := 24
 var _rally_cell := -1
 var _rally_terrain := -1
 var hp := PackedFloat32Array()
@@ -203,12 +206,54 @@ func rally_cell() -> int:
 
 
 func queen_field() -> PackedInt32Array:
-	var qc := _cell_index(pos[sim.queen_id])
-	if qc != _queen_field_cell or sim.world.passable_version != _queen_field_terrain:
-		_queen_field_cell = qc
-		_queen_field_terrain = sim.world.passable_version
-		_queen_field = sim.fields.bfs_from([qc])
-	return _queen_field
+	return path_field(_cell_index(pos[sim.queen_id]))
+
+
+func path_field(goal: int) -> PackedInt32Array:
+	if sim.world.passable_version != _paths_terrain:
+		_paths_terrain = sim.world.passable_version
+		_paths.clear()
+	if not _paths.has(goal):
+		if _paths.size() >= PATH_CACHE_MAX:
+			_paths.clear()
+		_paths[goal] = sim.fields.bfs_from([goal])
+	return _paths[goal]
+
+
+## Un paso por los túneles bajando por `dist` (un campo de `path_field`), sin cortar esquinas de
+## tierra, igual que `_step`. Devuelve false si desde acá no hay camino (se queda quieta).
+func step_along(i: int, cx: int, cy: int, ci: int, dist: PackedInt32Array) -> bool:
+	var world := sim.world
+	var best_k := -1
+	var best_d: int = dist[ci]
+	for k in 8:
+		var nx := cx + DX[k]
+		var ny := cy + DY[k]
+		if not world.is_passable(nx, ny):
+			continue
+		if DX[k] != 0 and DY[k] != 0:
+			if not world.is_passable(cx + DX[k], cy) or not world.is_passable(cx, cy + DY[k]):
+				continue
+		var nd: int = dist[ny * world.w + nx]
+		if nd < best_d:
+			best_d = nd
+			best_k = k
+	if best_k < 0:
+		target[i] = pos[i]
+		return false
+	target[i] = _center(cx + DX[best_k], cy + DY[best_k])
+	return true
+
+
+## Vida máxima real de la hormiga `i`: la misma cuenta con la que nace (`add_ant_at`), mejora de
+## Vida incluida para el bando del jugador. Fase 17: el HUD mostraba el % contra la vida base, así
+## que con la mejora comprada una hormiga sana figuraba con 115 % o más.
+func max_hp(i: int) -> float:
+	var c := caste[i]
+	var m := (sim.cfg.queen_hp_base if c == CasteDefs.Caste.QUEEN else sim.cfg.ant_hp) * CasteDefs.HP_MULT[c]
+	if faction[i] == 0:
+		m *= sim.upgrades.hp_mult
+	return m
 
 
 func _cell_index(p: Vector2) -> int:

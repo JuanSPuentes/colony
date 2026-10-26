@@ -78,12 +78,12 @@ func _t_player_and_rival_damage_each_other() -> void:
 
 func _t_wave_appears_on_last_day_not_before() -> void:
 	var cfg := _cfg()
-	cfg.season_length_days = 2
+	cfg.season_days = [2, 2, 2, 2]  # Fase 17: antes `season_length_days = 2` (un solo número)
 	var sim := _inc(cfg, 3)
 	_run(sim, cfg.day_length_s * 0.5)  # bien adentro del día 1, lejos del último día.
 	_check("sin llegar al último día de la estación, la colonia rival no ataca",
 		not sim.rival_colony.battle_active, "día=%d" % sim.day_number())
-	_run(sim, cfg.day_length_s * 1.6)  # ya en el último día (season_length_days=2).
+	_run(sim, cfg.day_length_s * 1.6)  # ya en el último día (estaciones de 2 días).
 	_check("al llegar al último día de la estación, la colonia rival ataca",
 		sim.rival_colony.battle_active, "día=%d" % sim.day_number())
 
@@ -93,7 +93,7 @@ func _t_season_does_not_advance_while_battle_active() -> void:
 	sim.rival_colony.start_battle(5, 1.0)
 	sim.rival_colony.queen.hp = sim.rival_colony.queen.max_hp * 1000.0  # no la matan sin querer.
 	var season_before := sim.season_index
-	_run(sim, sim.cfg.day_length_s * (sim.cfg.season_length_days + 1))  # de sobra para "otro día".
+	_run(sim, sim.cfg.day_length_s * (Simulation.SeasonSystem.season_length(sim) + 1))  # de sobra para "otro día".
 	_check("la estación no avanza mientras la batalla sigue activa",
 		sim.season_index == season_before and sim.rival_colony.battle_active)
 
@@ -131,7 +131,7 @@ func _t_classic_mode_unaffected() -> void:
 	cfg.era3_population = 2
 	var sim := Simulation.new(cfg, 7)
 	sim.spawn_colony_court()
-	_run(sim, cfg.day_length_s * (cfg.season_length_days + 2))
+	_run(sim, cfg.day_length_s * (cfg.season_days[0] + 2))
 	_check("el modo clásico nunca arranca una batalla rival aunque pase de sobra el tiempo",
 		not sim.rival_colony.battle_active and sim.season_index == 0)
 

@@ -19,6 +19,11 @@ func _initialize() -> void:
 	_t_classic_still_delivers_to_nest()
 	_t_save_keeps_formation()
 	_t_closed_nest_workers_dig_late_marks()
+	_t_drones_stay_in_tunnels()
+	_t_seasons_last_full_length()
+	_t_season_lengths()
+	_t_spider_stays_on_surface()
+	_t_hp_percent_counts_upgrade()
 	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -223,3 +228,119 @@ func _t_closed_nest_workers_dig_late_marks() -> void:
 		most = maxi(most, sim.ants.state_counts[AntSystem.State.DIG])
 	_check("las obreras iniciales cavan lo que se marca después", sim.dug >= 5, "cavadas en 10 s: %d" % sim.dug)
 	_check("con el nido cerrado cavan todas, no solo el 35 %", most >= initial, "a la vez: %d de %d" % [most, initial])
+
+
+## Los zánganos iban a la Guardería y a buscar huevos en línea recta, atravesando la tierra, y el
+## huevo "saltaba" hasta el zángano apenas lo elegía (lo cargaba desde lejos).
+func _t_drones_stay_in_tunnels() -> void:
+	var sim := _opened(4242)
+	var cfg := sim.cfg
+	sim.cmd_add_caste_ants(CasteDefs.Caste.DRONE, 4)
+	sim.colony.food = 2000.0
+	var bad := 0
+	var jumps := 0
+	for t in 60 * cfg.tick_rate:
+		if t % (6 * cfg.tick_rate) == 0:
+			sim.cmd_buy_egg()
+		var before := sim.brood.pos.duplicate()
+		sim.tick()
+		for b in mini(before.size(), sim.brood.pos.size()):
+			if sim.brood.pos[b].distance_to(before[b]) > cfg.cell_px * 1.5:
+				jumps += 1
+		for i in sim.ants.count:
+			if sim.ants.alive[i] == 1 and sim.ants.caste[i] == CasteDefs.Caste.DRONE:
+				var c := Vector2i(sim.ants.pos[i] / cfg.cell_px)
+				if not sim.world.is_passable(c.x, c.y):
+					bad += 1
+	_check("los zánganos nunca pisan la tierra (van por los túneles)", bad == 0, "muestras dentro de la tierra: %d" % bad)
+	_check("los huevos no saltan hasta el zángano: lo recoge al llegar", jumps == 0, "saltos: %d" % jumps)
+
+
+## La estación se contaba con `(día - 1) % largo`: ganar la batalla en el último día hacía que la
+## siguiente estación empezara YA en su último día (otra oleada con otra reina al instante: "la reina
+## revive"), y una batalla larga le acortaba los días a la siguiente.
+func _t_seasons_last_full_length() -> void:
+	var cfg := _cfg()
+	cfg.season_days = [3, 4, 3, 3]  # cortas, para que la prueba no tarde (lo que importa es la cuenta)
+	var sim := Simulation.new(cfg, 21)
+	sim.spawn_incremental_start()
+	var per_day := int(cfg.day_length_s / sim.dt)
+	var guard := 0
+	while not sim.rival_colony.battle_active and guard < per_day * (cfg.season_days[0] + 1):
+		sim.tick()
+		guard += 1
+	var battle_day := sim.day_number()
+	_check("la primera batalla llega el último día de la estación", sim.rival_colony.battle_active and battle_day == cfg.season_days[0], "día %d" % battle_day)
+	sim.rival_colony.queen.take_damage(9999.0)
+	var new_battle := false
+	for t in 40:
+		sim.tick()
+		new_battle = new_battle or sim.rival_colony.battle_active
+	_check("ganarla el último día no trae otra oleada al instante", not new_battle and sim.season_index == 1)
+	_check("la reina rival no revive", not sim.rival_colony.queen.alive)
+	guard = 0
+	while not sim.rival_colony.battle_active and guard < per_day * (cfg.season_days[1] + 3):
+		sim.tick()
+		guard += 1
+	_check("la estación siguiente dura sus %d días completos (cada una tiene su propia duración)" % cfg.season_days[1],
+		sim.rival_colony.battle_active and sim.day_number() - battle_day == cfg.season_days[1],
+		"batalla 1 el día %d, batalla 2 el día %d" % [battle_day, sim.day_number()])
+	var copy := SaveSystem.from_dict(SaveSystem.to_dict(sim), cfg)
+	_check("guardar/cargar conserva el inicio de la estación", copy.season_start_day == sim.season_start_day)
+
+
+func _t_season_lengths() -> void:
+	var cfg := _cfg()
+	_check("las estaciones duran 20, 15, 25 y 15 días", cfg.season_days == [20, 15, 25, 15], str(cfg.season_days))
+
+
+## La araña seguía a su presa en línea recta cuando se metía por el pozo: entraba al nido a
+## través de la tierra. Caso forzado: la araña elige una obrera en la superficie, junto a la entrada,
+## y esa obrera baja por el pozo.
+func _t_spider_stays_on_surface() -> void:
+	var cfg := _cfg()
+	var sim := Simulation.new(cfg, 33)
+	sim.spawn_incremental_start()  # la araña actúa siempre en este modo; un solo soldado, no huye
+	sim.cmd_force_spider()
+	var surface_px := float(cfg.surface_y * cfg.cell_px)
+	var px := float(cfg.cell_px)
+	sim.spider.pos = Vector2((cfg.nest_x - 6 + 0.5) * px, (cfg.surface_y - 0.5) * px)
+	var bait := sim.ants.add_ant_at(Vector2i(cfg.nest_x, cfg.surface_y - 1))
+	sim.ants.hp[bait] = 1.0e6  # que no muera: lo que importa es a dónde la sigue la araña
+	var top := Vector2((cfg.nest_x + 0.5) * px, (cfg.surface_y - 0.5) * px)
+	# Arriba, junto a la entrada, hasta que la araña la elige como presa.
+	var guard := 0
+	while sim.spider.target_ant != bait and guard < 200:
+		sim.ants.pos[bait] = top
+		sim.ants.target[bait] = top
+		sim.tick()
+		guard += 1
+	var chosen := sim.spider.target_ant == bait
+	var lowest := 0.0
+	for t in 30 * cfg.tick_rate:
+		# Después baja por el pozo del nido y se queda adentro.
+		var depth := minf(float(cfg.shaft_depth), 0.5 + t / 10.0)
+		sim.ants.pos[bait] = Vector2(top.x, (cfg.surface_y + depth) * px)
+		sim.ants.target[bait] = sim.ants.pos[bait]
+		sim.tick()
+		if sim.spider.alive:
+			lowest = maxf(lowest, sim.spider.pos.y)
+	_check("la araña llegó a elegir a la obrera como presa (si no, la prueba no prueba nada)", chosen)
+	_check("la araña no sigue a su presa por el pozo (no entra al nido)", lowest < surface_px,
+		"y más baja %.0f px, superficie en %.0f px" % [lowest, surface_px])
+
+
+## Con la mejora de Vida comprada, una hormiga sana figuraba con 115 % (se medía contra la vida base).
+func _t_hp_percent_counts_upgrade() -> void:
+	var cfg := _cfg()
+	var sim := Simulation.new(cfg, 34)
+	sim.spawn_incremental_start()
+	sim.colony.food = 1.0e6
+	sim.cmd_buy_upgrade(Upgrades.Stat.HP)
+	sim.cmd_buy_upgrade(Upgrades.Stat.HP)
+	var w := sim.ants.add_ant_at(Vector2i(cfg.nest_x, cfg.surface_y + cfg.shaft_depth + 1))
+	var pct_new := 100.0 * sim.ants.hp[w] / sim.ants.max_hp(w)
+	var q := sim.queen_id
+	var pct_queen := 100.0 * sim.ants.hp[q] / sim.ants.max_hp(q)
+	_check("una hormiga sana con la mejora de Vida se ve al 100 %", is_equal_approx(pct_new, 100.0) and is_equal_approx(pct_queen, 100.0),
+		"nueva %.0f %%, reina %.0f %%" % [pct_new, pct_queen])

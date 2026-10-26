@@ -51,7 +51,12 @@ func step(dt: float) -> void:
 	var ants := sim.ants
 	match state:
 		State.SEARCH, State.ATTACK:
-			if target_ant < 0 or ants.alive[target_ant] == 0:
+			# Fase 17: si la presa se metió bajo tierra, la suelta (antes la seguía en línea recta
+			# por el pozo y a través de la tierra). La araña es de la superficie: al nido no entra; el
+			# daño a la reina ya lo modela el asedio en la entrada (`State.SIEGE`).
+			if target_ant >= 0 and (ants.alive[target_ant] == 0 or ants.pos[target_ant].y >= cfg.surface_y * cfg.cell_px):
+				target_ant = -1
+			if target_ant < 0:
 				target_ant = _find_prey()
 			if target_ant >= 0:
 				var to: Vector2 = ants.pos[target_ant] - pos
@@ -64,7 +69,8 @@ func step(dt: float) -> void:
 						state = State.SEARCH
 				else:
 					state = State.SEARCH
-					pos += to.normalized() * cfg.spider_speed * cfg.cell_px * dt
+					# Solo a lo largo de la superficie (nunca hacia abajo, a la tierra).
+					pos.x += signf(to.x) * minf(absf(to.x), cfg.spider_speed * cfg.cell_px * dt)
 			else:
 				var to_nest := float(cfg.nest_x * cfg.cell_px) - pos.x
 				if absf(to_nest) > float(cfg.cell_px):

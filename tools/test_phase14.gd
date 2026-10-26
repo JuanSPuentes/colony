@@ -132,7 +132,7 @@ func _sim_tests() -> void:
 	_check("sin lluvia automática", sim.rain_start_tick == -1)
 	sim.cmd_add_ants(cfg.inc_spider_first_population + 10)
 	# Saltar al último día de la primera estación: en Juego normal aquí empezaría la batalla.
-	sim.tick_count = int(cfg.day_length_s * (cfg.season_length_days - 1) / sim.dt) + 10
+	sim.tick_count = int(cfg.day_length_s * (cfg.season_days[0] - 1) / sim.dt) + 10
 	for i in 120:
 		sim.tick()
 	_check("sin araña aunque la población pase el umbral", sim.spiders_spawned == 0)
@@ -300,7 +300,7 @@ func _coach_tests() -> void:
 	for l in _main.hud._topbar_row.get_children():
 		if (l as Label).visible:
 			bar_text += (l as Label).text + " | "
-	_check("la barra de arriba muestra hormigas, comida, día y la próxima batalla", bar_text.contains("🐜") and bar_text.contains("🍃") and bar_text.contains("Día 1") and bar_text.contains("⚔ en 4 días"), bar_text)
+	_check("la barra de arriba muestra hormigas, comida, día y la próxima batalla", bar_text.contains("🐜") and bar_text.contains("🍃") and bar_text.contains("Día 1") and bar_text.contains("⚔ en %d días" % (_main.cfg.season_days[0] - 1)), bar_text)
 
 
 ## Mapa a pantalla completa: ningún zoom deja ver más allá del mundo (sin franjas negras).

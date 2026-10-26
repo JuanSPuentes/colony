@@ -117,6 +117,8 @@ var _mature_since_s := -1.0
 ## Reemplaza la condición de victoria de la Fase 8 (retirada): esto es lo que ahora decide
 ## `game_over`/`victory` para el modo incremental.
 var season_index := 0
+## Fase 17: día (`day_number()`) en que empezó la estación actual (ver `SeasonSystem.day_in_season`).
+var season_start_day := 1
 var rival_colony: RivalColony
 
 var _terrain_seen := -1
