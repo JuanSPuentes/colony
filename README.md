@@ -979,3 +979,19 @@ la siguiente empieza al día siguiente de ganar. Cada estación tiene su duraci�
 **Vida en %.** Se medía contra la vida base, sin la mejora de Vida: una hormiga sana con la mejora
 comprada figuraba con 115 % o más. Ahora se mide contra su vida máxima real (`AntSystem.max_hp`,
 la misma cuenta con la que nace), en el tooltip, el panel y la barra de arriba.
+
+## Fase 18-19: contador de hojas, árbol gigante y bolsones de hongos
+
+- **Contador sobre cada fuente** (`PlantView._draw_counters`): "quedan/máximo", verde con ▲ cuando
+  rebrota, rojo si está vacía. Se dibuja en píxeles del viewport para leerse igual con cualquier zoom.
+- **Árbol gigante** (`Plant.Kind.GIANT`, solo "Juego normal" con mapa al azar): 1-2 por partida, a
+  `giant_min_dist` celdas o más del nido, `giant_leaves_mult` veces más hojas y rebrote
+  `giant_regrow_mult` veces más rápido. Dibujado 2.3 veces más grande, verde profundo.
+- **Bolsones de hongos** (`Plant.Kind.MUSHROOM`): 3-5 cuevitas cerradas en la primera capa de tierra,
+  sin nada abierto a menos de 3 celdas, con un brillo verde, morado o azul que se ve a través de la
+  tierra. Hay que cavar hasta ellos; las obreras los descubren solos por túnel (aunque el nido siga
+  cerrado hacia arriba) y llegan siguiendo el camino real (`Mode.ROUTE`, BFS desde el bolsón,
+  recalculada solo cuando cambia el terreno). Rebrotan también de noche (`mushroom_regrow_per_s`).
+  Se guardan tipo, color y cueva.
+- Todo opcional: pruebas, Nivel 0 y `main.tscn` directo siguen con el mapa de siempre.
+- Pruebas: `tools/test_phase19.gd` (11).

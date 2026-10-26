@@ -69,7 +69,8 @@ func _t_fresh_layout_random_plants() -> void:
 		sim.spawn_incremental_start(true)
 		var xs: Array[int] = []
 		for p in sim.plants:
-			xs.append(p.cell.x)
+			if not p.is_mushroom():  # Fase 19: los hongos están bajo tierra, no se enciman con los árboles
+				xs.append(p.cell.x)
 		xs.sort()
 		for k in range(1, xs.size()):
 			min_gap = mini(min_gap, xs[k] - xs[k - 1])

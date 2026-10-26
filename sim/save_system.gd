@@ -160,7 +160,8 @@ static func to_dict(sim: Simulation) -> Dictionary:
 
 	var plants := []
 	for p in sim.plants:
-		plants.append({"cell": [p.cell.x, p.cell.y], "leaves": p.leaves, "max_leaves": p.max_leaves, "regrow_acc": p.regrow_acc})
+		plants.append({"cell": [p.cell.x, p.cell.y], "leaves": p.leaves, "max_leaves": p.max_leaves, "regrow_acc": p.regrow_acc, "kind": p.kind, "hue": p.hue,
+			"pocket": p.pocket.map(func(c: Vector2i) -> Array: return [c.x, c.y])})
 	d["plants"] = plants
 
 	var corpses := []
@@ -396,6 +397,10 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 		var p := Plant.new(Vector2i(int(cell[0]), int(cell[1])), int(pd["max_leaves"]))
 		p.leaves = int(pd["leaves"])
 		p.regrow_acc = float(pd.get("regrow_acc", 0.0))
+		p.kind = int(pd.get("kind", Plant.Kind.TREE)) as Plant.Kind
+		p.hue = int(pd.get("hue", 0))
+		for c in pd.get("pocket", []):
+			p.pocket.append(Vector2i(int(c[0]), int(c[1])))
 		sim.plants.append(p)
 
 	sim.corpses.clear()

@@ -10,7 +10,7 @@ extends RefCounted
 ## aditivos: si nada pinta esas feromonas (como en la Fase 0) nunca se activan.
 
 enum State { EXPLORE, GO_TO_FOOD, CARRY_HOME, DIG, FLEE_WATER, IDLE, FLEE_DANGER, EVACUATE, NURSE, GUARD, ATTACK, CARRY_EGG }
-enum Mode { EXPLORE, FOOD, NEST, DIG, FLEE, PLANT, TOWARD, AWAY, STORE }
+enum Mode { EXPLORE, FOOD, NEST, DIG, FLEE, PLANT, TOWARD, AWAY, STORE, ROUTE }
 
 const STATE_COLORS: Array[Color] = [
 	Color("e6d84a"),  # EXPLORE
@@ -580,7 +580,7 @@ func _think_idle(i: int, cx: int, cy: int, ci: int, think_dt: float) -> void:
 	if sim.world.marked_count > 0 and diggers < can_dig and sim.fields.dig_dist[ci] < FAR:
 		state[i] = State.DIG
 		state_counts[State.DIG] += 1
-	elif (sim.total_leaves_left > 0 or not sim.corpses.is_empty()) and sim.fields.surface_dist[ci] < FAR:
+	elif (sim.total_leaves_left > 0 or not sim.corpses.is_empty()) and (sim.fields.surface_dist[ci] < FAR or _reachable_mushroom(ci)):
 		# Punto 4: hay que salir a EXPLORE también si solo quedan cadáveres por recoger (sin hojas),
 		# si no, `_corpse_logic` (que solo se llama desde EXPLORE/GO_TO_FOOD) nunca se evalúa y la
 		# colonia deja de recoger restos para siempre en cuanto se agotan las hojas.
@@ -642,6 +642,13 @@ func _plant_near(i: int) -> Plant:
 		if pl.leaves <= 0:
 			continue
 		var d := p.distance_to(_center(pl.cell.x, pl.cell.y))
+		if pl.is_mushroom():
+			# Fase 19: un bolsón cuenta por el camino real por túnel, no en línea recta a través
+			# de la tierra (si no hay túnel hasta él, no se ve).
+			var rc := mushroom_route(pl)[_cell_index(p)]
+			if rc >= FAR:
+				continue
+			d = float(rc * cfg.cell_px)
 		if d < best_d:
 			best_d = d
 			best = pl
@@ -666,8 +673,27 @@ func _plant_logic(i: int, cx: int, cy: int, ci: int) -> bool:
 		_step(i, cx, cy, ci, Mode.NEST, null)
 		return true
 	state[i] = State.GO_TO_FOOD
-	_step(i, cx, cy, ci, Mode.PLANT, pc)
+	_go_to_plant(i, cx, cy, ci, pl)
 	return true
+
+
+## Fase 19: los árboles se buscan en línea recta por la superficie (como siempre); los hongos,
+## siguiendo el camino por los túneles (`Mode.ROUTE`), que en un túnel con curvas no se traba.
+func _go_to_plant(i: int, cx: int, cy: int, ci: int, pl: Plant) -> void:
+	if pl.is_mushroom():
+		_step(i, cx, cy, ci, Mode.ROUTE, mushroom_route(pl))
+	else:
+		_step(i, cx, cy, ci, Mode.PLANT, _center(pl.cell.x, pl.cell.y))
+
+
+## Fase 19: distancia por túnel hasta un bolsón de hongos, recalculada solo cuando cambia el
+## terreno (se cava o se tapa algo). FAR = no hay camino.
+func mushroom_route(pl: Plant) -> PackedInt32Array:
+	if pl.route_version != sim.world.passable_version or pl.route.is_empty():
+		var src: Array[int] = [pl.cell.y * sim.world.w + pl.cell.x]
+		pl.route = sim.fields.bfs_from(src)
+		pl.route_version = sim.world.passable_version
+	return pl.route
 
 
 ## Fase 3 (solo modo incremental): la colonia recuerda las plantas de las que ya sacó hojas y las
@@ -676,23 +702,36 @@ func _plant_logic(i: int, cx: int, cy: int, ci: int) -> bool:
 ## la planta (las obreras quedaban dando vueltas junto al nido); con 100 hormigas, como en las
 ## Fases 0-2, no hacía falta. Si ninguna conocida tiene hojas, se explora como siempre.
 func _remembered_plant(i: int, cx: int, cy: int, ci: int) -> bool:
-	if not sim.incremental or cy >= sim.cfg.surface_y:
+	if not sim.incremental:
 		return false
+	# Fase 19: los bolsones de hongos conectados por túnel se "conocen" solos (están bajo el nido,
+	# las obreras los encuentran cavando) y se buscan también desde abajo; los árboles, como antes,
+	# solo desde la superficie y si ya se sacó alguna hoja de ahí.
+	var underground := cy >= sim.cfg.surface_y
 	var known := sim.econ.known_plants
 	var best: Plant = null
 	var best_d := INF
 	for k in sim.plants.size():
 		var pl := sim.plants[k]
-		if known[k] == 0 or pl.leaves <= 0:
+		if pl.leaves <= 0:
 			continue
-		var d := absf(pos[i].x - _center(pl.cell.x, pl.cell.y).x)
+		var d := INF
+		if pl.is_mushroom():
+			var rc := mushroom_route(pl)[ci]
+			if rc >= FAR:
+				continue
+			d = float(rc * sim.cfg.cell_px)
+		else:
+			if underground or known[k] == 0:
+				continue
+			d = absf(pos[i].x - _center(pl.cell.x, pl.cell.y).x)
 		if d < best_d:
 			best_d = d
 			best = pl
 	if best == null:
 		return false
 	state[i] = State.GO_TO_FOOD
-	_step(i, cx, cy, ci, Mode.PLANT, _center(best.cell.x, best.cell.y))
+	_go_to_plant(i, cx, cy, ci, best)
 	return true
 
 
@@ -708,7 +747,7 @@ func _think_explore(i: int, cx: int, cy: int, ci: int) -> void:
 	# Fase 17: sin salida a la superficie (nido cerrado) no hay nada que explorar: a descansar, que
 	# desde ahí se elige cavar. Antes las obreras iniciales de Juego normal salían a explorar antes de
 	# que el jugador marcara nada y quedaban atrapadas así, sin cavar lo que se marcaba después.
-	if sim.fields.surface_dist[ci] >= FAR:
+	if sim.fields.surface_dist[ci] >= FAR and not _reachable_mushroom(ci):
 		state[i] = State.IDLE
 		timer[i] = 0.5
 		target[i] = pos[i]
@@ -915,8 +954,11 @@ func _step(i: int, cx: int, cy: int, ci: int, mode: int, extra: Variant) -> void
 	var on_surface := cy < cfg.surface_y
 	var plant_pos := Vector2.ZERO
 	var field: PheromoneField = null
+	var route := PackedInt32Array()  # Fase 19: Mode.ROUTE (camino por túneles hasta un bolsón)
 	if mode == Mode.PLANT:
 		plant_pos = extra
+	elif mode == Mode.ROUTE:
+		route = extra
 	elif mode == Mode.TOWARD or mode == Mode.AWAY:
 		field = extra
 	for k in 8:
@@ -978,6 +1020,10 @@ func _step(i: int, cx: int, cy: int, ci: int, mode: int, extra: Variant) -> void
 				s = -_center(nx, ny).distance_to(plant_pos) / cfg.cell_px + 0.1 * rng.randf()
 				if on_surface and ny >= cfg.surface_y:
 					s -= 2.0
+			Mode.ROUTE:
+				if route[ni] >= FAR:
+					continue
+				s = float(route[ci] - route[ni]) * 2.0 + 0.2 * rng.randf()
 			Mode.TOWARD:
 				s = (field.get_v(nx, ny) - field.get_v(cx, cy)) * 10.0
 				s += cfg.w_persist * 0.3 * head.dot(_dirs[k]) + 0.2 * rng.randf()
@@ -1119,3 +1165,14 @@ class AntRef:
 		_ants.hp[_idx] -= amount
 		if _ants.hp[_idx] <= 0.0:
 			_ants._kill(_idx, false)
+
+
+## Fase 19: ¿hay algún bolsón de hongos con hongos al que se pueda llegar por túnel desde acá? Con
+## el nido todavía cerrado, eso es lo único que vale la pena "explorar".
+func _reachable_mushroom(ci: int) -> bool:
+	if not sim.incremental:
+		return false
+	for pl in sim.plants:
+		if pl.is_mushroom() and pl.leaves > 0 and mushroom_route(pl)[ci] < FAR:
+			return true
+	return false

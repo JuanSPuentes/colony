@@ -25,6 +25,11 @@ const DIR_TEXTURES: Array[Texture2D] = [
 const TREE_SIZE := Vector2(46.0, 46.0)
 const SIZE_VARIATION_MIN := 0.7
 const SIZE_VARIATION_MAX := 1.35
+## Fase 19: árbol gigante — mucho más grande que el más grande de los normales, verde profundo.
+const GIANT_SCALE := 2.3
+const GIANT_TINT := Color(0.24, 0.6, 0.27)
+## Fase 19: colores de los bolsones de hongos (verde, morado, azul): brillan para que se noten.
+const MUSHROOM_HUES: Array[Color] = [Color(0.45, 1.0, 0.4), Color(0.78, 0.42, 1.0), Color(0.35, 0.75, 1.0)]
 ## Igual que antes: con pocas hojas la planta se ve más chica, nunca por debajo de este piso para
 ## que siga siendo reconocible como árbol y no un brote.
 const MIN_SCALE := 0.45
@@ -39,6 +44,29 @@ const LEAF_TINTS: Array[Color] = [
 	Color(0.20, 0.48, 0.30), Color(0.62, 0.74, 0.26), Color(0.86, 0.56, 0.20),
 ]
 const TREE_SHADER := preload("res://view/tree_color.gdshader")
+## Fase 19: sprites del árbol gigante (8 vistas, mismo orden que `DIR_TEXTURES`).
+const GIANT_TEXTURES: Array[Texture2D] = [
+	preload("res://view/sprites/giant_tree/east.png"), preload("res://view/sprites/giant_tree/south-east.png"),
+	preload("res://view/sprites/giant_tree/south.png"), preload("res://view/sprites/giant_tree/south-west.png"),
+	preload("res://view/sprites/giant_tree/west.png"), preload("res://view/sprites/giant_tree/north-west.png"),
+	preload("res://view/sprites/giant_tree/north.png"), preload("res://view/sprites/giant_tree/north-east.png"),
+]
+## Fase 19: hongos — hongo grande y racimo, 8 vistas de cada uno (16 variantes), en escala de
+## grises: el color lo pone el bolsón al dibujarlos.
+const MUSHROOM_TEXTURES: Array[Texture2D] = [
+	preload("res://view/sprites/mushroom_big/east.png"), preload("res://view/sprites/mushroom_big/south-east.png"),
+	preload("res://view/sprites/mushroom_big/south.png"), preload("res://view/sprites/mushroom_big/south-west.png"),
+	preload("res://view/sprites/mushroom_big/west.png"), preload("res://view/sprites/mushroom_big/north-west.png"),
+	preload("res://view/sprites/mushroom_big/north.png"), preload("res://view/sprites/mushroom_big/north-east.png"),
+	preload("res://view/sprites/mushroom_cluster/east.png"), preload("res://view/sprites/mushroom_cluster/south-east.png"),
+	preload("res://view/sprites/mushroom_cluster/south.png"), preload("res://view/sprites/mushroom_cluster/south-west.png"),
+	preload("res://view/sprites/mushroom_cluster/west.png"), preload("res://view/sprites/mushroom_cluster/north-west.png"),
+	preload("res://view/sprites/mushroom_cluster/north.png"), preload("res://view/sprites/mushroom_cluster/north-east.png"),
+]
+## Tamaño de cada hongo en celdas (la cueva mide 2 de alto): varía entre estos dos.
+const MUSHROOM_SIZE_MIN := 0.95
+const MUSHROOM_SIZE_MAX := 1.85
+const MUSHROOM_SHADER := preload("res://view/mushroom_color.gdshader")
 
 var sim: Simulation
 
@@ -47,6 +75,61 @@ func _ready() -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = TREE_SHADER
 	material = mat
+	# Fase 18: contador de hojas encima de cada árbol. Nodo hijo aparte porque el shader de los
+	# árboles (`material`) también teñiría el texto; el hijo no lo hereda (`use_parent_material`
+	# es false por defecto) y va por encima de las hormigas para que siempre se lea.
+	_counters = Node2D.new()
+	_counters.z_index = 3
+	add_child(_counters)
+	_counters.draw.connect(_draw_counters)
+	_mushrooms = Node2D.new()
+	add_child(_mushrooms)
+	_mushrooms.draw.connect(_draw_mushrooms)
+	# Los sprites de hongo van en otro hijo con su propio shader (el brillo y la cueva no lo llevan).
+	_mushroom_sprites = Node2D.new()
+	var mmat := ShaderMaterial.new()
+	mmat.shader = MUSHROOM_SHADER
+	_mushroom_sprites.material = mmat
+	add_child(_mushroom_sprites)
+	_mushroom_sprites.draw.connect(_draw_mushroom_sprites)
+
+
+var _counters: Node2D
+var _mushrooms: Node2D
+var _mushroom_sprites: Node2D
+const COUNTER_FONT_VP := 9  # tamaño en píxeles del viewport del mundo (constante con cualquier zoom)
+const COUNTER_FULL := Color(0.92, 1.0, 0.86)
+const COUNTER_EMPTY := Color(1.0, 0.55, 0.45)
+const COUNTER_GROW := Color(0.55, 1.0, 0.5)
+
+
+## Fase 18: "hojas que quedan / máximo" sobre cada árbol, con ▲ cuando está rebrotando (de día y
+## sin llegar a su máximo, solo en el modo incremental, que es donde rebrotan).
+func _draw_counters() -> void:
+	if sim == null:
+		return
+	# Se dibuja en píxeles del viewport (no del mundo): con zoom el texto no se agranda borroso, se
+	# dibuja nítido y siempre del mismo tamaño en pantalla.
+	var cs := get_canvas_transform().get_scale().x
+	_counters.draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0 / cs, 1.0 / cs))
+	var font := ThemeDB.fallback_font
+	var fs := COUNTER_FONT_VP
+	var cpx := sim.cfg.cell_px
+	var growing_now := sim.incremental and not DayNight.is_night(sim.time_s(), sim.cfg)
+	for p in sim.plants:
+		var top := _top_of(p)
+		var grows_now := sim.incremental and (p.is_mushroom() or growing_now)
+		var growing := grows_now and p.leaves < p.max_leaves
+		var text := "%d/%d%s" % [p.leaves, p.max_leaves, " ▲" if growing else ""]
+		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var pos := top * cs + Vector2(-w * 0.5, -4.0)
+		var col := COUNTER_EMPTY if p.leaves == 0 else (COUNTER_GROW if growing else COUNTER_FULL)
+		draw_string_outline_on(_counters, font, pos, text, fs, 3, Color(0, 0, 0, 0.85))
+		_counters.draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
+
+
+static func draw_string_outline_on(ci: CanvasItem, font: Font, pos: Vector2, text: String, fs: int, size: int, col: Color) -> void:
+	ci.draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, size, col)
 
 
 func setup(s: Simulation) -> void:
@@ -60,6 +143,10 @@ static func _tint_for_cell(cell: Vector2i) -> Color:
 
 func _process(_delta: float) -> void:
 	queue_redraw()
+	if _counters != null:
+		_counters.queue_redraw()
+		_mushrooms.queue_redraw()
+		_mushroom_sprites.queue_redraw()
 
 
 ## Rotación fija por celda (hash simple, sin estado): dos plantas en la misma celda siempre eligen
@@ -77,15 +164,88 @@ static func _size_for_cell(cell: Vector2i) -> float:
 	return lerpf(SIZE_VARIATION_MIN, SIZE_VARIATION_MAX, float(h) / 999.0)
 
 
+## Fase 19: tamaño en el mundo de un árbol (normal o gigante) según sus hojas.
+func _tree_size(p: Plant) -> Vector2:
+	var frac := float(p.leaves) / float(p.max_leaves)
+	var s := TREE_SIZE * maxf(frac, MIN_SCALE)
+	if p.kind == Plant.Kind.GIANT:
+		return s * GIANT_SCALE
+	return s * _size_for_cell(p.cell)
+
+
+## Fase 19: punto de arriba de cada fuente (donde va su contador).
+func _top_of(p: Plant) -> Vector2:
+	var cpx := sim.cfg.cell_px
+	if p.is_mushroom():
+		var min_y := p.cell.y
+		for c in p.pocket:
+			min_y = mini(min_y, c.y)
+		return Vector2((p.cell.x + 0.5) * cpx, min_y * cpx - 2.0)
+	var size := _tree_size(p)
+	return Vector2((p.cell.x + 0.5) * cpx, (p.cell.y + 1) * cpx + size.y * SINK_FRACTION - size.y)
+
+
 func _draw() -> void:
 	if sim == null:
 		return
 	var cpx := sim.cfg.cell_px
 	for p in sim.plants:
-		var frac := float(p.leaves) / float(p.max_leaves)
-		var scale := maxf(frac, MIN_SCALE)
-		var size := TREE_SIZE * scale * _size_for_cell(p.cell)
+		if p.is_mushroom():
+			continue  # los dibuja `_mushrooms` (sin el shader de los árboles)
+		var size := _tree_size(p)
 		var base := Vector2((p.cell.x + 0.5) * cpx, (p.cell.y + 1) * cpx)
-		var tex := DIR_TEXTURES[_dir_for_cell(p.cell)]
+		var tex: Texture2D = GIANT_TEXTURES[_dir_for_cell(p.cell)] if p.kind == Plant.Kind.GIANT else DIR_TEXTURES[_dir_for_cell(p.cell)]
 		base.y += size.y * SINK_FRACTION
-		draw_texture_rect(tex, Rect2(base - Vector2(size.x * 0.5, size.y), size), false, _tint_for_cell(p.cell))
+		var tint := GIANT_TINT if p.kind == Plant.Kind.GIANT else _tint_for_cell(p.cell)
+		draw_texture_rect(tex, Rect2(base - Vector2(size.x * 0.5, size.y), size), false, tint)
+
+
+## Fase 19: bolsones de hongos. Un brillo de color (verde, morado o azul) que se ve a través de la
+## tierra alrededor de la cueva — la pista de que ahí hay algo antes de cavar — y hongos con
+## sombrero de ese color que se van achicando en cantidad a medida que se cosechan (los hongos en
+## sí los dibuja `_draw_mushroom_sprites`, con su shader).
+func _draw_mushrooms() -> void:
+	if sim == null:
+		return
+	var cpx := float(sim.cfg.cell_px)
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 600.0)
+	for p in sim.plants:
+		if not p.is_mushroom():
+			continue
+		var col: Color = MUSHROOM_HUES[p.hue % MUSHROOM_HUES.size()]
+		# Halo a través de la tierra (más grande y tenue) y la cueva iluminada.
+		for c in p.pocket:
+			var center := Vector2((c.x + 0.5) * cpx, (c.y + 0.5) * cpx)
+			_mushrooms.draw_circle(center, cpx * 1.9, Color(col, 0.07 + 0.05 * pulse))
+		for c in p.pocket:
+			_mushrooms.draw_rect(Rect2(c.x * cpx, c.y * cpx, cpx, cpx), Color(col.darkened(0.55), 0.55))
+
+
+## Fase 19: sprites de hongo (grande y racimo) sobre el piso de cada bolsón: tantos como le queden
+## (uno por celda del piso como máximo). Cada uno elige sprite, vista, tamaño y una variación del
+## color del bolsón por su celda (hash sin estado, se ve igual tras guardar/cargar). El color lo
+## aplica `mushroom_color.gdshader` sobre el gris del sprite.
+func _draw_mushroom_sprites() -> void:
+	if sim == null:
+		return
+	var cpx := float(sim.cfg.cell_px)
+	for p in sim.plants:
+		if not p.is_mushroom():
+			continue
+		var col: Color = MUSHROOM_HUES[p.hue % MUSHROOM_HUES.size()]
+		var floor_cells: Array[Vector2i] = []
+		for c in p.pocket:
+			if c.y == p.cell.y:
+				floor_cells.append(c)
+		var shown := int(ceil(float(floor_cells.size()) * float(p.leaves) / float(p.max_leaves)))
+		for k in mini(shown, floor_cells.size()):
+			var c := floor_cells[k]
+			var h := absi(c.x * 73856093 + c.y * 19349663 + k * 83492791)
+			var tex: Texture2D = MUSHROOM_TEXTURES[h % MUSHROOM_TEXTURES.size()]
+			var s := cpx * lerpf(MUSHROOM_SIZE_MIN, MUSHROOM_SIZE_MAX, float((h / 7) % 100) / 99.0)
+			var other: Color = MUSHROOM_HUES[(p.hue + 1 + (h / 11) % 2) % MUSHROOM_HUES.size()]
+			var mcol := col.lerp(other, 0.2 * float((h / 13) % 3))
+			mcol = mcol.lightened(0.08) if (h / 17) % 2 == 0 else mcol.darkened(0.15)
+			var bx := (c.x + 0.5) * cpx
+			var by := (c.y + 1) * cpx + 0.5
+			_mushroom_sprites.draw_texture_rect(tex, Rect2(bx - s * 0.5, by - s, s, s), false, mcol)

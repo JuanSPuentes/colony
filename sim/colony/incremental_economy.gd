@@ -122,13 +122,23 @@ func tick(dt: float) -> void:
 
 
 ## Las plantas rebrotan de día, hasta su máximo (si no, el modo incremental se quedaría sin hojas).
+## Fase 19: el gigante rebrota `giant_regrow_mult` veces más rápido; los hongos no necesitan sol
+## (rebrotan también de noche, a su propio ritmo) — de noche son la única fuente que crece.
 func regrow_plants(dt: float) -> void:
-	if DayNight.is_night(sim.time_s(), sim.cfg):
-		return
+	var night := DayNight.is_night(sim.time_s(), sim.cfg)
+	var cfg := sim.cfg
 	for p in sim.plants:
 		if p.leaves >= p.max_leaves:
 			continue
-		p.regrow_acc += sim.cfg.inc_plant_regrow_per_s * dt
+		var rate := cfg.inc_plant_regrow_per_s
+		match p.kind:
+			Plant.Kind.MUSHROOM:
+				rate = cfg.mushroom_regrow_per_s
+			Plant.Kind.GIANT:
+				rate *= cfg.giant_regrow_mult
+		if night and p.kind != Plant.Kind.MUSHROOM:
+			continue
+		p.regrow_acc += rate * dt
 		if p.regrow_acc >= 1.0:
 			p.regrow_acc -= 1.0
 			p.leaves += 1

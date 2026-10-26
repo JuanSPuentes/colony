@@ -344,8 +344,92 @@ func _place_plants_random() -> void:
 		var leaves := cfg.leaves_per_plant + rng.randi_range(-10, 15)
 		plants.append(Plant.new(Vector2i(x, cfg.surface_y - 1), leaves))
 		total_leaves_left += leaves
+	_place_giants(used)
+	_carve_mushroom_pockets()
 	econ.known_plants = PackedByteArray()
 	econ.known_plants.resize(plants.size())
+
+
+## Fase 19: 1-2 árboles gigantes, lejos del nido (`giant_min_dist`), con mucho más para cosechar.
+func _place_giants(used: Array[int]) -> void:
+	var n := rng.randi_range(cfg.giant_count_min, cfg.giant_count_max)
+	var placed := 0
+	var tries := 0
+	while placed < n and tries < 300:
+		tries += 1
+		var x := rng.randi_range(4, world.w - 5)
+		if absi(x - cfg.nest_x) < cfg.giant_min_dist:
+			continue
+		var clash := false
+		for ux in used:
+			if absi(ux - x) < 7:
+				clash = true
+				break
+		if clash:
+			continue
+		used.append(x)
+		var leaves := int(round(cfg.leaves_per_plant * cfg.giant_leaves_mult))
+		var g := Plant.new(Vector2i(x, cfg.surface_y - 1), leaves)
+		g.kind = Plant.Kind.GIANT
+		plants.append(g)
+		total_leaves_left += leaves
+		placed += 1
+
+
+## Fase 19: cuevitas cerradas en la primera capa de tierra con un bolsón de hongos cada una. Se
+## abren (TUNNEL) pero sin conexión al nido: hasta que el jugador cave hasta ahí, nadie llega.
+func _carve_mushroom_pockets() -> void:
+	var n := rng.randi_range(cfg.mushroom_pockets_min, cfg.mushroom_pockets_max)
+	var layer_bottom := cfg.surface_y + int((world.h - cfg.surface_y) * 0.28)
+	var nest_bottom := cfg.surface_y + cfg.shaft_depth + cfg.chamber_h + 2
+	var made := 0
+	var tries := 0
+	var taken: Array[Rect2i] = []
+	while made < n and tries < 400:
+		tries += 1
+		var pw := rng.randi_range(3, 5)
+		var ph := 2
+		var x := rng.randi_range(3, world.w - pw - 3)
+		var y := rng.randi_range(cfg.surface_y + 4, layer_bottom - ph)
+		var r := Rect2i(x, y, pw, ph)
+		if absi(x + pw / 2 - cfg.nest_x) < cfg.chamber_w + 4 and y < nest_bottom:
+			continue
+		var ok := true
+		for t in taken:
+			if t.grow(4).intersects(r):
+				ok = false
+				break
+		if not ok:
+			continue
+		for yy in range(y, y + ph):
+			for xx in range(x, x + pw):
+				if world.cells[yy * world.w + xx] == WorldGrid.Cell.ROCK:
+					ok = false
+		# Cerrado de verdad: nada abierto (nido, cámaras, otros túneles) a menos de 3 celdas, para
+		# que haya que cavar hasta él.
+		for yy in range(y - 3, y + ph + 3):
+			for xx in range(x - 3, x + pw + 3):
+				if world.in_bounds(xx, yy) and yy >= cfg.surface_y and world.is_open(xx, yy):
+					ok = false
+		if not ok:
+			continue
+		taken.append(r)
+		var mush := Plant.new(Vector2i(x + pw / 2, y + ph - 1), cfg.mushroom_pieces)
+		mush.kind = Plant.Kind.MUSHROOM
+		mush.hue = rng.randi_range(0, 2)
+		for yy in range(y, y + ph):
+			for xx in range(x, x + pw):
+				var i := yy * world.w + xx
+				world.cells[i] = WorldGrid.Cell.TUNNEL
+				world.changed.append(i)
+				mush.pocket.append(Vector2i(xx, yy))
+		plants.append(mush)
+		total_leaves_left += cfg.mushroom_pieces
+		made += 1
+	world.passable_version += 1
+	world.jobs_version += 1
+	fields.recompute_terrain()
+	fields.recompute_dig()
 
 
 func time_s() -> float:

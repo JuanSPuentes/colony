@@ -246,6 +246,19 @@ extends Resource
 @export var inc_rain_first_s := 600.0
 ## Hojas que rebrota cada planta por segundo, solo de día y hasta su máximo.
 @export var inc_plant_regrow_per_s := 0.06
+## Fase 19: árbol gigante (solo "Juego normal" con mapa al azar). Lejos del nido, muchas más hojas y
+## rebrote más rápido: vale la pena un rastro largo y defenderlo.
+@export var giant_count_min := 1
+@export var giant_count_max := 2
+@export var giant_min_dist := 28
+@export var giant_leaves_mult := 4.0
+@export var giant_regrow_mult := 2.5
+## Fase 19: bolsones de hongos en la primera capa de tierra (solo "Juego normal" con mapa al azar).
+## Cerrados al empezar: hay que cavar hasta ellos. Rebrotan también de noche.
+@export var mushroom_pockets_min := 3
+@export var mushroom_pockets_max := 5
+@export var mushroom_pieces := 30
+@export var mushroom_regrow_per_s := 0.05
 
 ## Fase 9: estaciones y colonia rival del modo incremental (reemplaza la condición de victoria de
 ## la Fase 8, retirada — ver README sección 15/16). 4 estaciones fijas (`SeasonSystem.SEASON_COUNT`);
