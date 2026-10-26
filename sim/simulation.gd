@@ -37,6 +37,9 @@ var attack: PheromoneField
 var evacuate: PheromoneField
 var water: WaterSim
 var fields: NestDistanceField
+## Fase 24: niebla bajo tierra. null salvo en "Juego normal" con mapa al azar (las pruebas, el
+## Nivel 0 y los otros modos ven todo, como siempre).
+var fog: Fog
 var ants: AntSystem
 var plants: Array[Plant] = []
 ## Punto 4: restos de hormigas y amenazas muertas, recolectables por obreras (ver `AntSystem`).
@@ -192,6 +195,7 @@ func spawn_incremental_start(fresh_layout := false) -> void:
 		_seal_shaft()
 		_carve_side_chambers()
 		_place_plants_random()
+		enable_fog()
 	# Arranca el reloj ya pasado el amanecer (`DayNight.FADE`): a tick_count=0 el mundo se ve casi
 	# negro un instante (el amanecer empieza oscuro y se aclara), aunque `is_night()` ya dé "de
 	# día" — así la partida se ve a pleno día desde el primer frame, no a mitad de esa animación.
@@ -494,6 +498,8 @@ func tick() -> void:
 	if world.passable_version != _terrain_seen:
 		_terrain_seen = world.passable_version
 		fields.recompute_terrain()
+		if fog != null:
+			fog.update(world, fields, cfg.surface_y)
 		_dig_dirty = true
 	if world.jobs_version != _jobs_seen:
 		_jobs_seen = world.jobs_version
@@ -877,3 +883,15 @@ func _rain_interval_s() -> float:
 	if incremental:
 		return rng.randf_range(cfg.inc_rain_interval_min_s, cfg.inc_rain_interval_max_s)
 	return cfg.rain_interval_s
+
+
+## Fase 24: activa la niebla bajo tierra (Juego normal con mapa al azar; también al cargar una
+## partida que la tenía). Se calcula del terreno actual.
+func enable_fog() -> void:
+	fog = Fog.new(world.w * world.h)
+	fog.update(world, fields, cfg.surface_y)
+
+
+## Fase 24: ¿la colonia ya descubrió este bolsón de hongos? Sin niebla, siempre.
+func is_discovered(pl: Plant) -> bool:
+	return fog == null or fog.any_revealed(pl.pocket, world.w)

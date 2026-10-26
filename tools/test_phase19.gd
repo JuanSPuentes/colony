@@ -14,6 +14,8 @@ func _initialize() -> void:
 	_t_regrow_rules()
 	_t_save_load_keeps_kinds()
 	_t_flooded_pocket_is_skipped()
+	_t_fog()
+	_t_trees_first()
 	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -184,3 +186,46 @@ func _t_flooded_pocket_is_skipped() -> void:
 	for t in int(60.0 * sim.cfg.tick_rate):
 		sim.tick()
 	_check("cuando baja el agua, vuelven a cosechar el bolsón", m.max_leaves - m.leaves > taken0, "tomados antes=%d después=%d" % [taken0, m.max_leaves - m.leaves])
+
+
+## Fase 24: niebla bajo tierra. Los bolsones arrancan sin descubrir y se descubren al cavar cerca.
+func _t_fog() -> void:
+	var sim := _fresh(7)
+	var w := sim.world
+	_check("hay niebla en Juego normal con mapa al azar", sim.fog != null)
+	var hidden := true
+	for m in _of_kind(sim, Plant.Kind.MUSHROOM):
+		hidden = hidden and not sim.is_discovered(m)
+	_check("los bolsones arrancan ocultos", hidden)
+	var nest_i: int = (sim.cfg.surface_y + sim.cfg.shaft_depth + 1) * w.w + sim.cfg.nest_x
+	_check("el nido y la superficie se ven", sim.fog.is_revealed(nest_i) and sim.fog.is_revealed((sim.cfg.surface_y - 1) * w.w + 3))
+	var m := _nearest_pocket(sim)
+	_connect(sim, m)
+	sim.tick()
+	_check("al cavar hasta el bolsón, se descubre", sim.is_discovered(m))
+	var back := SaveSystem.from_dict(SaveSystem.to_dict(sim), sim.cfg)
+	_check("guardar/cargar conserva la niebla", back.fog != null and back.is_discovered(back.plants[sim.plants.find(m)]))
+	var classic := Simulation.new(_cfg(), 7)
+	classic.spawn_incremental_start()
+	_check("sin mapa al azar no hay niebla (se ve todo)", classic.fog == null)
+
+
+## Fase 24: primero lo de arriba. Con árboles con hojas, de día y con salida a la superficie, las
+## obreras no van a los hongos aunque estén más cerca; de noche sí.
+func _t_trees_first() -> void:
+	var sim := _fresh(7)
+	var m := _nearest_pocket(sim)
+	_connect(sim, m)
+	# Abrir el pozo hacia la superficie (el nido arranca cerrado en este modo).
+	var w := sim.world
+	for y in range(sim.cfg.surface_y, sim.cfg.surface_y + sim.cfg.shaft_depth):
+		w.cells[y * w.w + sim.cfg.nest_x] = WorldGrid.Cell.TUNNEL
+	w.passable_version += 1
+	sim.tick_count = int(0.1 * sim.cfg.day_length_s / sim.dt)
+	for i in int(60.0 * sim.cfg.tick_rate):
+		sim.tick()
+	_check("de día y con árboles con hojas, no se comen los hongos", m.leaves == m.max_leaves, "hongos tomados=%d" % (m.max_leaves - m.leaves))
+	sim.tick_count = int(0.65 * sim.cfg.day_length_s / sim.dt)
+	for i in int(60.0 * sim.cfg.tick_rate):
+		sim.tick()
+	_check("de noche (los árboles no rebrotan) sí van a los hongos", m.leaves < m.max_leaves, "hongos tomados=%d" % (m.max_leaves - m.leaves))

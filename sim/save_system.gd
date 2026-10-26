@@ -50,6 +50,7 @@ static func to_dict(sim: Simulation) -> Dictionary:
 	d["test_mode"] = sim.test_mode
 	# Fase 14: Nivel 0.
 	d["tutorial_level"] = sim.tutorial_level
+	d["fog"] = sim.fog != null
 	d["tutorial_battle_started"] = sim.tutorial_battle_started
 	d["econ"] = {
 		"bought_eggs": sim.econ.bought_eggs,
@@ -418,6 +419,9 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	sim.rooms._seen_rooms_version = -1
 	sim.rooms._seen_terrain_recomputes = -1
 	sim.rooms.maybe_recompute()
+	# Fase 24: la niebla también es derivada del terreno.
+	if bool(d.get("fog", false)):
+		sim.enable_fog()
 	ants._recount()
 	return sim
 

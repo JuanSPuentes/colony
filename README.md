@@ -1014,3 +1014,21 @@ Separado en tres piezas, cada una con una sola responsabilidad:
 - **`view/dig_effects_view.gd` (`DigEffectsView`):** grietas en 3 etapas sobre lo que se está
   cavando según `job_progress`, y la tierra que se desprende en partículas al terminar la celda.
   Solo lee la simulación.
+
+## Fase 21-24: agua, lluvia, niebla bajo tierra y prioridad de la comida
+
+- **El agua corta caminos de verdad:** `dig_dist` y el camino a los bolsones de hongos
+  (`AntSystem.mushroom_route`) tratan el agua profunda como pared y se recalculan mientras haya
+  agua (`Simulation.water_epoch`). Si la lluvia corta el único camino, las obreras no se traban:
+  buscan comida en otro lado y vuelven cuando el agua baja.
+- **Menos lluvia en Juego normal:** la próxima llega a 1,5-2,5 días (`inc_rain_interval_min_s`/
+  `max_s`, al azar). Antes llovía cada 200 s con días de 300 s y el agua (que tarda ~2,75 min en
+  secarse) casi no llegaba a irse.
+- **Niebla bajo tierra** (`sim/core/fog.gd`, `view/fog_view.gd`; solo Juego normal con mapa al
+  azar): se ve la superficie y lo que está a 2 celdas de un hueco al que se puede llegar; lo
+  descubierto queda. Un bolsón de hongos recién existe para las obreras cuando se descubre. Si un
+  túnel pasa a 5 celdas o menos de un bolsón oculto, titilan unas esporas de su color sobre la
+  niebla. Se deduce del terreno: no se guarda, se recalcula al cargar.
+- **Primero lo de arriba** (`AntSystem._mushroom_ok`): las obreras van a los hongos solo si el nido
+  no tiene salida, es de noche, no quedan árboles con hojas, o el jugador pintó Comida hasta el
+  bolsón. Antes iban siempre a lo más cercano, y los bolsones conectados solían ganarle a los árboles.

@@ -645,10 +645,10 @@ func _plant_near(i: int) -> Plant:
 		if pl.is_mushroom():
 			# Fase 19: un bolsón cuenta por el camino real por túnel, no en línea recta a través
 			# de la tierra (si no hay túnel hasta él, no se ve).
-			var rc := mushroom_route(pl)[_cell_index(p)]
-			if rc >= FAR:
+			var pci := _cell_index(p)
+			if not _mushroom_ok(pl, pci):
 				continue
-			d = float(rc * cfg.cell_px)
+			d = float(mushroom_route(pl)[pci] * cfg.cell_px)
 		if d < best_d:
 			best_d = d
 			best = pl
@@ -720,10 +720,9 @@ func _remembered_plant(i: int, cx: int, cy: int, ci: int) -> bool:
 			continue
 		var d := INF
 		if pl.is_mushroom():
-			var rc := mushroom_route(pl)[ci]
-			if rc >= FAR:
+			if not _mushroom_ok(pl, ci):
 				continue
-			d = float(rc * sim.cfg.cell_px)
+			d = float(mushroom_route(pl)[ci] * sim.cfg.cell_px)
 		else:
 			if underground or known[k] == 0:
 				continue
@@ -1176,6 +1175,29 @@ func _reachable_mushroom(ci: int) -> bool:
 	if not sim.incremental:
 		return false
 	for pl in sim.plants:
-		if pl.is_mushroom() and pl.leaves > 0 and mushroom_route(pl)[ci] < FAR:
+		if pl.is_mushroom() and pl.leaves > 0 and _mushroom_ok(pl, ci):
+			return true
+	return false
+
+
+## Fase 24: ¿esta obrera, parada en `ci`, debería ir a este bolsón de hongos ahora? Primero lo de
+## arriba: los hongos son la reserva. Va si el bolsón ya se descubrió (niebla) y hay camino, y
+## además: el nido no tiene salida (no hay otra comida), es de noche (los árboles no rebrotan), ya no
+## quedan árboles con hojas, o el jugador pintó Comida hasta el bolsón.
+func _mushroom_ok(pl: Plant, ci: int) -> bool:
+	if pl.leaves <= 0 or not sim.is_discovered(pl) or mushroom_route(pl)[ci] >= FAR:
+		return false
+	if sim.fields.surface_dist[ci] >= FAR:
+		return true
+	if sim.incremental and DayNight.is_night(sim.time_s(), sim.cfg):
+		return true
+	if sim.food.data[pl.cell.y * sim.world.w + pl.cell.x] > sim.cfg.food_follow_threshold:
+		return true
+	return not _trees_have_leaves()
+
+
+func _trees_have_leaves() -> bool:
+	for pl in sim.plants:
+		if not pl.is_mushroom() and pl.leaves > 0:
 			return true
 	return false
