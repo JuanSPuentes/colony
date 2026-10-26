@@ -311,7 +311,7 @@ func _level0_lessons() -> Array[Dictionary]:
 func _normal_lessons() -> Array[Dictionary]:
 	return [
 		{"id": "welcome", "title": "Juego normal", "when": func(_s: Simulation) -> bool: return true, "focus": _nest, "zoom": Z_WIDE,
-			"text": "Sobrevive a 4 estaciones. Clic izq. arrastra el mapa; clic derecho usa la herramienta."},
+			"text": "Sobrevive a 4 estaciones. Tu nido ya tiene Real (reina), Guardería (huevos) y Almacén (comida). Clic izq. arrastra el mapa; clic derecho usa la herramienta."},
 		# Fase 15: el nido arranca cerrado; abrirlo es lo primero y lo decide el jugador.
 		{"id": "open", "title": "Abre el nido", "when": func(s: Simulation) -> bool: return not _nest_open(s), "focus": _nest, "zoom": Z_NEAR,
 			"text": "El nido está cerrado. Marca un túnel desde la cámara hasta la superficie, por donde quieras salir.",
@@ -343,5 +343,5 @@ func _normal_lessons() -> Array[Dictionary]:
 			"text": "Caza obreras sueltas. Feromona de Ataque (2, Q/E) manda a los soldados."},
 		{"id": "rival", "title": "Fin de estación", "when": func(s: Simulation) -> bool: return s.rival_colony.battle_active,
 			"focus": func(s: Simulation) -> Vector2: return s.rival_colony.queen.pos, "zoom": Z_NEAR,
-			"text": "Mata a la reina rival para pasar de estación. Feromona de Ataque (2, Q/E)."},
+			"text": "Mata a la reina rival para pasar de estación. Tus soldados se juntan en la salida del nido y salen juntos a buscarla."},
 	]

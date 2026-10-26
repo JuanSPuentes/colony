@@ -287,6 +287,12 @@ extends Resource
 ## Zángano guardián: si una amenaza llega a esta distancia (px) de la reina o de un huevo, los
 ## zánganos van a pelear ahí; más lejos no persiguen (su lugar es junto a la reina).
 @export var drone_guard_px := 64.0
+## Fase 17: además, la amenaza tiene que estar a esta cantidad de celdas de la reina POR LOS TÚNELES.
+@export var drone_guard_cells := 12
+## Fase 17: formación de batalla (ver `RivalColony._update_rally`): cuánto esperan los soldados
+## en la entrada a que lleguen los demás antes de marchar, y qué tan cerca cuenta como "llegó".
+@export var rally_max_s := 25.0
+@export var rally_radius_cells := 4.0
 
 @export_group("Fase 14: Nivel 0")
 ## Comida inicial: más que `inc_start_food` para que el primer huevo se pueda comprar pronto.

@@ -25,6 +25,7 @@ const SECTIONS := [
 		"Cada huevo nace Obrera, Soldado o Zángano al azar — no se elige.",
 		"Obreras: cavan y traen hojas. Soldados: patrullan y defienden la colonia.",
 		"Zánganos: escoltan a la reina, la defienden a ella y a los huevos, y llevan los huevos a la Guardería.",
+		"El nido arranca con tres cámaras: Real (la reina), Guardería (los huevos) y Almacén (ahí dejan la comida).",
 	]],
 	["Comida", [
 		"Pinta un rastro con la feromona de Comida [2] hacia una planta.",
@@ -38,6 +39,7 @@ const SECTIONS := [
 	["Estaciones", [
 		"4 estaciones; al final de cada una ataca una colonia rival de verdad.",
 		"No se avanza a la siguiente hasta derrotar a su reina.",
+		"Tus soldados se juntan en la salida del nido y salen juntos: ¡el nido tiene que estar abierto!",
 		"Ganar las 4 batallas es la victoria del modo.",
 	]],
 	["Mejoras", [

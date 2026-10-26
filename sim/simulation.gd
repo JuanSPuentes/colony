@@ -120,6 +120,8 @@ var season_index := 0
 var rival_colony: RivalColony
 
 var _terrain_seen := -1
+var _storage_rooms_seen := -1
+var _storage_terrain_seen := -1
 var _jobs_seen := -1
 var _dig_dirty := true
 
@@ -180,6 +182,7 @@ func spawn_incremental_start(fresh_layout := false) -> void:
 	incremental = true
 	if fresh_layout:
 		_seal_shaft()
+		_carve_side_chambers()
 		_place_plants_random()
 	# Arranca el reloj ya pasado el amanecer (`DayNight.FADE`): a tick_count=0 el mundo se ve casi
 	# negro un instante (el amanecer empieza oscuro y se aclara), aunque `is_night()` ya dé "de
@@ -285,6 +288,36 @@ func _seal_shaft() -> void:
 	fields.recompute_dig()
 
 
+## Fase 17: Juego normal arranca con las tres cámaras hechas: la Real (la cámara de siempre), una
+## Guardería a la izquierda y un Almacén a la derecha, cada una unida a la Real por un pasillo corto.
+## Así la comida tiene a dónde ir desde el principio y los zánganos a dónde llevar los huevos. Las
+## rocas nunca aparecen tan cerca del nido (`WorldGrid.generate`), así que siempre caben.
+func _carve_side_chambers() -> void:
+	var w := world.w
+	var half := cfg.chamber_w / 2
+	var y0 := cfg.surface_y + cfg.shaft_depth
+	var mid := y0 + cfg.chamber_h / 2
+	for side in [-1, 1]:
+		var room_type := WorldGrid.Room.NURSERY if side < 0 else WorldGrid.Room.STORAGE
+		# Pasillo de 2 celdas desde el borde de la Real.
+		for k in range(1, 3):
+			var cx: int = cfg.nest_x + side * (half + k)
+			world.cells[mid * w + cx] = WorldGrid.Cell.TUNNEL
+			world.changed.append(mid * w + cx)
+		# Cámara de 5 x `chamber_h` a continuación.
+		for k in range(3, 8):
+			var cx2: int = cfg.nest_x + side * (half + k)
+			for y in range(y0, y0 + cfg.chamber_h):
+				var i := y * w + cx2
+				world.cells[i] = WorldGrid.Cell.TUNNEL
+				world.room[i] = room_type
+				world.changed.append(i)
+	world.rooms_version += 1
+	world.passable_version += 1
+	fields.recompute_terrain()
+	fields.recompute_dig()
+
+
 ## Fase 15: árboles al azar — cantidad, lado y distancia al nido sin un patrón fijo, solo con una
 ## separación mínima para que no se encimen y sin tapar la superficie justo encima del nido.
 func _place_plants_random() -> void:
@@ -349,6 +382,11 @@ func tick() -> void:
 		_dig_dirty = false
 		fields.recompute_dig()
 	rooms.maybe_recompute()
+	# Fase 17: en Juego normal la comida va al Almacén (ver `AntSystem._use_storage`).
+	if incremental and (world.rooms_version != _storage_rooms_seen or fields.recomputes != _storage_terrain_seen):
+		_storage_rooms_seen = world.rooms_version
+		_storage_terrain_seen = fields.recomputes
+		fields.recompute_storage()
 	_update_corpses(dt)
 	ants.tick()
 	# Todo lo que sigue solo existe si hay una colonia completa (ver nota en la cabecera).
@@ -413,80 +451,61 @@ func _update_era() -> void:
 ## no tiene eras, así que usa su propio umbral (`cfg.inc_spider_first_population`) sin esperar nada
 ## más — ver dónde se llama esta función en `tick()`.
 func _update_spider(step_dt: float, first_population: int) -> void:
-	if spider.alive:
-		spider.step(step_dt)
-		return
-	# Fase 6: en el modo Test solo se mueve/ataca si ya está viva (de que la hizo aparecer el
-	# panel de pruebas); nunca aparece sola por población o por el temporizador de recurrencia —
-	# el sandbox se controla a mano, no solo.
-	if test_mode:
-		return
-	if spiders_spawned == 0 and ants.alive_count >= first_population:
-		spider.spawn(1.0)
-		spiders_spawned += 1
-		spider_next_s = cfg.spider_interval_s
-		notify("¡Una araña acecha en la superficie!")
-		return
-	if spiders_spawned > 0:
-		spider_next_s -= step_dt
-		if spider_next_s <= 0.0:
-			spider.spawn(1.0 + cfg.spider_strength_growth * spiders_spawned)
-			spiders_spawned += 1
-			spider_next_s = cfg.spider_interval_s
-			notify("¡Otra araña acecha en la superficie!")
-	elif spider_next_s <= 0.0:
-		spider_next_s = cfg.spider_interval_s
+	var r := _threat_cycle(spider, step_dt, spiders_spawned, spider_next_s, first_population,
+		cfg.spider_interval_s, cfg.spider_strength_growth,
+		"¡Una araña acecha en la superficie!", "¡Otra araña acecha en la superficie!")
+	spiders_spawned = r[0]
+	spider_next_s = r[1]
 
 
-## Fase 5: igual forma que `_update_spider`, solo para la colonia con reina (no en incremental,
-## igual que la condición de victoria — ver `tick()`): el ciempiés aparece después
-## (`cfg.centipede_first_population` > `cfg.spider_first_population`) para que la amenaza escale.
+## Fase 5: el ciempiés aparece después (`cfg.centipede_first_population` >
+## `cfg.spider_first_population`) para que la amenaza escale. Solo en la colonia con reina.
 func _update_centipede(step_dt: float) -> void:
-	if centipede.alive:
-		centipede.step(step_dt)
-		return
-	if test_mode:
-		return
-	if centipedes_spawned == 0 and ants.alive_count >= cfg.centipede_first_population:
-		centipede.spawn(1.0)
-		centipedes_spawned += 1
-		centipede_next_s = cfg.centipede_interval_s
-		notify("¡Un ciempiés se metió por los túneles!")
-		return
-	if centipedes_spawned > 0:
-		centipede_next_s -= step_dt
-		if centipede_next_s <= 0.0:
-			centipede.spawn(1.0 + cfg.centipede_strength_growth * centipedes_spawned)
-			centipedes_spawned += 1
-			centipede_next_s = cfg.centipede_interval_s
-			notify("¡Otro ciempiés se metió por los túneles!")
-	elif centipede_next_s <= 0.0:
-		centipede_next_s = cfg.centipede_interval_s
+	var r := _threat_cycle(centipede, step_dt, centipedes_spawned, centipede_next_s, cfg.centipede_first_population,
+		cfg.centipede_interval_s, cfg.centipede_strength_growth,
+		"¡Un ciempiés se metió por los túneles!", "¡Otro ciempiés se metió por los túneles!")
+	centipedes_spawned = r[0]
+	centipede_next_s = r[1]
 
 
-## Fase 7: igual forma que `_update_spider`/`_update_centipede`. `cfg.mantis_first_population`
-## queda entre las otras dos para que la amenaza de superficie escale antes que el ciempiés.
+## Fase 7: `cfg.mantis_first_population` queda entre las otras dos para que la amenaza de
+## superficie escale antes que el ciempiés.
 func _update_mantis(step_dt: float) -> void:
-	if mantis.alive:
-		mantis.step(step_dt)
-		return
+	var r := _threat_cycle(mantis, step_dt, mantises_spawned, mantis_next_s, cfg.mantis_first_population,
+		cfg.mantis_interval_s, cfg.mantis_strength_growth,
+		"¡Una mantis acecha camuflada en la superficie!", "¡Otra mantis acecha camuflada en la superficie!")
+	mantises_spawned = r[0]
+	mantis_next_s = r[1]
+
+
+## Ciclo de vida común de las amenazas (antes copiado tres veces, una por amenaza): si está viva,
+## actúa; si no, la primera aparece al llegar a `first_population` y las siguientes cada
+## `interval` segundos, cada una más fuerte (`growth`). Devuelve `[spawned, next_s]` actualizados
+## (los contadores siguen siendo variables separadas por amenaza: el guardado las lee por nombre).
+## `threat` sin tipar: `Spider`, `Centipede` y `Mantis` no comparten clase base, solo la forma
+## (`.alive`, `.step()`, `.spawn()`).
+func _threat_cycle(threat, step_dt: float, spawned: int, next_s: float, first_population: int,
+		interval: float, growth: float, first_msg: String, again_msg: String) -> Array:
+	if threat.alive:
+		threat.step(step_dt)
+		return [spawned, next_s]
+	# Fase 6: en el modo Test solo se mueve/ataca si ya está viva (la hizo aparecer el panel de
+	# pruebas); nunca aparece sola por población o por el temporizador — el sandbox va a mano.
 	if test_mode:
-		return
-	if mantises_spawned == 0 and ants.alive_count >= cfg.mantis_first_population:
-		mantis.spawn(1.0)
-		mantises_spawned += 1
-		mantis_next_s = cfg.mantis_interval_s
-		notify("¡Una mantis acecha camuflada en la superficie!")
-		return
-	if mantises_spawned > 0:
-		mantis_next_s -= step_dt
-		if mantis_next_s <= 0.0:
-			mantis.spawn(1.0 + cfg.mantis_strength_growth * mantises_spawned)
-			mantises_spawned += 1
-			mantis_next_s = cfg.mantis_interval_s
-			notify("¡Otra mantis acecha camuflada en la superficie!")
-	elif mantis_next_s <= 0.0:
-		mantis_next_s = cfg.mantis_interval_s
+		return [spawned, next_s]
+	if spawned == 0 and ants.alive_count >= first_population:
+		threat.spawn(1.0)
+		notify(first_msg)
+		return [1, interval]
+	if spawned > 0:
+		next_s -= step_dt
+		if next_s <= 0.0:
+			threat.spawn(1.0 + growth * spawned)
+			notify(again_msg)
+			return [spawned + 1, interval]
+	elif next_s <= 0.0:
+		next_s = interval
+	return [spawned, next_s]
 
 
 func _check_game_over() -> void:

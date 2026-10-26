@@ -798,17 +798,22 @@ func _process(_delta: float) -> void:
 		_tooltip.visible = false
 		return
 	var screen_pos := get_viewport().get_mouse_position()
+	# Fuera del mapa (sobre el panel lateral) no hay nada que señalar: antes igual se recorrían todas
+	# las hormigas cada cuadro, y podía salir el tooltip de una hormiga escondida debajo del panel.
+	if not _world_rect(_m).has_point(screen_pos):
+		_tooltip.visible = false
+		return
 	var world_pos: Vector2 = _m._to_world(screen_pos)
 	var cell: Vector2i = _m._world_cell(world_pos)
 	var sim: Simulation = _m.sim
 	var text := ""
 	if sim.queen_id >= 0:
 		var nearest := -1
-		var nearest_d := 6.0  # px: el radio de "estás señalando esta hormiga".
+		var nearest_d := 6.0 * 6.0  # px²: el radio de "estás señalando esta hormiga" (6 px).
 		for i in sim.ants.count:
 			if sim.ants.alive[i] == 0:
 				continue
-			var d: float = sim.ants.pos[i].distance_to(world_pos)
+			var d: float = sim.ants.pos[i].distance_squared_to(world_pos)
 			if d < nearest_d:
 				nearest_d = d
 				nearest = i
@@ -828,10 +833,8 @@ func _process(_delta: float) -> void:
 		_tooltip.position = screen_pos + Vector2(14, 14)
 
 
-## `m` es el nodo main.gd: lee todo lo que necesita de él y de `m.sim`.
-func update_info(m: Node) -> void:
-	var sim: Simulation = m.sim
-	_layout()  # barato; sigue el alto real de la ventana si cambia de tamaño
+## Modo con reina ("Modo infinito", Test y partidas clásicas): castas, cría, comida y agua, reparto.
+func _update_classic(m: Node, sim: Simulation) -> void:
 	_top.text = "Hormigas: %d   ·   %s   ·   %d FPS\nSemilla: %d" % [
 		sim.ants.alive_count, "En pausa" if m.paused else "Velocidad x%d" % m.speed, Engine.get_frames_per_second(), sim.rng.seed]
 
@@ -892,19 +895,36 @@ func update_info(m: Node) -> void:
 		var castes := [CasteDefs.Caste.WORKER, CasteDefs.Caste.NURSE, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE]
 		for i in castes.size():
 			_caste_sliders[i].set_value_no_signal(t[castes[i]])
-		var lines := ""
-		for n in sim.notifications:
-			lines += "[color=#ffd43c]• %s[/color]\n" % n
-		_log.text = lines
 	else:
 		_colony.text = ""
 		_resources.text = ""
 		_ratio.text = ""
-		_log.text = ""
-	_log_card.visible = _log.text != ""
 
-	# Fase 3: en el modo incremental el mismo panel cuenta otra cosa (pisa los textos de arriba).
+
+## Avisos de la partida (los mismos en todos los modos con reina); la tarjeta solo se ve si hay.
+func _update_log(sim: Simulation) -> void:
+	var lines := ""
+	if sim.queen_id >= 0:
+		for n in sim.notifications:
+			lines += "[color=#ffd43c]• %s[/color]\n" % n
+	_log.text = lines
+	_log_card.visible = lines != ""
+
+
+## `m` es el nodo main.gd: lee todo lo que necesita de él y de `m.sim`.
+func update_info(m: Node) -> void:
+	var sim: Simulation = m.sim
+	_layout()  # barato; sigue el alto real de la ventana si cambia de tamaño
 	_m = m
+	# El mismo panel cuenta cosas distintas según el modo. Antes se armaban siempre los textos del
+	# modo con reina y, en Juego normal, `_update_incremental` los pisaba en el mismo cuadro.
+	if sim.incremental:
+		_update_incremental(m, sim)
+	else:
+		_update_classic(m, sim)
+	_update_log(sim)
+
+	# Fase 3: qué secciones existen depende del modo.
 	_buy_row.visible = sim.incremental
 	_ratio.visible = not sim.incremental
 	_caste_row.visible = not sim.incremental
@@ -921,8 +941,6 @@ func update_info(m: Node) -> void:
 	if _test_panel.visible:
 		_test_panel.position = world_rect.position + Vector2(world_rect.size.x - _test_panel.size.x - 10.0 * S, 10.0 * S)
 	_threat_header.text = "CRÍA" if sim.incremental else "AMENAZAS"
-	if sim.incremental:
-		_update_incremental(m, sim)
 
 	var tool_names := ["", "Cavar [1]", "Feromona [2]", "Cámara [3]", "Borrar [4]", "Mover reina [5]"]
 	var sub := ""

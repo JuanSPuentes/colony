@@ -10,7 +10,7 @@ extends RefCounted
 ## aditivos: si nada pinta esas feromonas (como en la Fase 0) nunca se activan.
 
 enum State { EXPLORE, GO_TO_FOOD, CARRY_HOME, DIG, FLEE_WATER, IDLE, FLEE_DANGER, EVACUATE, NURSE, GUARD, ATTACK, CARRY_EGG }
-enum Mode { EXPLORE, FOOD, NEST, DIG, FLEE, PLANT, TOWARD, AWAY }
+enum Mode { EXPLORE, FOOD, NEST, DIG, FLEE, PLANT, TOWARD, AWAY, STORE }
 
 const STATE_COLORS: Array[Color] = [
 	Color("e6d84a"),  # EXPLORE
@@ -69,6 +69,8 @@ var patrol_x := PackedInt32Array()
 var _queen_field := PackedInt32Array()
 var _queen_field_cell := -1
 var _queen_field_terrain := -1
+var _rally_cell := -1
+var _rally_terrain := -1
 var hp := PackedFloat32Array()
 var timer := PackedFloat32Array()
 var stuck_t := PackedFloat32Array()
@@ -76,6 +78,12 @@ var check_acc := PackedFloat32Array()
 ## Fase 9: bando (0 = jugador, 1 = rival — ver `sim/colony/rival_colony.gd`). Aditivo: todo lo que
 ## no pasa `ant_faction` a `add_ant_at` sigue creando hormigas de bando 0, igual que siempre.
 var faction := PackedByteArray()
+## Índices de cada bando ([0] jugador, [1] rival), en orden ascendente. `_nearest_enemy_index` recorre
+## solo el bando buscado en vez de todas las hormigas: con 300 hormigas y una oleada de 20 rivales,
+## cada búsqueda pasaba por las 300 (y la llaman todas al pensar, y los zánganos cada tick). Se
+## rehace solo cuando nace una hormiga (`_grow`); las muertas se siguen saltando por `alive`.
+var _members: Array[PackedInt32Array] = [PackedInt32Array(), PackedInt32Array()]
+var _members_dirty := true
 
 var max_stuck_seen := 0.0
 var _bfs_q := PackedInt32Array()
@@ -93,6 +101,7 @@ func _init(s: Simulation) -> void:
 
 
 func _grow(n: int) -> void:
+	_members_dirty = true
 	var total := count + n
 	pos.resize(total)
 	prev.resize(total)
@@ -173,6 +182,24 @@ func apply_hp_upgrade(ratio: float) -> void:
 	for i in count:
 		if alive[i] == 1 and faction[i] == 0:
 			hp[i] *= ratio
+
+
+## Fase 17: punto de reunión de los soldados en una batalla: la celda de la superficie más cerca
+## del nido por los túneles (la salida). -1 si el nido no tiene salida (nido cerrado). Se recalcula
+## solo si cambió el terreno.
+func rally_cell() -> int:
+	if sim.world.passable_version != _rally_terrain:
+		_rally_terrain = sim.world.passable_version
+		_rally_cell = -1
+		var best := FAR
+		var y := sim.cfg.surface_y - 1
+		for x in sim.world.w:
+			var c := y * sim.world.w + x
+			var nd := sim.fields.nest_dist[c]
+			if nd < best:
+				best = nd
+				_rally_cell = c
+	return _rally_cell
 
 
 func queen_field() -> PackedInt32Array:
@@ -367,12 +394,24 @@ func _on_enter(i: int, ci: int) -> void:
 	if carry[i] == 1:
 		if trip_steps[i] < cfg.food_trail_range:
 			sim.food.deposit(ci, cfg.food_deposit * (1.0 - float(trip_steps[i]) / cfg.food_trail_range))
-		if state[i] == State.CARRY_HOME and sim.fields.nest_dist[ci] == 0:
+		if state[i] == State.CARRY_HOME and _at_drop(ci):
 			_deliver(i)
 	elif state[i] == State.EXPLORE or state[i] == State.GO_TO_FOOD:
 		var nd := sim.fields.nest_dist[ci]
 		if nd < cfg.home_range:
 			sim.home.deposit(ci, cfg.home_deposit * (1.0 - float(nd) / cfg.home_range))
+
+
+## Fase 17: en Juego normal, con un Almacén válido y alcanzable, la carga se deja ahí; si no, en el
+## nido como siempre (Modo infinito y las pruebas viejas no cambian: no es modo incremental).
+func _use_storage(ci: int) -> bool:
+	return sim.incremental and sim.rooms.valid[WorldGrid.Room.STORAGE] and sim.fields.storage_dist[ci] < FAR
+
+
+func _at_drop(ci: int) -> bool:
+	if _use_storage(ci):
+		return sim.fields.storage_dist[ci] == 0
+	return sim.fields.nest_dist[ci] == 0
 
 
 func _deliver(i: int) -> void:
@@ -463,10 +502,10 @@ func _think(i: int, cx: int, cy: int, ci: int) -> void:
 		State.GO_TO_FOOD:
 			_think_food(i, cx, cy, ci)
 		State.CARRY_HOME:
-			if sim.fields.nest_dist[ci] == 0:
+			if _at_drop(ci):
 				_deliver(i)
 			else:
-				_step(i, cx, cy, ci, Mode.NEST, null)
+				_step(i, cx, cy, ci, Mode.STORE if _use_storage(ci) else Mode.NEST, null)
 		State.DIG:
 			_think_dig(i, cx, cy, ci)
 
@@ -733,10 +772,16 @@ func _nearest_threat(p: Vector2, max_range: float):
 
 ## Índice de la hormiga viva de bando `want_faction` más cercana a `p` dentro de `max_range`, o -1.
 func _nearest_enemy_index(p: Vector2, max_range: float, want_faction: int) -> int:
+	if _members_dirty:
+		_members_dirty = false
+		_members[0].clear()
+		_members[1].clear()
+		for j in count:
+			_members[faction[j]].append(j)
 	var best := -1
 	var best_d := max_range
-	for j in count:
-		if alive[j] == 0 or faction[j] != want_faction:
+	for j in _members[want_faction]:
+		if alive[j] == 0:
 			continue
 		var d := p.distance_to(pos[j])
 		if d < best_d:
@@ -858,6 +903,11 @@ func _step(i: int, cx: int, cy: int, ci: int, mode: int, extra: Variant) -> void
 				if nd >= FAR:
 					continue
 				s = float(f.nest_dist[ci] - nd) * 2.0 + 0.2 * rng.randf() - 2.0 * lw
+			Mode.STORE:
+				var sd := f.storage_dist[ni]
+				if sd >= FAR:
+					continue
+				s = float(f.storage_dist[ci] - sd) * 2.0 + 0.2 * rng.randf() - 2.0 * lw
 			Mode.DIG:
 				var dd := f.dig_dist[ni]
 				if dd >= FAR:

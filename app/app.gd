@@ -100,13 +100,19 @@ func _ready() -> void:
 			_pending.call())
 
 
-func _start_game(incremental: bool) -> void:
+## Crea la escena de partida (sin arrancarla: cada modo llama a `game.start()` a su manera) y
+## esconde el menú. Antes estas líneas estaban repetidas en cada función que arranca una partida.
+func _new_game_scene() -> void:
 	menu.visible = false
 	game = load(MAIN_SCENE).instantiate()
 	game.auto_start = false
 	add_child(game)
 	game.set_brightness(settings.brightness)
 	game.menu_requested.connect(func() -> void: _open_options("game"))
+
+
+func _start_game(incremental: bool) -> void:
+	_new_game_scene()
 	# "Juego normal" sortea una semilla nueva en cada partida (mapa distinto cada vez, a pedido
 	# del jugador); "Modo infinito" sigue arrancando siempre con `cfg.world_seed` fijo, como desde
 	# el principio del proyecto — acá no se pidió cambiarlo, y el seed fijo sigue siendo útil para
@@ -123,12 +129,7 @@ func _start_game(incremental: bool) -> void:
 
 ## Fase 14: Nivel 0. Mapa fijo (`cfg.world_seed`), para que la explicación sea la misma siempre.
 func _start_tutorial() -> void:
-	menu.visible = false
-	game = load(MAIN_SCENE).instantiate()
-	game.auto_start = false
-	add_child(game)
-	game.set_brightness(settings.brightness)
-	game.menu_requested.connect(func() -> void: _open_options("game"))
+	_new_game_scene()
 	game.coach_enabled = true
 	game.start(game.cfg.world_seed, null, "tutorial")
 
@@ -142,12 +143,7 @@ func _open_guide() -> void:
 ## hermana en vez de un tercer caso en `_start_game` para no arriesgar el flujo ya probado de
 ## "Juego normal"/"Modo infinito" (ver tools/test_app_menu.gd).
 func _start_test_game() -> void:
-	menu.visible = false
-	game = load(MAIN_SCENE).instantiate()
-	game.auto_start = false
-	add_child(game)
-	game.set_brightness(settings.brightness)
-	game.menu_requested.connect(func() -> void: _open_options("game"))
+	_new_game_scene()
 	game.start(game.cfg.world_seed, null, "test")
 
 
@@ -248,12 +244,7 @@ func _restart_same_mode() -> void:
 
 
 func _continue_game() -> void:
-	menu.visible = false
-	game = load(MAIN_SCENE).instantiate()
-	game.auto_start = false
-	add_child(game)
-	game.set_brightness(settings.brightness)
-	game.menu_requested.connect(func() -> void: _open_options("game"))
+	_new_game_scene()
 	game.coach_enabled = true
 	game.load_game()
 	if game.sim == null:  # no había partida o el archivo no se pudo leer

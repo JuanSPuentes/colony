@@ -47,6 +47,7 @@ convención de una prueba por fase. Existe justo para que el proyecto no se vuel
 21. [Fase 14: controles de cámara, guía contextual y Nivel 0](#21-fase-14-controles-de-cámara-guía-contextual-y-nivel-0)
 22. [Fase 15: nido cerrado, excavación continua, árboles al azar y feromonas más claras](#22-fase-15-nido-cerrado-excavación-continua-árboles-al-azar-y-feromonas-más-claras)
 23. [Fase 16: obreras, soldados, huevos y zánganos](#23-fase-16-obreras-soldados-huevos-y-zánganos)
+24. [Fase 17: batallas, zánganos, cámaras iniciales y rendimiento](#24-fase-17-batallas-zánganos-cámaras-iniciales-y-rendimiento)
 
 ---
 
@@ -353,6 +354,7 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | `Godot --headless --path . --script tools/test_phase14.gd` | Fase 14 (sección 21): clic izquierdo arrastra el mapa y no usa la herramienta, clic derecho sí, Shift + derecho borra, flechas/WASD con Shift más rápido, teclas combinadas y diagonal normalizada, la guía contextual (orden de lecciones, pausa y acercamiento, objetivos que se cumplen solos), el Nivel 0 (sin araña/lluvia/estaciones automáticas, batalla pedida por la guía, las hormigas dañan a la reina rival, victoria al matarla, guardar/cargar). **34 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase15.gd` | Fase 15 (sección 22): nido cerrado y árboles al azar en Juego normal, excavación continua, soldados que sueltan un rastro de Ataque vacío, tarjeta de las feromonas. **21 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase16.gd` | Fase 16 (sección 23): un túnel largo se cava sin ir y volver (casi una decisión por celda), los soldados patrullan casi todo el ancho del mapa y revisan el nido, los huevos nacen al lado de la reina en una celda libre, la cría se dibuja sobre la capa de feromonas, nacen zánganos en Juego normal, el zángano defiende a la reina sin perseguir lejos y la escolta por los túneles, guardar/cargar la patrulla. **16 pruebas.** |
+| `Godot --headless --path . --script tools/test_phase17.gd` | Fase 17 (sección 24): los soldados ganan la batalla en formación y sobreviven, con el nido cerrado la batalla avisa que hay que abrirlo, una rival encima de la cámara (a través de la tierra) no saca al zángano pero una dentro del nido sí, Juego normal arranca con Real/Guardería/Almacén, la comida va al Almacén en Juego normal y al nido en Modo infinito, guardar/cargar la formación. **11 pruebas.** |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
 **Última ejecución verificada (2026-10-22, Godot 4.7.2):** las 13 suites de la tabla pasan, incluida `test_phase14` (34/34). Antes (2026-10-20): las siete suites en 34/34 (Fase 0),
@@ -910,3 +912,42 @@ persiguen. Sin tarea, escoltan a la reina siguiendo los túneles (un campo de di
 celda, compartido y recalculado solo si ella se mueve o cambia el terreno). Aparecen en el HUD, en
 la guía de "Cómo jugar", en la lección de castas del Nivel 0 y en un consejo cuando nace el
 primero. Cambio intencional: `tools/test_phase1.gd` ya no exige que el zángano pelee "sin moverse".
+
+## 24. Fase 17: batallas, zánganos, cámaras iniciales y rendimiento
+
+**Batalla de fin de estación que no se podía ganar.** Los soldados sí atacaban, pero cada uno
+patrullaba por su lado y llegaba solo al grupo rival: seis rivales juntas le hacían 48 de daño por
+segundo a un soldado de 18 de vida. Medido: 8 soldados muertos en 40 s sin tocar a ninguna rival ni
+a la reina. Ahora, al empezar la batalla, los soldados se reúnen en la salida del nido
+(`AntSystem.rally_cell`, la celda de la superficie más cerca del nido por los túneles) y, cuando
+llegan unos 3/4 o pasan `rally_max_s`, marchan juntos hacia la reina rival
+(`RivalColony.marching`, `AntCasteAI.battle_formation`). Mismo escenario: batalla ganada en ~20 s
+con 8 de 9 soldados vivos. La feromona de Ataque sigue teniendo prioridad. Si el nido sigue cerrado
+nadie puede salir ni entrar: la batalla avisa "Abre el nido cavando hasta la superficie".
+
+**Zánganos que soltaban los huevos y se pegaban a la tierra.** Detectaban amenazas en línea recta:
+una rival caminando por la superficie encima de la cámara contaba como "cerca de la reina", y
+salían hacia ella a través de la tierra. Ahora la amenaza tiene que estar a `drone_guard_cells` de
+la reina **por los túneles** (`AntSystem.queen_field`).
+
+**Comida en la primera cámara.** Las obreras dejaban la hoja en la primera celda del nido, hubiera
+Almacén o no. Ahora Juego normal arranca con tres cámaras unidas por pasillos (Guardería, Real,
+Almacén: `Simulation._carve_side_chambers`) y, en ese modo, con un Almacén válido la carga se
+entrega ahí (`NestDistanceField.storage_dist`, `AntSystem._use_storage`). Modo infinito, el Nivel 0
+y las pruebas viejas no cambian. El Almacén se tiñe de un naranja más marcado (antes casi igual a
+la Real).
+
+**Revisión de código y rendimiento** (sin cambiar la lógica del juego: huella de la simulación
+idéntica antes y después en tres partidas de referencia). Con ~300 hormigas en batalla:
+- La búsqueda del enemigo más cercano recorría todas las hormigas en cada llamada; ahora recorre solo
+  el bando buscado (`AntSystem._members`). Tick: 4,9 ms → 2,3 ms.
+- La capa de feromonas/agua/cámaras pintaba ~25.000 píxeles uno por uno 5 veces por segundo (un
+  tirón cada 200 ms); ahora arma la imagen en bytes de una vez (idéntica byte a byte) y salta
+  cámaras y agua si no cambiaron. 7,4 ms → 1,2 ms.
+- El panel ya no arma los textos del modo con reina para pisarlos en Juego normal, y el tooltip no
+  busca hormigas con el mouse fuera del mapa.
+- Las tres amenazas compartían la misma lógica de aparición copiada tres veces
+  (`Simulation._threat_cycle`), y `app.gd` repetía la creación de la partida en cuatro funciones
+  (`_new_game_scene`). Se quitaron dos funciones que nadie usaba.
+- `tools/test_phase15.gd` mide las obreras atrapadas por racha (más de 10 s seguidos), no en un solo
+  instante: así daba 3 o 4 según el azar sin que ninguna estuviera atrapada.

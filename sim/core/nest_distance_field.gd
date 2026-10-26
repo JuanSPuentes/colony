@@ -17,6 +17,10 @@ var dig_dist := PackedInt32Array()
 var dig_frontier := 0
 var _queue := PackedInt32Array()
 var recomputes := 0
+## Fase 17: pasos hasta la cámara Almacén (sus celdas pasables), para que en Juego normal las
+## obreras dejen la comida ahí y no en la primera celda del nido. FAR en todo el mapa si no hay
+## Almacén. Lo recalcula `Simulation.tick()` cuando cambian las cámaras o el terreno.
+var storage_dist := PackedInt32Array()
 
 
 func _init(g: WorldGrid) -> void:
@@ -25,6 +29,8 @@ func _init(g: WorldGrid) -> void:
 	nest_dist.resize(n)
 	surface_dist.resize(n)
 	dig_dist.resize(n)
+	storage_dist.resize(n)
+	storage_dist.fill(FAR)
 	_queue.resize(n)
 	nest_dist.fill(FAR)
 	surface_dist.fill(FAR)
@@ -67,6 +73,14 @@ func recompute_dig() -> void:
 				if open:
 					dig_frontier += 1
 	_bfs(sources, dig_dist)
+
+
+func recompute_storage() -> void:
+	var sources: Array[int] = []
+	for i in world.room.size():
+		if world.room[i] == WorldGrid.Room.STORAGE and world.is_passable(i % world.w, i / world.w):
+			sources.append(i)
+	_bfs(sources, storage_dist)
 
 
 ## BFS puntual contra celdas pasables, para un destino que no es el nido ni la superficie (hoy lo

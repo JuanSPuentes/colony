@@ -137,6 +137,7 @@ static func to_dict(sim: Simulation) -> Dictionary:
 		"queen_hp": sim.rival_colony.queen.hp,
 		"queen_max_hp": sim.rival_colony.queen.max_hp,
 		"queen_alive": sim.rival_colony.queen.alive,
+		"marching": sim.rival_colony.marching, "rally_s": sim.rival_colony.rally_s,
 	}
 
 	var ants := sim.ants
@@ -333,6 +334,9 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 		sim.rival_colony.queen.hp = float(rcd["queen_hp"])
 		sim.rival_colony.queen.max_hp = float(rcd["queen_max_hp"])
 		sim.rival_colony.queen.alive = rcd["queen_alive"]
+		# Fase 17: ausente en guardados viejos; la formación arranca de nuevo (reunión).
+		sim.rival_colony.marching = bool(rcd.get("marching", false))
+		sim.rival_colony.rally_s = float(rcd.get("rally_s", 0.0))
 
 	var ad: Dictionary = d["ants"]
 	var ants := sim.ants
@@ -379,6 +383,7 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	ants.faction = PackedByteArray(faction_in) if faction_in.size() == ants.count else PackedByteArray()
 	if ants.faction.size() != ants.count:
 		ants.faction.resize(ants.count)  # 0 por defecto: bando jugador
+	ants._members_dirty = true  # los bandos cambiaron por fuera de `_grow`: rehacer la lista
 
 	sim.plants.clear()
 	for pd in d["plants"]:

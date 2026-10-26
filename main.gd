@@ -286,10 +286,6 @@ func _resize_world_container() -> void:
 	world_container.stretch_shrink = maxi(1, roundi(free.x / WORLD_SIZE.x))
 
 
-func _current_phero() -> PheromoneField:
-	return InputTools.current_phero(self)
-
-
 # --- Bucle ----------------------------------------------------------------------------------------
 
 func _process(delta: float) -> void:
@@ -615,7 +611,3 @@ func _apply_line(from: Vector2i, to: Vector2i) -> void:
 func _apply_at(c: Vector2i) -> void:
 	InputTools.apply_at(self, c)
 
-
-## Un clic en el cielo pinta sobre la fila del suelo.
-func _snap(c: Vector2i) -> Vector2i:
-	return InputTools.snap(self, c)

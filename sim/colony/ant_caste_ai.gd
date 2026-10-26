@@ -85,22 +85,24 @@ static func think_drone(ants, i: int, cx: int, cy: int, ci: int) -> void:
 	ants.target[i] = brood.pos[best]
 
 
-## Fase 14: la amenaza más cercana a la reina o a algún huevo, dentro de `cfg.drone_guard_px`; null
-## si no hay ninguna. Los zánganos no persiguen más allá: su lugar es junto a la reina.
+## La amenaza cerca de la reina contra la que salen los zánganos, o null. Fase 17: "cerca" se mide
+## por los túneles (`AntSystem.queen_field`), no en línea recta. Antes una rival caminando por la
+## superficie, justo encima de la cámara, contaba como cerca: los zánganos soltaban los huevos que
+## llevaban a la Guardería e intentaban ir hacia ella a través de la tierra, pegados a la pared.
+## Los huevos nacen al lado de la reina y la Guardería queda junto a la Real, así que este radio
+## (`cfg.drone_guard_cells` por los túneles) también los cubre a ellos.
 static func guard_threat(ants):
 	var sim: Simulation = ants.sim
-	var r := sim.cfg.drone_guard_px
-	if sim.queen_id >= 0 and ants.alive[sim.queen_id] == 1:
-		var t = ants._nearest_threat(ants.pos[sim.queen_id], r)
-		if t != null:
-			return t
-	var brood := sim.brood
-	for b in brood.stage.size():
-		if brood.alive[b] and brood.stage[b] == BroodSystem.Stage.EGG:
-			var t2 = ants._nearest_threat(brood.pos[b], r)
-			if t2 != null:
-				return t2
-	return null
+	if sim.queen_id < 0 or ants.alive[sim.queen_id] == 0:
+		return null
+	var t = ants._nearest_threat(ants.pos[sim.queen_id], sim.cfg.drone_guard_px)
+	if t == null:
+		return null
+	var dist: PackedInt32Array = ants.queen_field()
+	var tc: int = ants._cell_index(t.pos)
+	if tc < 0 or tc >= dist.size() or dist[tc] > sim.cfg.drone_guard_cells:
+		return null
+	return t
 
 
 ## Fase 14: se queda a unas celdas de la reina; si se aleja, vuelve (por el nido si está lejos).
@@ -201,9 +203,38 @@ static func think_soldier(ants, i: int, cx: int, cy: int, ci: int, think_dt: flo
 				ants.state[i] = AntSystem.State.ATTACK
 				ants._step(i, cx, cy, ci, AntSystem.Mode.TOWARD, sim.attack)
 				return
+	if sim.rival_colony.battle_active and battle_formation(ants, i, cx, cy, ci):
+		return
 	ants.state[i] = AntSystem.State.GUARD
 	patrol(ants, i, cx, cy, ci, think_dt)
 
+
+## Fase 17: durante la batalla de fin de estación los soldados no patrullan sueltos: primero se
+## reúnen en la entrada del nido y después marchan juntos hacia la reina rival (ver
+## `RivalColony.marching`). Pelean con lo que se crucen igual que siempre: eso lo decide
+## `think_soldier` antes de llegar acá. Devuelve false si no hay a dónde ir (nido cerrado).
+static func battle_formation(ants, i: int, cx: int, cy: int, ci: int) -> bool:
+	var sim: Simulation = ants.sim
+	var cfg := sim.cfg
+	var rival := sim.rival_colony
+	var rc: int = ants.rally_cell()
+	if rc < 0:
+		return false  # el nido no tiene salida: no hay forma de salir a pelear
+	var on_surface := cy < cfg.surface_y
+	ants.state[i] = AntSystem.State.ATTACK
+	if not on_surface:
+		# Salir primero, por los túneles (misma tendencia hacia afuera que una obrera explorando).
+		ants._step(i, cx, cy, ci, AntSystem.Mode.EXPLORE, null)
+		return true
+	if rival.marching and rival.queen.alive:
+		ants._step(i, cx, cy, ci, AntSystem.Mode.PLANT, rival.queen.pos)
+		return true
+	var rp: Vector2 = ants._center(rc % sim.world.w, rc / sim.world.w)
+	if ants.pos[i].distance_to(rp) <= cfg.cell_px:
+		ants.target[i] = ants.pos[i]
+	else:
+		ants._step(i, cx, cy, ci, AntSystem.Mode.PLANT, rp)
+	return true
 
 ## Fase 14: patrulla de verdad. Antes el soldado "exploraba" con la misma puntuación que una obrera
 ## (atraído por la feromona de comida, repelido por la de hogar) y terminaba yendo y viniendo por
