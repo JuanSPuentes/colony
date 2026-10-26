@@ -18,6 +18,7 @@ func _initialize() -> void:
 	_t_foragers_leave_the_shaft()
 	_t_painted_trail_survives_in_normal_game()
 	_t_unreachable_threat_does_not_stop_digging()
+	_t_flooded_path_does_not_trap_diggers()
 	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -256,3 +257,45 @@ func _t_unreachable_threat_does_not_stop_digging() -> void:
 	_check("can_reach: dentro del nido cerrado no se alcanza la superficie",
 		not sim.ants.can_reach(Vector2(sim.cfg.nest_x * 8, (sim.cfg.surface_y + sim.cfg.shaft_depth + 1) * 8), Vector2(sim.cfg.nest_x * 8 + 40, (sim.cfg.surface_y - 1) * 8))
 		or opened_at >= 0.0)
+
+
+## Fase 21: si el agua corta el único camino hasta lo marcado, las obreras no se quedan trabadas
+## intentando cavar: el camino a cavar (`dig_dist`) trata el agua profunda como pared, así que se
+## van a buscar comida, y cuando el agua baja vuelven a cavar solas.
+func _t_flooded_path_does_not_trap_diggers() -> void:
+	var cfg := _cfg()
+	var sim := Simulation.new(cfg, 3)
+	sim.spawn_incremental_start()
+	for k in 6:
+		sim.ants.add_ant_at(Vector2i(cfg.nest_x, cfg.surface_y + cfg.shaft_depth + 1), CasteDefs.Caste.WORKER)
+	var w := sim.world
+	var y: int = cfg.surface_y + cfg.shaft_depth + 1
+	var x0: int = cfg.nest_x - cfg.chamber_w / 2 - 1
+	for k in 10:
+		w.cells[y * w.w + x0 - k] = WorldGrid.Cell.TUNNEL
+	w.passable_version += 1
+	for k in range(10, 13):
+		sim.cmd_mark(x0 - k, y)
+	var flood: Array[int] = []
+	for k in range(3, 7):
+		flood.append(y * w.w + x0 - k)
+	var digging := 0
+	var samples := 0
+	for t in int(30.0 * cfg.tick_rate):
+		for i in flood:
+			if sim.water.level[i] < 0.9:
+				sim.water.add(i, 0.95 - sim.water.level[i])
+		sim.tick()
+		if t % 10 == 0:
+			for a in sim.ants.count:
+				if sim.ants.alive[a] == 1 and sim.ants.caste[a] == CasteDefs.Caste.WORKER:
+					samples += 1
+					digging += int(sim.ants.state[a] == AntSystem.State.DIG)
+	var nest_i: int = y * w.w + cfg.nest_x
+	_check("con el pasillo inundado, lo marcado figura inalcanzable", sim.fields.dig_dist[nest_i] >= NestDistanceField.FAR)
+	_check("con el pasillo inundado, nadie se queda trabado en modo cavar", digging == 0, "%d de %d muestras" % [digging, samples])
+	sim.water.clear()
+	var dug0 := sim.dug
+	for t in int(40.0 * cfg.tick_rate):
+		sim.tick()
+	_check("cuando baja el agua, vuelven a cavar solas", sim.dug - dug0 == 3, "cavadas=%d" % (sim.dug - dug0))

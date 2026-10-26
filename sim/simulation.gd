@@ -126,6 +126,7 @@ var _storage_rooms_seen := -1
 var _storage_terrain_seen := -1
 var _jobs_seen := -1
 var _dig_dirty := true
+var _dig_was_wet := false
 
 
 func _init(config: SimConfig, seed_value: int = -1) -> void:
@@ -141,6 +142,8 @@ func _init(config: SimConfig, seed_value: int = -1) -> void:
 	evacuate = PheromoneField.new(world.w, world.h, cfg.evacuate_decay_per_s)
 	water = WaterSim.new(world)
 	fields = NestDistanceField.new(world)
+	fields.water = water
+	fields.water_block = cfg.flee_level
 	_place_plants()
 	fields.recompute_terrain()
 	fields.recompute_dig()
@@ -492,6 +495,12 @@ func tick() -> void:
 	if world.jobs_version != _jobs_seen:
 		_jobs_seen = world.jobs_version
 		_dig_dirty = true
+	# Fase 21: `dig_dist` esquiva el agua profunda; mientras haya agua (y una vez más cuando se va)
+	# hay que recalcularlo, porque el agua sube y baja sin que cambie el terreno.
+	var wet := water.volume > 0.0
+	if wet or _dig_was_wet:
+		_dig_dirty = true
+	_dig_was_wet = wet
 	if _dig_dirty and tick_count % cfg.field_refresh_ticks == 0:
 		_dig_dirty = false
 		fields.recompute_dig()

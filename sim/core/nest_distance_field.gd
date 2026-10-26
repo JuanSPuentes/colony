@@ -21,6 +21,12 @@ var recomputes := 0
 ## obreras dejen la comida ahí y no en la primera celda del nido. FAR en todo el mapa si no hay
 ## Almacén. Lo recalcula `Simulation.tick()` cuando cambian las cámaras o el terreno.
 var storage_dist := PackedInt32Array()
+## Fase 21: agua para `dig_dist`. Las obreras no cruzan agua profunda (solo huyendo, ver
+## `AntSystem._step`), así que el camino hasta lo que hay que cavar la trata como pared: si la
+## lluvia corta el único camino, la obrera ve que no llega y se va a buscar comida en vez de
+## quedarse trabada. La pone `Simulation`; sin ella (`null`) todo funciona como antes.
+var water: WaterSim
+var water_block := 1.0e9
 
 
 func _init(g: WorldGrid) -> void:
@@ -72,7 +78,7 @@ func recompute_dig() -> void:
 							sources.append(ni)
 				if open:
 					dig_frontier += 1
-	_bfs(sources, dig_dist)
+	_bfs(sources, dig_dist, true)
 
 
 func recompute_storage() -> void:
@@ -94,14 +100,16 @@ func bfs_from(sources: Array[int]) -> PackedInt32Array:
 	return out
 
 
-func _bfs(sources: Array[int], out: PackedInt32Array) -> void:
+func _bfs(sources: Array[int], out: PackedInt32Array, avoid_water := false) -> void:
 	out.fill(FAR)
+	var wl := water.level if avoid_water and water != null else PackedFloat32Array()
+	var wet := not wl.is_empty() and water.volume > 0.0
 	var w := world.w
 	var h := world.h
 	var head := 0
 	var tail := 0
 	for s in sources:
-		if world.is_passable(s % w, s / w):
+		if world.is_passable(s % w, s / w) and not (wet and wl[s] >= water_block):
 			out[s] = 0
 			_queue[tail] = s
 			tail += 1
@@ -111,19 +119,19 @@ func _bfs(sources: Array[int], out: PackedInt32Array) -> void:
 		var cx := cur % w
 		var cy := cur / w
 		var nd := out[cur] + 1
-		if cx > 0 and out[cur - 1] > nd and world.is_passable(cx - 1, cy):
+		if cx > 0 and out[cur - 1] > nd and world.is_passable(cx - 1, cy) and not (wet and wl[cur - 1] >= water_block):
 			out[cur - 1] = nd
 			_queue[tail] = cur - 1
 			tail += 1
-		if cx < w - 1 and out[cur + 1] > nd and world.is_passable(cx + 1, cy):
+		if cx < w - 1 and out[cur + 1] > nd and world.is_passable(cx + 1, cy) and not (wet and wl[cur + 1] >= water_block):
 			out[cur + 1] = nd
 			_queue[tail] = cur + 1
 			tail += 1
-		if cy > 0 and out[cur - w] > nd and world.is_passable(cx, cy - 1):
+		if cy > 0 and out[cur - w] > nd and world.is_passable(cx, cy - 1) and not (wet and wl[cur - w] >= water_block):
 			out[cur - w] = nd
 			_queue[tail] = cur - w
 			tail += 1
-		if cy < h - 1 and out[cur + w] > nd and world.is_passable(cx, cy + 1):
+		if cy < h - 1 and out[cur + w] > nd and world.is_passable(cx, cy + 1) and not (wet and wl[cur + w] >= water_block):
 			out[cur + w] = nd
 			_queue[tail] = cur + w
 			tail += 1
