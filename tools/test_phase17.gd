@@ -18,6 +18,7 @@ func _initialize() -> void:
 	_t_food_goes_to_storage()
 	_t_classic_still_delivers_to_nest()
 	_t_save_keeps_formation()
+	_t_closed_nest_workers_dig_late_marks()
 	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -192,3 +193,33 @@ func _t_save_keeps_formation() -> void:
 	sim.rival_colony.marching = true
 	var copy := SaveSystem.from_dict(SaveSystem.to_dict(sim), sim.cfg)
 	_check("guardar/cargar conserva la formación de batalla", copy.rival_colony.marching and is_equal_approx(copy.rival_colony.rally_s, sim.rival_colony.rally_s))
+
+
+## Con el nido cerrado, las obreras iniciales se iban a "explorar" (sin salida, dando vueltas para
+## siempre) antes de que el jugador marcara nada, y después no cavaban lo que se marcaba: solo
+## cavaban las que nacían de un huevo nuevo.
+func _t_closed_nest_workers_dig_late_marks() -> void:
+	var cfg := _cfg()
+	var sim := Simulation.new(cfg, 4242)
+	sim.spawn_incremental_start(true)
+	for t in 20 * cfg.tick_rate:
+		sim.tick()
+	var exploring := 0
+	for i in sim.ants.count:
+		if sim.ants.alive[i] == 1 and sim.ants.state[i] == AntSystem.State.EXPLORE:
+			exploring += 1
+	_check("sin salida a la superficie nadie se queda explorando", exploring == 0, "explorando: %d" % exploring)
+	var half := cfg.chamber_w / 2
+	var mid := cfg.surface_y + cfg.shaft_depth + cfg.chamber_h / 2
+	for side in [-1, 1]:
+		for dy in range(1, 12):
+			for y in [mid - dy, mid + dy]:
+				if y >= cfg.surface_y:
+					sim.cmd_mark(cfg.nest_x + side * (half + 1), y)
+	var initial: int = sim.ants.count_by_caste([CasteDefs.Caste.WORKER])[CasteDefs.Caste.WORKER]
+	var most := 0
+	for t in 10 * cfg.tick_rate:
+		sim.tick()
+		most = maxi(most, sim.ants.state_counts[AntSystem.State.DIG])
+	_check("las obreras iniciales cavan lo que se marca después", sim.dug >= 5, "cavadas en 10 s: %d" % sim.dug)
+	_check("con el nido cerrado cavan todas, no solo el 35 %", most >= initial, "a la vez: %d de %d" % [most, initial])

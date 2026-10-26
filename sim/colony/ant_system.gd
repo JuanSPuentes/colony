@@ -528,13 +528,19 @@ func _think_idle(i: int, cx: int, cy: int, ci: int, think_dt: float) -> void:
 	# Fase 14: tope por celdas cavables a la vez (`dig_frontier`), no por el total marcado: un túnel
 	# de 15 celdas se cava de a una, y mandar más obreras solo las hacía ir y volver.
 	var can_dig := mini(sim.fields.dig_frontier, sim.world.marked_count)
-	if sim.world.marked_count > 0 and diggers < mini(can_dig, max_diggers) and sim.fields.dig_dist[ci] < FAR:
+	# Fase 17: el tope de excavadoras deja obreras libres para buscar comida; sin salida a la
+	# superficie (nido cerrado) no hay comida que buscar, así que cavan todas las que tengan dónde.
+	if sim.fields.surface_dist[ci] < FAR:
+		can_dig = mini(can_dig, max_diggers)
+	if sim.world.marked_count > 0 and diggers < can_dig and sim.fields.dig_dist[ci] < FAR:
 		state[i] = State.DIG
 		state_counts[State.DIG] += 1
-	elif sim.total_leaves_left > 0 or not sim.corpses.is_empty():
+	elif (sim.total_leaves_left > 0 or not sim.corpses.is_empty()) and sim.fields.surface_dist[ci] < FAR:
 		# Punto 4: hay que salir a EXPLORE también si solo quedan cadáveres por recoger (sin hojas),
 		# si no, `_corpse_logic` (que solo se llama desde EXPLORE/GO_TO_FOOD) nunca se evalúa y la
 		# colonia deja de recoger restos para siempre en cuanto se agotan las hojas.
+		# Fase 17: solo si hay salida a la superficie. Con el nido todavía cerrado, "explorar" era dar
+		# vueltas adentro para siempre, y una obrera explorando nunca mira si hay algo para cavar.
 		state[i] = State.EXPLORE
 	else:
 		timer[i] = 4.0  # sin trabajo: seguir descansando
@@ -654,6 +660,14 @@ func _food_here_max(cx: int, cy: int, ci: int) -> float:
 
 func _think_explore(i: int, cx: int, cy: int, ci: int) -> void:
 	var cfg := sim.cfg
+	# Fase 17: sin salida a la superficie (nido cerrado) no hay nada que explorar: a descansar, que
+	# desde ahí se elige cavar. Antes las obreras iniciales de Juego normal salían a explorar antes de
+	# que el jugador marcara nada y quedaban atrapadas así, sin cavar lo que se marcaba después.
+	if sim.fields.surface_dist[ci] >= FAR:
+		state[i] = State.IDLE
+		timer[i] = 0.5
+		target[i] = pos[i]
+		return
 	if _corpse_logic(i, cx, cy, ci) or _plant_logic(i, cx, cy, ci) or _remembered_plant(i, cx, cy, ci):
 		return
 	if sim.total_leaves_left <= 0 and sim.world.marked_count == 0:
