@@ -995,3 +995,22 @@ la misma cuenta con la que nace), en el tooltip, el panel y la barra de arriba.
   Se guardan tipo, color y cueva.
 - Todo opcional: pruebas, Nivel 0 y `main.tscn` directo siguen con el mapa de siempre.
 - Pruebas: `tools/test_phase19.gd` (11).
+
+## Fase 20: terreno estilo Terraria
+
+Separado en tres piezas, cada una con una sola responsabilidad:
+
+- **`view/terrain_style.gd` (`TerrainStyle`):** solo la paleta y las texturas, sin estado de la
+  partida. Cada material (tierra de cada capa, pared de fondo de cada capa, roca) es una textura
+  de 32x32 que se repite sin costuras (ruido suave interpolado + granitos), generada una sola vez.
+  El límite entre capas se mezcla con ruido para que no sea una línea recta. También el color de
+  cada tipo de cámara (`room_color`).
+- **`view/terrain_view.gd` (`TerrainView`):** arma la imagen copiando a cada celda su trozo de
+  textura (`Image.blit_rect`, nativo: la tierra sigue de una celda a otra sin cortes). Suma el borde
+  oscuro e irregular donde la tierra toca un hueco (con esquinas redondeadas y una luz de borde
+  arriba), la "pared de fondo" oscura detrás de lo excavado, y las cámaras como un tinte suave con
+  contorno (punteado si todavía no es válida) — antes eran bloques de color sólido en
+  `OverlayView`, que ya no dibuja cámaras. Al cambiar una celda repinta también sus 4 vecinas.
+- **`view/dig_effects_view.gd` (`DigEffectsView`):** grietas en 3 etapas sobre lo que se está
+  cavando según `job_progress`, y la tierra que se desprende en partículas al terminar la celda.
+  Solo lee la simulación.

@@ -64,8 +64,8 @@ const MUSHROOM_TEXTURES: Array[Texture2D] = [
 	preload("res://view/sprites/mushroom_cluster/north.png"), preload("res://view/sprites/mushroom_cluster/north-east.png"),
 ]
 ## Tamaño de cada hongo en celdas (la cueva mide 2 de alto): varía entre estos dos.
-const MUSHROOM_SIZE_MIN := 0.95
-const MUSHROOM_SIZE_MAX := 1.85
+const MUSHROOM_SIZE_MIN := 1.2
+const MUSHROOM_SIZE_MAX := 2.6
 const MUSHROOM_SHADER := preload("res://view/mushroom_color.gdshader")
 
 var sim: Simulation
@@ -210,15 +210,20 @@ func _draw_mushrooms() -> void:
 	var cpx := float(sim.cfg.cell_px)
 	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 600.0)
 	for p in sim.plants:
-		if not p.is_mushroom():
+		if not p.is_mushroom() or p.pocket.is_empty():
 			continue
 		var col: Color = MUSHROOM_HUES[p.hue % MUSHROOM_HUES.size()]
-		# Halo a través de la tierra (más grande y tenue) y la cueva iluminada.
+		# Un solo brillo suave centrado en la cueva (se ve a través de la tierra: la pista de que ahí
+		# hay algo) y un tinte leve adentro, sobre la pared de fondo que ya dibuja `TerrainView`.
+		var box := Rect2(Vector2(p.pocket[0]) * cpx, Vector2.ZERO)
 		for c in p.pocket:
-			var center := Vector2((c.x + 0.5) * cpx, (c.y + 0.5) * cpx)
-			_mushrooms.draw_circle(center, cpx * 1.9, Color(col, 0.07 + 0.05 * pulse))
+			box = box.expand(Vector2(c) * cpx).expand(Vector2(c + Vector2i.ONE) * cpx)
+		var center := box.get_center()
+		var r := maxf(box.size.x, box.size.y) * 0.5
+		for k in 3:
+			_mushrooms.draw_circle(center, r * (1.6 - 0.25 * k), Color(col, (0.035 + 0.025 * pulse) * (k + 1) * 0.6))
 		for c in p.pocket:
-			_mushrooms.draw_rect(Rect2(c.x * cpx, c.y * cpx, cpx, cpx), Color(col.darkened(0.55), 0.55))
+			_mushrooms.draw_rect(Rect2(Vector2(c) * cpx, Vector2(cpx, cpx)), Color(col, 0.13))
 
 
 ## Fase 19: sprites de hongo (grande y racimo) sobre el piso de cada bolsón: tantos como le queden
@@ -233,19 +238,31 @@ func _draw_mushroom_sprites() -> void:
 		if not p.is_mushroom():
 			continue
 		var col: Color = MUSHROOM_HUES[p.hue % MUSHROOM_HUES.size()]
+		var in_pocket := {}
+		for c in p.pocket:
+			in_pocket[c] = true
+		# Piso: celdas de la cueva con tierra debajo. Cuántos hongos se ven depende de cuántos quedan.
 		var floor_cells: Array[Vector2i] = []
 		for c in p.pocket:
-			if c.y == p.cell.y:
+			if not in_pocket.has(c + Vector2i(0, 1)):
 				floor_cells.append(c)
+		floor_cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.x < b.x)
 		var shown := int(ceil(float(floor_cells.size()) * float(p.leaves) / float(p.max_leaves)))
 		for k in mini(shown, floor_cells.size()):
 			var c := floor_cells[k]
+			# Alto libre sobre esta celda del piso: el hongo nunca pasa del techo de la cueva.
+			var clear := 1
+			while in_pocket.has(c - Vector2i(0, clear)):
+				clear += 1
 			var h := absi(c.x * 73856093 + c.y * 19349663 + k * 83492791)
 			var tex: Texture2D = MUSHROOM_TEXTURES[h % MUSHROOM_TEXTURES.size()]
 			var s := cpx * lerpf(MUSHROOM_SIZE_MIN, MUSHROOM_SIZE_MAX, float((h / 7) % 100) / 99.0)
-			var other: Color = MUSHROOM_HUES[(p.hue + 1 + (h / 11) % 2) % MUSHROOM_HUES.size()]
-			var mcol := col.lerp(other, 0.2 * float((h / 13) % 3))
-			mcol = mcol.lightened(0.08) if (h / 17) % 2 == 0 else mcol.darkened(0.15)
+			s = minf(s, clear * cpx - 1.0)
+			# Variación dentro de la misma familia de color: un poco de corrimiento de tono, más o menos
+			# saturado y más claro u oscuro (mezclar con el color de otro bolsón daba grises).
+			var hue_shift := (float((h / 11) % 100) / 99.0 - 0.5) * 0.12
+			var mcol := Color.from_hsv(fposmod(col.h + hue_shift, 1.0), clampf(col.s * (0.85 + 0.3 * float((h / 13) % 3) / 2.0), 0.0, 1.0), col.v)
+			mcol = mcol.lightened(0.1) if (h / 17) % 2 == 0 else mcol.darkened(0.15)
 			var bx := (c.x + 0.5) * cpx
-			var by := (c.y + 1) * cpx + 0.5
+			var by := (c.y + 1) * cpx
 			_mushroom_sprites.draw_texture_rect(tex, Rect2(bx - s * 0.5, by - s, s, s), false, mcol)

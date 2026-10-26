@@ -46,6 +46,8 @@ var world_size_override := Vector2.ZERO
 var world_vp: SubViewport
 var world_container: SubViewportContainer
 var terrain_view: TerrainView
+## Fase 20: grietas al cavar y tierra que se desprende (encima del terreno).
+var dig_effects_view: DigEffectsView
 var plant_view: PlantView
 var corpse_view: CorpseView
 var brood_view: BroodView
@@ -146,6 +148,7 @@ func _ready() -> void:
 	_resize_world_container()
 	get_tree().root.size_changed.connect(_resize_world_container)
 	terrain_view = TerrainView.new()
+	dig_effects_view = DigEffectsView.new()
 	plant_view = PlantView.new()
 	corpse_view = CorpseView.new()
 	brood_view = BroodView.new()
@@ -160,7 +163,7 @@ func _ready() -> void:
 	rain_view = RainView.new()
 	# Fase 16: la cría va después de `overlay` (feromonas y tinte de cámaras), no antes: debajo
 	# de esa capa los huevos quedaban tapados en cuanto había un rastro o una cámara encima.
-	for n in [sky_view, terrain_view, plant_view, corpse_view, overlay, brood_view, ant_renderer, spider_view, centipede_view, mantis_view, rival_queen_view, rain_view, day_night_view]:
+	for n in [sky_view, terrain_view, dig_effects_view, plant_view, corpse_view, overlay, brood_view, ant_renderer, spider_view, centipede_view, mantis_view, rival_queen_view, rain_view, day_night_view]:
 		world_vp.add_child(n)
 	camera = Camera2D.new()
 	world_vp.add_child(camera)
@@ -216,6 +219,7 @@ func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> v
 		else:
 			sim.spawn_incremental_start(fresh_layout_enabled)
 	terrain_view.setup(sim)
+	dig_effects_view.setup(sim)
 	day_night_view.setup(sim)
 	plant_view.setup(sim)
 	corpse_view.setup(sim)

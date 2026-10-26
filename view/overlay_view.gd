@@ -33,17 +33,12 @@ var _pher_sprite: Sprite2D
 var _water_img: Image
 var _water_tex: ImageTexture
 var _water_sprite: Sprite2D
-var _room_img: Image
-var _room_tex: ImageTexture
-var _room_sprite: Sprite2D
-## Las tres imágenes se arman como bytes RGBA8 de una vez (`Image.set_data`) en vez de 8.400
+## Las imágenes se arman como bytes RGBA8 de una vez (`Image.set_data`) en vez de 8.400
 ## `set_pixel` por capa: `refresh()` costaba ~7 ms y corre 5 veces por segundo (un tirón cada
 ## 200 ms). `_rgba8` reproduce exacto lo que hace `set_pixel` (trunca, no redondea), así que la
-## imagen sale idéntica byte a byte. Cámaras y agua además se saltan si no cambió nada.
+## imagen sale idéntica byte a byte. El agua además se salta si no cambió nada.
 var _pher_bytes := PackedByteArray()
 var _water_bytes := PackedByteArray()
-var _room_bytes := PackedByteArray()
-var _room_key := ""
 var _water_blank := false
 ## Color de trabajo para pasar la opacidad por float32 (como la guarda `Color`) antes de truncarla.
 var _tmp := Color()
@@ -56,15 +51,12 @@ func setup(s: Simulation) -> void:
 	var scale_px := float(sim.cfg.cell_px)
 	_pher_img = Image.create(w, h, false, Image.FORMAT_RGBA8)
 	_water_img = Image.create(w, h, false, Image.FORMAT_RGBA8)
-	_room_img = Image.create(w, h, false, Image.FORMAT_RGBA8)
-	for b in [_pher_bytes, _water_bytes, _room_bytes]:
+	for b in [_pher_bytes, _water_bytes]:
 		b.resize(w * h * 4)
 		b.fill(0)
-	_room_key = ""
 	_water_blank = false
 	_pher_tex = ImageTexture.create_from_image(_pher_img)
 	_water_tex = ImageTexture.create_from_image(_water_img)
-	_room_tex = ImageTexture.create_from_image(_room_img)
 	if _pher_sprite == null:
 		_pher_sprite = Sprite2D.new()
 		_pher_sprite.centered = false
@@ -73,17 +65,11 @@ func setup(s: Simulation) -> void:
 		_water_sprite = Sprite2D.new()
 		_water_sprite.centered = false
 		add_child(_water_sprite)
-	if _room_sprite == null:
-		_room_sprite = Sprite2D.new()
-		_room_sprite.centered = false
-		add_child(_room_sprite)
 	_pher_sprite.texture = _pher_tex
 	_water_sprite.texture = _water_tex
-	_room_sprite.texture = _room_tex
 	_water_sprite.z_index = 1  # el agua se dibuja por encima de las hormigas
 	_pher_sprite.scale = Vector2(scale_px, scale_px)
 	_water_sprite.scale = Vector2(scale_px, scale_px)
-	_room_sprite.scale = Vector2(scale_px, scale_px)
 	refresh()
 
 
@@ -184,39 +170,12 @@ func _draw_player_pheros(w: int, h: int) -> void:
 	_upload(_pher_img, _pher_tex, _pher_bytes)
 
 
-func _room_color(room_type: int, is_valid: bool) -> Color:
-	var base: Color
-	match room_type:
-		WorldGrid.Room.ROYAL:
-			base = Color(1.0, 0.85, 0.2)
-		WorldGrid.Room.NURSERY:
-			base = Color(0.3, 0.85, 0.9)
-		WorldGrid.Room.STORAGE:
-			# Fase 17: naranja más marcado; el ocre de antes casi no se distinguía del amarillo de la Real.
-			base = Color(0.95, 0.45, 0.15)
-		_:
-			return Color(0, 0, 0, 0)
-	return Color(base.r, base.g, base.b, 0.55 if is_valid else 0.22)
-
-
 func refresh() -> void:
 	var w := sim.world.w
 	var h := sim.world.h
-	# Siempre se dibujan las cámaras designadas, sean o no la capa activa (ayuda a construir).
+	# Fase 20: las cámaras ya no se pintan acá (bloques de color sólido): las dibuja `TerrainView`
+	# como un tinte suave con contorno. Igual hay que recalcular cuáles son válidas.
 	sim.rooms.maybe_recompute()
-	# Las cámaras casi nunca cambian: solo se redibujan si cambió alguna o cuáles son válidas.
-	var key := "%d|%s" % [sim.world.rooms_version, sim.rooms.valid]
-	if key != _room_key:
-		_room_key = key
-		var room := sim.world.room
-		for i in w * h:
-			var r := room[i]
-			if r == WorldGrid.Room.NONE:
-				_clear_px(_room_bytes, i)
-			else:
-				var rc := _room_color(r, sim.rooms.valid[r])
-				_put(_room_bytes, i, rc, rc.a)
-		_upload(_room_img, _room_tex, _room_bytes)
 	if layer == Layer.PLAYER_PHEROS:
 		_pher_sprite.visible = true
 		_draw_player_pheros(w, h)

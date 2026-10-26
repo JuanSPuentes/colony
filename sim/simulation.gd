@@ -380,56 +380,84 @@ func _place_giants(used: Array[int]) -> void:
 ## abren (TUNNEL) pero sin conexión al nido: hasta que el jugador cave hasta ahí, nadie llega.
 func _carve_mushroom_pockets() -> void:
 	var n := rng.randi_range(cfg.mushroom_pockets_min, cfg.mushroom_pockets_max)
-	var layer_bottom := cfg.surface_y + int((world.h - cfg.surface_y) * 0.28)
-	var nest_bottom := cfg.surface_y + cfg.shaft_depth + cfg.chamber_h + 2
-	var made := 0
-	var tries := 0
+	var top := cfg.surface_y + 5
+	var bottom := cfg.surface_y + int((world.h - cfg.surface_y) * 0.28)
 	var taken: Array[Rect2i] = []
-	while made < n and tries < 400:
+	var tries := 0
+	while taken.size() < n and tries < 400:
 		tries += 1
-		var pw := rng.randi_range(3, 5)
-		var ph := 2
-		var x := rng.randi_range(3, world.w - pw - 3)
-		var y := rng.randi_range(cfg.surface_y + 4, layer_bottom - ph)
-		var r := Rect2i(x, y, pw, ph)
-		if absi(x + pw / 2 - cfg.nest_x) < cfg.chamber_w + 4 and y < nest_bottom:
+		var center := Vector2i(rng.randi_range(6, world.w - 7), rng.randi_range(top, bottom))
+		var cells := _pocket_shape(center)
+		var box := _bounds(cells)
+		if not _pocket_fits(cells, box, taken):
 			continue
-		var ok := true
-		for t in taken:
-			if t.grow(4).intersects(r):
-				ok = false
-				break
-		if not ok:
-			continue
-		for yy in range(y, y + ph):
-			for xx in range(x, x + pw):
-				if world.cells[yy * world.w + xx] == WorldGrid.Cell.ROCK:
-					ok = false
-		# Cerrado de verdad: nada abierto (nido, cámaras, otros túneles) a menos de 3 celdas, para
-		# que haya que cavar hasta él.
-		for yy in range(y - 3, y + ph + 3):
-			for xx in range(x - 3, x + pw + 3):
-				if world.in_bounds(xx, yy) and yy >= cfg.surface_y and world.is_open(xx, yy):
-					ok = false
-		if not ok:
-			continue
-		taken.append(r)
-		var mush := Plant.new(Vector2i(x + pw / 2, y + ph - 1), cfg.mushroom_pieces)
-		mush.kind = Plant.Kind.MUSHROOM
-		mush.hue = rng.randi_range(0, 2)
-		for yy in range(y, y + ph):
-			for xx in range(x, x + pw):
-				var i := yy * world.w + xx
-				world.cells[i] = WorldGrid.Cell.TUNNEL
-				world.changed.append(i)
-				mush.pocket.append(Vector2i(xx, yy))
-		plants.append(mush)
-		total_leaves_left += cfg.mushroom_pieces
-		made += 1
+		taken.append(box)
+		_carve_pocket(cells)
 	world.passable_version += 1
 	world.jobs_version += 1
 	fields.recompute_terrain()
 	fields.recompute_dig()
+
+
+## Fase 20: forma de una cueva de hongos — un óvalo irregular (no un rectángulo), más ancho que
+## alto y con el piso más parejo que el techo, para que los hongos tengan dónde pararse.
+func _pocket_shape(center: Vector2i) -> Array[Vector2i]:
+	var rx := rng.randf_range(3.2, 4.4)
+	var ry := rng.randf_range(1.5, 2.1)
+	var out: Array[Vector2i] = []
+	for dy in range(-3, 4):
+		for dx in range(-5, 6):
+			var fx := float(dx) / rx
+			var fy := float(dy) / ry
+			# Techo más irregular que el piso.
+			var wobble := rng.randf_range(-0.25, 0.3) if dy < 0 else rng.randf_range(-0.08, 0.12)
+			if fx * fx + fy * fy <= 1.0 + wobble:
+				out.append(center + Vector2i(dx, dy))
+	return out
+
+
+static func _bounds(cells: Array[Vector2i]) -> Rect2i:
+	var r := Rect2i(cells[0], Vector2i.ONE)
+	for c in cells:
+		r = r.expand(c).expand(c + Vector2i.ONE)
+	return r
+
+
+## Cabe si no pisa roca, no se acerca a otra cueva y no hay nada abierto (nido, cámaras, túneles) a
+## menos de 3 celdas: tiene que estar cerrada, para que haya que cavar hasta ella.
+func _pocket_fits(cells: Array[Vector2i], box: Rect2i, taken: Array[Rect2i]) -> bool:
+	if box.position.y <= cfg.surface_y + 2 or box.end.y >= world.h - 2 or box.position.x < 2 or box.end.x > world.w - 2:
+		return false
+	for t in taken:
+		if t.grow(4).intersects(box):
+			return false
+	for c in cells:
+		if world.type_at(c.x, c.y) == WorldGrid.Cell.ROCK:
+			return false
+	for yy in range(box.position.y - 3, box.end.y + 3):
+		for xx in range(box.position.x - 3, box.end.x + 3):
+			if world.in_bounds(xx, yy) and yy >= cfg.surface_y and world.is_open(xx, yy):
+				return false
+	return true
+
+
+## Abre la cueva y pone el bolsón de hongos con su piso (las celdas abiertas con tierra debajo).
+func _carve_pocket(cells: Array[Vector2i]) -> void:
+	for c in cells:
+		var i := c.y * world.w + c.x
+		world.cells[i] = WorldGrid.Cell.TUNNEL
+		world.changed.append(i)
+	var floor_cells: Array[Vector2i] = []
+	for c in cells:
+		if not world.is_open(c.x, c.y + 1):
+			floor_cells.append(c)
+	floor_cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.x < b.x)
+	var mush := Plant.new(floor_cells[floor_cells.size() / 2], cfg.mushroom_pieces)
+	mush.kind = Plant.Kind.MUSHROOM
+	mush.hue = rng.randi_range(0, 2)
+	mush.pocket = cells
+	plants.append(mush)
+	total_leaves_left += cfg.mushroom_pieces
 
 
 func time_s() -> float:
