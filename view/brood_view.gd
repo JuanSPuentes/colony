@@ -13,9 +13,15 @@ extends Node2D
 ## ninguna lógica de movimiento — el huevo sigue al zángano solo, dibujar su posición actual basta.
 
 const EGG_TEXTURE := preload("res://view/sprites/egg/egg.png")
-## Chico a propósito: más pequeño que una hormiga (`AntRenderer.BODY_SIZE` = 7.5), para que no
-## compita visualmente con las castas adultas ("que se queden quietas sin molestar").
-const EGG_SIZE := Vector2(4.0, 4.0)
+## Más chico que una hormiga (`AntRenderer.BODY_SIZE` = 7.5), para que no compita con las castas
+## adultas. Fase 14: de 4 a 5 px, y la cría se dibuja por encima de la capa de feromonas/cámaras
+## (ver el orden en `main.gd`): con un tinte de cámara y un rastro de hogar encima, 4 px no se veían.
+const EGG_SIZE := Vector2(5.0, 5.0)
+## Fase 14: larva y pupa sin sprite propio, con formas simples: así la cría no "desaparece" en
+## cuanto el huevo pasa de etapa (en Juego normal eso pasa en pocos segundos).
+const LARVA_COLOR := Color("f2ead2")
+const PUPA_COLOR := Color("c9a46a")
+const OUTLINE := Color(0.1, 0.07, 0.05, 0.9)
 
 var sim: Simulation
 
@@ -34,7 +40,20 @@ func _draw() -> void:
 		return
 	var brood := sim.brood
 	for i in brood.stage.size():
-		if not brood.alive[i] or brood.stage[i] != BroodSystem.Stage.EGG:
+		if not brood.alive[i]:
 			continue
 		var p := brood.pos[i]
-		draw_texture_rect(EGG_TEXTURE, Rect2(p - EGG_SIZE * 0.5, EGG_SIZE), false)
+		match brood.stage[i]:
+			BroodSystem.Stage.EGG:
+				draw_texture_rect(EGG_TEXTURE, Rect2(p - EGG_SIZE * 0.5, EGG_SIZE), false)
+			BroodSystem.Stage.LARVA:
+				# Gusanito curvo: tres círculos que se achican.
+				for k in 3:
+					var c := p + Vector2(-1.4 + 1.4 * k, 0.5 - absf(k - 1) * 0.6)
+					draw_circle(c, 1.35 - 0.25 * k, OUTLINE)
+					draw_circle(c, 1.0 - 0.25 * k, LARVA_COLOR)
+			BroodSystem.Stage.PUPA:
+				draw_set_transform(p, 0.0, Vector2(1.0, 1.6))
+				draw_circle(Vector2.ZERO, 1.7, OUTLINE)
+				draw_circle(Vector2.ZERO, 1.3, PUPA_COLOR)
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

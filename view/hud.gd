@@ -694,13 +694,15 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 		sim.day_number(), "de noche" if night else "de día", sim.ants.alive_count,
 		"En pausa" if m.paused else "Velocidad x%d" % m.speed, Engine.get_frames_per_second()]
 
-	var c := sim.ants.count_by_caste([CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER])
+	var c := sim.ants.count_by_caste([CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE])
 	var queen_alive := sim.ants.alive[sim.queen_id] == 1
 	var queen_hp := sim.ants.hp[sim.queen_id] if queen_alive else 0.0
 	var queen_hp_max := cfg.queen_hp_base * CasteDefs.HP_MULT[CasteDefs.Caste.QUEEN]
-	_colony.text = "[color=#%s]●[/color] %s   [color=#%s]●[/color] %s   [color=#%s]●[/color] Reina %d%%" % [
+	# Fase 14: zánganos también en Juego normal.
+	_colony.text = "[color=#%s]●[/color] %s   [color=#%s]●[/color] %s   [color=#%s]●[/color] %s\n[color=#%s]●[/color] Reina %d%%" % [
 		CasteDefs.COLORS[CasteDefs.Caste.WORKER].to_html(false), _plural(c[CasteDefs.Caste.WORKER], "obrera", "obreras"),
 		CasteDefs.COLORS[CasteDefs.Caste.SOLDIER].to_html(false), _plural(c[CasteDefs.Caste.SOLDIER], "soldado", "soldados"),
+		CasteDefs.COLORS[CasteDefs.Caste.DRONE].to_html(false), _plural(c[CasteDefs.Caste.DRONE], "zángano", "zánganos"),
 		CasteDefs.COLORS[CasteDefs.Caste.QUEEN].to_html(false), int(100.0 * queen_hp / maxf(queen_hp_max, 0.01))]
 	_resources.text = "Comida: %.0f / %.0f\n+%.0f/min por hojas · −%.0f/min de consumo%s" % [
 		sim.colony.food, sim.colony.food_cap, sim.econ.income_per_min, sim.econ.upkeep_per_min,
@@ -719,7 +721,7 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 	# ya se sorteó al comprarlo (`IncrementalEconomy.buy_egg`), así que esto no es una previsión:
 	# es lo que de verdad va a nacer. Un punto de color por huevo (no por larva/pupa, para no
 	# amontonar la línea) adelanta el resultado antes de que se vea la hormiga.
-	var coming := {CasteDefs.Caste.WORKER: 0, CasteDefs.Caste.SOLDIER: 0}
+	var coming := {CasteDefs.Caste.WORKER: 0, CasteDefs.Caste.SOLDIER: 0, CasteDefs.Caste.DRONE: 0}
 	var egg_dots := ""
 	for i in sim.brood.stage.size():
 		if not sim.brood.alive[i] or not coming.has(sim.brood.caste[i]):
@@ -728,12 +730,13 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 		if sim.brood.stage[i] == BroodSystem.Stage.EGG:
 			egg_dots += "[color=#%s]●[/color]" % CasteDefs.COLORS[sim.brood.caste[i]].to_html(false)
 	var st := sim.brood.counts_by_stage
-	if coming[CasteDefs.Caste.WORKER] + coming[CasteDefs.Caste.SOLDIER] == 0:
+	if coming[CasteDefs.Caste.WORKER] + coming[CasteDefs.Caste.SOLDIER] + coming[CasteDefs.Caste.DRONE] == 0:
 		_threats.text = "Nada en camino: compra un huevo abajo"
 	else:
-		_threats.text = "En camino: %s y %s\nLarvas: %d   ·   Pupas: %d" % [
+		_threats.text = "En camino: %s, %s, %s\nLarvas: %d   ·   Pupas: %d" % [
 			_plural(coming[CasteDefs.Caste.WORKER], "obrera", "obreras"),
 			_plural(coming[CasteDefs.Caste.SOLDIER], "soldado", "soldados"),
+			_plural(coming[CasteDefs.Caste.DRONE], "zángano", "zánganos"),
 			st[BroodSystem.Stage.LARVA], st[BroodSystem.Stage.PUPA]]
 	if egg_dots != "":
 		_colony.text += "   Huevos: " + egg_dots
@@ -767,7 +770,7 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 	# Tabla: la casta a la izquierda y una columna por número, para leerlos de un vistazo.
 	var dim := "[color=#9a94a0]%s[/color]"
 	var stats_text := "[table=4][cell][/cell][cell]%s  [/cell][cell]%s  [/cell][cell]%s[/cell]" % [dim % "Vida", dim % "Vel.", dim % "Daño/s"]
-	for stat_caste in [CasteDefs.Caste.QUEEN, CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER]:
+	for stat_caste in [CasteDefs.Caste.QUEEN, CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE]:
 		var base_hp: float = cfg.queen_hp_base if stat_caste == CasteDefs.Caste.QUEEN else cfg.ant_hp
 		var hp_val := base_hp * CasteDefs.HP_MULT[stat_caste] * up.hp_mult
 		var speed_val := cfg.ant_speed * CasteDefs.SPEED_MULT[stat_caste] * up.speed_mult

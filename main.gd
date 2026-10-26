@@ -158,7 +158,9 @@ func _ready() -> void:
 	day_night_view = DayNightView.new()
 	sky_view = SkyView.new()
 	rain_view = RainView.new()
-	for n in [sky_view, terrain_view, plant_view, corpse_view, brood_view, overlay, ant_renderer, spider_view, centipede_view, mantis_view, rival_queen_view, rain_view, day_night_view]:
+	# Fase 16: la cría va después de `overlay` (feromonas y tinte de cámaras), no antes: debajo
+	# de esa capa los huevos quedaban tapados en cuanto había un rastro o una cámara encima.
+	for n in [sky_view, terrain_view, plant_view, corpse_view, overlay, brood_view, ant_renderer, spider_view, centipede_view, mantis_view, rival_queen_view, rain_view, day_night_view]:
 		world_vp.add_child(n)
 	camera = Camera2D.new()
 	world_vp.add_child(camera)

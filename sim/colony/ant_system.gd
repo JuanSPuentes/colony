@@ -61,6 +61,14 @@ var carry_kind := PackedByteArray()
 ## Solo lo usa el Zángano: índice en `BroodSystem` del huevo que está cargando ahora, -1 si
 ## ninguno (ver `_think_drone`).
 var carry_egg := PackedInt32Array()
+## Fase 14: punto de patrulla del soldado (columna del mapa a la que va por la superficie), -1 sin
+## punto elegido, -2 "volviendo a revisar el nido". Ver `AntCasteAI.think_soldier`.
+var patrol_x := PackedInt32Array()
+## Fase 14: distancias por los túneles hasta la celda de la reina, para que los zánganos la escolten
+## (`AntCasteAI.escort_queen`). Se recalcula solo si la reina cambia de celda o cambia el terreno.
+var _queen_field := PackedInt32Array()
+var _queen_field_cell := -1
+var _queen_field_terrain := -1
 var hp := PackedFloat32Array()
 var timer := PackedFloat32Array()
 var stuck_t := PackedFloat32Array()
@@ -103,6 +111,7 @@ func _grow(n: int) -> void:
 	carry.resize(total)
 	carry_kind.resize(total)
 	carry_egg.resize(total)
+	patrol_x.resize(total)
 	hp.resize(total)
 	timer.resize(total)
 	stuck_t.resize(total)
@@ -142,6 +151,7 @@ func add_ant_at(cell: Vector2i, ant_caste: int = CasteDefs.Caste.WORKER, ant_fac
 	carry[i] = 0
 	carry_kind[i] = 0
 	carry_egg[i] = -1
+	patrol_x[i] = -1
 	hp[i] = (cfg.queen_hp_base if ant_caste == CasteDefs.Caste.QUEEN else cfg.ant_hp) * CasteDefs.HP_MULT[ant_caste]
 	# Fase 9: mejora de vida, solo bando jugador (las rivales no se benefician de tus mejoras).
 	if ant_faction == 0:
@@ -163,6 +173,15 @@ func apply_hp_upgrade(ratio: float) -> void:
 	for i in count:
 		if alive[i] == 1 and faction[i] == 0:
 			hp[i] *= ratio
+
+
+func queen_field() -> PackedInt32Array:
+	var qc := _cell_index(pos[sim.queen_id])
+	if qc != _queen_field_cell or sim.world.passable_version != _queen_field_terrain:
+		_queen_field_cell = qc
+		_queen_field_terrain = sim.world.passable_version
+		_queen_field = sim.fields.bfs_from([qc])
+	return _queen_field
 
 
 func _cell_index(p: Vector2) -> int:
@@ -217,9 +236,9 @@ func tick() -> void:
 				_move(i, dt, lv)
 			continue
 		if caste[i] == CasteDefs.Caste.DRONE:
-			# Sigue sin pelear activo (no abandona la tarea por una amenaza, solo devuelve el golpe
-			# si lo alcanzan donde está: defensa pasiva, igual que siempre). Pero ya no es del todo
-			# inmóvil: su única tarea es cargar huevos hasta la Guardería (ver `_think_drone`).
+			# Golpea a lo que tenga al alcance. Fase 14: además de cargar huevos hasta la Guardería,
+			# defiende a la reina y a los huevos si una amenaza se les acerca, y sin tarea escolta a la
+			# reina (ver `AntCasteAI.think_drone`); fuera de ese radio sigue sin perseguir a nadie.
 			var threat = _nearest_threat(p, cfg.soldier_melee_range_px)
 			if threat != null:
 				threat.take_damage(CasteDefs.DAMAGE_PER_S[CasteDefs.Caste.DRONE] * dt * sim.upgrades.damage_mult)
@@ -313,7 +332,6 @@ func _dig_progress(i: int, dt: float) -> void:
 		# `_think_dig` la saca sola a IDLE si ya no hay nada alcanzable que cavar.
 		if world.marked_count > 0:
 			timer[i] = 0.0
-			next_think[i] = sim.tick_count
 		else:
 			state[i] = State.IDLE
 			timer[i] = 0.0
@@ -468,7 +486,10 @@ func _think_idle(i: int, cx: int, cy: int, ci: int, think_dt: float) -> void:
 	# Elegir trabajo.
 	var diggers := state_counts[State.DIG]
 	var max_diggers := maxi(2, int(alive_count * cfg.max_diggers_fraction))
-	if sim.world.marked_count > 0 and diggers < mini(sim.world.marked_count, max_diggers) and sim.fields.dig_dist[ci] < FAR:
+	# Fase 14: tope por celdas cavables a la vez (`dig_frontier`), no por el total marcado: un túnel
+	# de 15 celdas se cava de a una, y mandar más obreras solo las hacía ir y volver.
+	var can_dig := mini(sim.fields.dig_frontier, sim.world.marked_count)
+	if sim.world.marked_count > 0 and diggers < mini(can_dig, max_diggers) and sim.fields.dig_dist[ci] < FAR:
 		state[i] = State.DIG
 		state_counts[State.DIG] += 1
 	elif sim.total_leaves_left > 0 or not sim.corpses.is_empty():

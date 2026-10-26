@@ -274,6 +274,20 @@ extends Resource
 @export var inc_upgrade_work_step := 0.12
 
 ## Fase 14: Nivel 0 (tutorial jugable, ver `sim/colony/tutorial_level.gd`).
+## Fase 14: patrulla del soldado (ver `AntCasteAI.patrol`).
+@export_group("Fase 14: patrulla y zánganos")
+## Probabilidad de que, al elegir el siguiente punto de patrulla, el soldado vaya a revisar el nido.
+@export var soldier_nest_check_chance := 0.2
+@export var soldier_nest_check_s := 6.0
+## Si no llega a su punto de patrulla en este tiempo (algo en el camino), elige otro.
+@export var soldier_patrol_timeout_s := 40.0
+## Probabilidad de que un huevo comprado en Juego normal nazca zángano (sale de la parte de
+## obrera: `inc_egg_soldier_chance` no cambia).
+@export var inc_egg_drone_chance := 0.12
+## Zángano guardián: si una amenaza llega a esta distancia (px) de la reina o de un huevo, los
+## zánganos van a pelear ahí; más lejos no persiguen (su lugar es junto a la reina).
+@export var drone_guard_px := 64.0
+
 @export_group("Fase 14: Nivel 0")
 ## Comida inicial: más que `inc_start_food` para que el primer huevo se pueda comprar pronto.
 @export var tut_start_food := 60.0

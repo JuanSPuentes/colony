@@ -149,7 +149,7 @@ static func to_dict(sim: Simulation) -> Dictionary:
 		"trip_steps": Array(ants.trip_steps), "job": Array(ants.job),
 		"last_cell": Array(ants.last_cell), "ignore_until": Array(ants.ignore_until),
 		"alive": Array(ants.alive), "carry": Array(ants.carry), "carry_kind": Array(ants.carry_kind),
-		"carry_egg": Array(ants.carry_egg),
+		"carry_egg": Array(ants.carry_egg), "patrol_x": Array(ants.patrol_x),
 		"hp": Array(ants.hp), "timer": Array(ants.timer),
 		"stuck_t": Array(ants.stuck_t), "check_acc": Array(ants.check_acc),
 		"max_stuck_seen": ants.max_stuck_seen,
@@ -362,6 +362,12 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	if ants.carry_egg.size() != ants.count:
 		ants.carry_egg.resize(ants.count)
 		ants.carry_egg.fill(-1)
+	# Fase 14: ausente en guardados viejos; -1 = el soldado elige un punto nuevo al pensar.
+	var patrol_in: Array = ad.get("patrol_x", [])
+	ants.patrol_x = PackedInt32Array(patrol_in)
+	if ants.patrol_x.size() != ants.count:
+		ants.patrol_x.resize(ants.count)
+		ants.patrol_x.fill(-1)
 	ants.hp = PackedFloat32Array(ad["hp"])
 	ants.timer = PackedFloat32Array(ad["timer"])
 	ants.stuck_t = PackedFloat32Array(ad["stuck_t"])

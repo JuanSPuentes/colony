@@ -45,6 +45,8 @@ convención de una prueba por fase. Existe justo para que el proyecto no se vuel
 19. [Fase 12: guía rápida al entrar a "Juego normal"](#19-fase-12-guía-rápida-al-entrar-a-juego-normal)
 20. [Fase 13: las mejoras son progresivas de verdad](#20-fase-13-las-mejoras-son-progresivas-de-verdad)
 21. [Fase 14: controles de cámara, guía contextual y Nivel 0](#21-fase-14-controles-de-cámara-guía-contextual-y-nivel-0)
+22. [Fase 15: nido cerrado, excavación continua, árboles al azar y feromonas más claras](#22-fase-15-nido-cerrado-excavación-continua-árboles-al-azar-y-feromonas-más-claras)
+23. [Fase 16: obreras, soldados, huevos y zánganos](#23-fase-16-obreras-soldados-huevos-y-zánganos)
 
 ---
 
@@ -349,6 +351,8 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | `Godot --headless --path . --script tools/test_phase10.gd` | Tutorial de "Juego normal" (sección 17): la lista de pasos propia del modo incremental progresa en orden (cavar, comida, comprar huevo, comprar mejora), `cmd_buy_egg`/`cmd_buy_upgrade` incrementan los contadores que lee, el modo historia sigue con su propia lista sin mezclarse, el modo Test nunca muestra la burbuja, reiniciar partida reinicia el progreso. |
 | (sección 18, sin suite propia) | Mapa aleatorio en "Juego normal": cubierto dentro de `tools/test_app_menu.gd` (dos partidas sucesivas caen en semillas distintas; Modo infinito sigue fijo). |
 | `Godot --headless --path . --script tools/test_phase14.gd` | Fase 14 (sección 21): clic izquierdo arrastra el mapa y no usa la herramienta, clic derecho sí, Shift + derecho borra, flechas/WASD con Shift más rápido, teclas combinadas y diagonal normalizada, la guía contextual (orden de lecciones, pausa y acercamiento, objetivos que se cumplen solos), el Nivel 0 (sin araña/lluvia/estaciones automáticas, batalla pedida por la guía, las hormigas dañan a la reina rival, victoria al matarla, guardar/cargar). **34 pruebas.** |
+| `Godot --headless --path . --script tools/test_phase15.gd` | Fase 15 (sección 22): nido cerrado y árboles al azar en Juego normal, excavación continua, soldados que sueltan un rastro de Ataque vacío, tarjeta de las feromonas. **21 pruebas.** |
+| `Godot --headless --path . --script tools/test_phase16.gd` | Fase 16 (sección 23): un túnel largo se cava sin ir y volver (casi una decisión por celda), los soldados patrullan casi todo el ancho del mapa y revisan el nido, los huevos nacen al lado de la reina en una celda libre, la cría se dibuja sobre la capa de feromonas, nacen zánganos en Juego normal, el zángano defiende a la reina sin perseguir lejos y la escolta por los túneles, guardar/cargar la patrulla. **16 pruebas.** |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
 **Última ejecución verificada (2026-10-22, Godot 4.7.2):** las 13 suites de la tabla pasan, incluida `test_phase14` (34/34). Antes (2026-10-20): las siete suites en 34/34 (Fase 0),
@@ -873,3 +877,36 @@ el motivo en letra normal (con salto de línea) y cómo seguir.
 - Pruebas: `tools/test_phase15.gd` (21). Las pruebas de rendimiento/movimiento de `test_phase0` y
   `test_phase1` pasaron de 500 a 50 hormigas, a pedido del jugador (tardaban minutos y fallaban por
   carga de la máquina).
+
+## 23. Fase 16: obreras, soldados, huevos y zánganos
+
+Cuatro problemas de comportamiento reportados jugando. Cada uno se reprodujo primero con una
+simulación de diagnóstico antes de tocar el código.
+
+**Obreras que iban y venían sin cavar.** Con 17 obreras y un túnel de 18 celdas, decidían cavar
+49 veces para 18 celdas: tras cavar cada celda volvían a "descansar" al nido antes de poder
+elegir trabajo (`_think_idle` exige estar cerca del nido), y si llegaban a la punta ya tomada,
+también. Ahora, tras cavar, siguen cavando si queda algo marcado; si la punta está tomada, esperan
+ahí; y el tope de excavadoras sale de las celdas cavables a la vez
+(`NestDistanceField.dig_frontier`), no del total marcado. Resultado: 11 decisiones para 18 celdas,
+y el túnel se termina antes.
+
+**Soldados que no recorrían el mapa.** Patrullaban con la misma puntuación de una obrera
+explorando (atraídos por la feromona de comida, repelidos por la de hogar) y se quedaban en la
+franja junto al rastro (columnas 42 a 86 de 0 a 119). Ahora (`AntCasteAI.patrol`) eligen un punto
+al azar a lo ancho de todo el mapa, caminan por la superficie hasta llegar y eligen otro; con
+`soldier_nest_check_chance` vuelven a revisar el nido un rato. El punto se guarda en
+`AntSystem.patrol_x` (y con F6).
+
+**Huevos invisibles en una cámara Real nueva.** El huevo nacía exactamente en la posición de la
+reina, y su sprite (más chico) quedaba debajo de ella; además la cría se dibujaba por debajo de la
+capa de feromonas y cámaras. Ahora nace en una celda libre al lado de la reina
+(`Simulation.egg_spot`), la cría se dibuja sobre esa capa, y larva y pupa también tienen dibujo.
+
+**Zánganos.** No nacían en Juego normal: ahora un huevo comprado puede salir zángano
+(`inc_egg_drone_chance`). Además de llevar huevos a la Guardería, defienden: si una amenaza llega
+a `drone_guard_px` de la reina o de un huevo, sueltan lo que carguen y van a pelear; más lejos no
+persiguen. Sin tarea, escoltan a la reina siguiendo los túneles (un campo de distancias a su
+celda, compartido y recalculado solo si ella se mueve o cambia el terreno). Aparecen en el HUD, en
+la guía de "Cómo jugar", en la lección de castas del Nivel 0 y en un consejo cuando nace el
+primero. Cambio intencional: `tools/test_phase1.gd` ya no exige que el zángano pelee "sin moverse".

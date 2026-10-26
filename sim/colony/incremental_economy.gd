@@ -54,8 +54,14 @@ func buy_egg() -> bool:
 		return false
 	sim.colony.food -= egg_cost()
 	bought_eggs += 1
-	var caste := CasteDefs.Caste.SOLDIER if sim.rng.randf() < sim.cfg.inc_egg_soldier_chance else CasteDefs.Caste.WORKER
-	sim.brood.lay_egg(caste, sim.ants.pos[sim.queen_id])
+	# Fase 14: también pueden salir zánganos (antes nunca en este modo: no existían en Juego normal).
+	var r := sim.rng.randf()
+	var caste := CasteDefs.Caste.WORKER
+	if r < sim.cfg.inc_egg_soldier_chance:
+		caste = CasteDefs.Caste.SOLDIER
+	elif r < sim.cfg.inc_egg_soldier_chance + sim.cfg.inc_egg_drone_chance:
+		caste = CasteDefs.Caste.DRONE
+	sim.brood.lay_egg(caste, sim.egg_spot())
 	return true
 
 

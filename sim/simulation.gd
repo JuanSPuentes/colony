@@ -212,6 +212,27 @@ func spawn_tutorial_start() -> void:
 	rain_start_tick = -1
 
 
+## Fase 14: dónde deja la reina un huevo nuevo: en una celda libre al lado suyo (no debajo). Antes
+## nacía exactamente en su posición y el sprite del huevo, más chico, quedaba tapado por la reina:
+## con la reina quieta en una cámara Real nueva, los huevos "no aparecían".
+func egg_spot() -> Vector2:
+	var q := ants.pos[queen_id]
+	var cx := floori(q.x / cfg.cell_px)
+	var cy := floori(q.y / cfg.cell_px)
+	var free: Array[Vector2i] = []
+	for k in 8:
+		var nx: int = cx + AntSystem.DX[k]
+		var ny: int = cy + AntSystem.DY[k]
+		if ny >= cfg.surface_y and world.is_passable(nx, ny):
+			free.append(Vector2i(nx, ny))
+	if free.is_empty():
+		return q
+	var c := free[rng.randi() % free.size()]
+	# Un poco de desorden dentro de la celda: varios huevos en la misma no se tapan entre sí.
+	var jitter := Vector2(rng.randf_range(-0.3, 0.3), rng.randf_range(-0.25, 0.25)) * cfg.cell_px
+	return (Vector2(c) + Vector2(0.5, 0.5)) * cfg.cell_px + jitter
+
+
 ## Fase 14: la guía pide la batalla final del Nivel 0 (ver `sim/colony/tutorial_level.gd`).
 func cmd_start_tutorial_battle() -> bool:
 	return TutorialLevel.start_battle(self)

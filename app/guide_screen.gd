@@ -22,8 +22,9 @@ const PANEL_BG := Color(0.07, 0.06, 0.08, 0.92)
 const SECTIONS := [
 	["Tu colonia", [
 		"La reina pone huevos; tú los compras con comida (botón [7]).",
-		"Cada huevo nace Obrera o Soldado al azar — no se elige.",
-		"Obreras: cavan y traen hojas. Soldados: defienden la colonia.",
+		"Cada huevo nace Obrera, Soldado o Zángano al azar — no se elige.",
+		"Obreras: cavan y traen hojas. Soldados: patrullan y defienden la colonia.",
+		"Zánganos: escoltan a la reina, la defienden a ella y a los huevos, y llevan los huevos a la Guardería.",
 	]],
 	["Comida", [
 		"Pinta un rastro con la feromona de Comida [2] hacia una planta.",

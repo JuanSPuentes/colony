@@ -306,8 +306,11 @@ func _t_colony_wide_defense_by_caste() -> void:
 	var hp1 := with_drone.spider.hp
 	var start_pos := with_drone.ants.pos[d]
 	_run(with_drone, 3.0)
-	_check("el zángano pelea pasivo (daño chico) sin moverse", with_drone.spider.hp < hp1 and with_drone.ants.pos[d] == start_pos,
-		"vida araña %.1f -> %.1f" % [hp1, with_drone.spider.hp])
+	# Fase 15 (cambio intencional, pedido del jugador): el zángano ya no es solo pasivo; si la amenaza
+	# está cerca de la reina o de un huevo (acá la araña está en la entrada, a pocas celdas de la
+	# reina) sale a defenderla, así que puede moverse. Lo que sigue igual: su daño es el más chico.
+	_check("el zángano pelea con daño chico", with_drone.spider.hp < hp1 and hp1 - with_drone.spider.hp < (hp0 - with_worker.spider.hp) + 0.01,
+		"vida araña %.1f -> %.1f (posición %s -> %s)" % [hp1, with_drone.spider.hp, start_pos, with_drone.ants.pos[d]])
 
 	var with_nurse := _colony(cfg, 32)
 	# `spawn_colony_court` ya pone nodrizas; usamos la que venga puesta, no hace falta agregar otra.

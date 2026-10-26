@@ -11,6 +11,10 @@ var world: WorldGrid
 var nest_dist := PackedInt32Array()
 var surface_dist := PackedInt32Array()
 var dig_dist := PackedInt32Array()
+## Fase 14: celdas marcadas que se pueden cavar YA (tienen al lado una celda pasable), tomadas o
+## no. Un túnel largo marcado solo se cava por la punta: mandar más excavadoras que esto las hace ir
+## y volver sin nada que hacer (ver `AntSystem._think_idle`).
+var dig_frontier := 0
 var _queue := PackedInt32Array()
 var recomputes := 0
 
@@ -43,18 +47,25 @@ func recompute_dig() -> void:
 	var sources: Array[int] = []
 	var seen := {}
 	var w := world.w
+	dig_frontier = 0
 	for y in range(world.cfg.surface_y - 1, world.h):
 		for x in w:
 			var i := y * w + x
-			if world.cells[i] == WorldGrid.Cell.MARKED and world.job_claim[i] == -1:
+			if world.cells[i] == WorldGrid.Cell.MARKED:
+				var open := false
 				for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 					var nx: int = x + d.x
 					var ny: int = y + d.y
 					if world.is_passable(nx, ny):
+						open = true
+						if world.job_claim[i] != -1:
+							continue
 						var ni: int = ny * w + nx
 						if not seen.has(ni):
 							seen[ni] = true
 							sources.append(ni)
+				if open:
+					dig_frontier += 1
 	_bfs(sources, dig_dist)
 
 

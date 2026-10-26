@@ -146,7 +146,7 @@ func tick(sim: Simulation, dt: float) -> void:
 	if egg_cooldown <= 0.0 and sim.queen_id >= 0 and ants.alive[sim.queen_id] == 1 \
 			and rooms.valid[WorldGrid.Room.ROYAL] and food >= cfg.egg_food_threshold:
 		food -= cfg.egg_lay_cost
-		sim.brood.lay_egg(furthest_from_target(sim), ants.pos[sim.queen_id])
+		sim.brood.lay_egg(furthest_from_target(sim), sim.egg_spot())
 		egg_cooldown = cfg.egg_interval_s
 	_trend_timer += dt
 	if _trend_timer >= 5.0:
