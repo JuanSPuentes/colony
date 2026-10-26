@@ -244,6 +244,11 @@ extends Resource
 ## una colonia de 5 hormigas que todavía no puede cavar un drenaje). Por defecto: inicio del día 3
 ## (`day_length_s * 2`; si `day_length_s` cambia, esto hay que recalcularlo a mano).
 @export var inc_rain_first_s := 600.0
+## Fase 23: en Juego normal llovía cada `rain_interval_s` (200 s, ~1,5 lluvias por día de 300 s): casi
+## todos los días, y la supervivencia se volvía muy difícil. Ahora la próxima lluvia llega entre
+## estos dos valores (1,5 a 2,5 días), al azar para que no sea predecible.
+@export var inc_rain_interval_min_s := 450.0
+@export var inc_rain_interval_max_s := 750.0
 ## Hojas que rebrota cada planta por segundo, solo de día y hasta su máximo.
 @export var inc_plant_regrow_per_s := 0.06
 ## Fase 19: árbol gigante (solo "Juego normal" con mapa al azar). Lejos del nido, muchas más hojas y

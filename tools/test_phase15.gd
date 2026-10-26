@@ -19,6 +19,7 @@ func _initialize() -> void:
 	_t_painted_trail_survives_in_normal_game()
 	_t_unreachable_threat_does_not_stop_digging()
 	_t_flooded_path_does_not_trap_diggers()
+	_t_rain_is_less_frequent_in_normal_game()
 	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -299,3 +300,16 @@ func _t_flooded_path_does_not_trap_diggers() -> void:
 	for t in int(40.0 * cfg.tick_rate):
 		sim.tick()
 	_check("cuando baja el agua, vuelven a cavar solas", sim.dug - dug0 == 3, "cavadas=%d" % (sim.dug - dug0))
+
+
+## Fase 23: en Juego normal llovía casi todos los días (cada 200 s, día de 300 s). Ahora la próxima
+## lluvia llega a 1,5-2,5 días. En 30 minutos (6 días) deberían caer pocas, no 7 u 8.
+func _t_rain_is_less_frequent_in_normal_game() -> void:
+	var cfg := SimConfig.new()
+	cfg.rain_auto = true
+	var sim := Simulation.new(cfg, 12)
+	sim.spawn_incremental_start()
+	for i in int(1800.0 * cfg.tick_rate):
+		sim.tick()
+	_check("en Juego normal llueve cada 1,5-2,5 días, no casi todos los días", sim.rains_started >= 2 and sim.rains_started <= 4,
+		"lluvias en 30 min: %d" % sim.rains_started)

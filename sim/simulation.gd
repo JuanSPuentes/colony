@@ -663,7 +663,7 @@ func _update_weather() -> void:
 			if tick_count >= rain_end_tick:
 				weather = Weather.CLEAR
 				water.raining = false
-				rain_start_tick = tick_count + int(cfg.rain_interval_s * cfg.tick_rate) if cfg.rain_auto else -1
+				rain_start_tick = tick_count + int(_rain_interval_s() * cfg.tick_rate) if cfg.rain_auto else -1
 
 
 func _begin_rain() -> void:
@@ -869,3 +869,11 @@ func checksum() -> int:
 	if incremental:
 		h = (h * 31 + econ.bought_eggs * 7 + total_leaves_left) & 0x7fffffff
 	return h
+
+
+## Fase 23: segundos hasta la próxima lluvia. En Juego normal, al azar entre 1,5 y 2,5 días (antes
+## llovía casi todos los días); en los demás modos, el intervalo fijo de siempre.
+func _rain_interval_s() -> float:
+	if incremental:
+		return rng.randf_range(cfg.inc_rain_interval_min_s, cfg.inc_rain_interval_max_s)
+	return cfg.rain_interval_s
