@@ -354,7 +354,7 @@ Todas las pruebas son GDScript corrido a través de Godot. Usa el build de conso
 | `Godot --headless --path . --script tools/test_phase14.gd` | Fase 14 (sección 21): clic izquierdo arrastra el mapa y no usa la herramienta, clic derecho sí, Shift + derecho borra, flechas/WASD con Shift más rápido, teclas combinadas y diagonal normalizada, la guía contextual (orden de lecciones, pausa y acercamiento, objetivos que se cumplen solos), el Nivel 0 (sin araña/lluvia/estaciones automáticas, batalla pedida por la guía, las hormigas dañan a la reina rival, victoria al matarla, guardar/cargar). **34 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase15.gd` | Fase 15 (sección 22): nido cerrado y árboles al azar en Juego normal, excavación continua, soldados que sueltan un rastro de Ataque vacío, tarjeta de las feromonas. **21 pruebas.** |
 | `Godot --headless --path . --script tools/test_phase16.gd` | Fase 16 (sección 23): un túnel largo se cava sin ir y volver (casi una decisión por celda), los soldados patrullan casi todo el ancho del mapa y revisan el nido, los huevos nacen al lado de la reina en una celda libre, la cría se dibuja sobre la capa de feromonas, nacen zánganos en Juego normal, el zángano defiende a la reina sin perseguir lejos y la escolta por los túneles, guardar/cargar la patrulla. **16 pruebas.** |
-| `Godot --headless --path . --script tools/test_phase17.gd` | Fase 17 (sección 24): los soldados ganan la batalla en formación y sobreviven, con el nido cerrado la batalla avisa que hay que abrirlo, una rival encima de la cámara (a través de la tierra) no saca al zángano pero una dentro del nido sí, Juego normal arranca con Real/Guardería/Almacén, la comida va al Almacén en Juego normal y al nido en Modo infinito, guardar/cargar la formación. **11 pruebas.** |
+| `Godot --headless --path . --script tools/test_phase17.gd` | Fase 17 (sección 24): los soldados ganan la batalla en formación y sobreviven, con el nido cerrado la batalla avisa que hay que abrirlo, una rival encima de la cámara (a través de la tierra) no saca al zángano pero una dentro del nido sí, Juego normal arranca con Real/Guardería/Almacén, la comida va al Almacén en Juego normal y al nido en Modo infinito, guardar/cargar la formación, las obreras iniciales cavan con el nido cerrado, los zánganos nunca pisan la tierra ni hacen saltar los huevos, la araña no sigue a su presa por el pozo, las estaciones duran sus días completos sin oleada repetida (20/15/25/15), la vida en % cuenta la mejora de Vida. **25 pruebas.** |
 | `Godot --path . --script tools/screenshot.gd -- <carpeta>` | (Necesita ventana.) Guarda capturas PNG. |
 
 **Última ejecución verificada (2026-10-22, Godot 4.7.2):** las 13 suites de la tabla pasan, incluida `test_phase14` (34/34). Antes (2026-10-20): las siete suites en 34/34 (Fase 0),
@@ -668,8 +668,9 @@ condición de victoria real de este modo.
   que `Spider`. `RivalColony.start_battle(ant_count, strength)` la hace aparecer junto a su oleada,
   lejos del nido del jugador; `update()` detecta cuándo muere para terminar la batalla.
 - **`sim/colony/season_system.gd`:** cada tick (solo en modo incremental) decide si hay que
-  arrancar la batalla del último día (`cfg.season_length_days`) o si hay que cerrar la estación
-  porque la batalla ya se ganó. Al cerrar la 4ª: `game_over = true; victory = true`.
+  arrancar la batalla del último día de la estación (`cfg.season_days`, una duración por
+  estación desde la Fase 17; antes `season_length_days`) o si hay que cerrar la estación porque
+  la batalla ya se ganó. Al cerrar la 4ª: `game_over = true; victory = true`.
 - **Mejoras de colonia (`sim/colony/upgrades.gd`):** se compran con comida, mismo patrón de costo
   creciente que comprar un huevo (`cmd_buy_upgrade`). Cuatro stats (daño, vida, velocidad de
   movimiento, velocidad de cavado), **progresivas de verdad: afectan a toda la colonia**, no solo
@@ -951,3 +952,30 @@ idéntica antes y después en tres partidas de referencia). Con ~300 hormigas en
   (`_new_game_scene`). Se quitaron dos funciones que nadie usaba.
 - `tools/test_phase15.gd` mide las obreras atrapadas por racha (más de 10 s seguidos), no en un solo
   instante: así daba 3 o 4 según el azar sin que ninguna estuviera atrapada.
+
+**Obreras iniciales que no cavaban con el nido cerrado.** Antes de que el jugador marcara nada salían
+a explorar; sin salida a la superficie daban vueltas para siempre, y una obrera explorando nunca
+revisa si hay algo para cavar (solo cavaban las nacidas de un huevo nuevo). Ahora, sin salida, no
+se va a explorar (descansa y desde ahí elige cavar), y sin comida que buscar cavan todas, no solo el
+35 %. Con el nido abierto no cambia nada.
+
+**Zánganos que atravesaban las paredes.** Desde la Fase 1 iban a la Guardería y a buscar huevos en
+línea recta, y el huevo saltaba hasta ellos apenas lo elegían. Ahora todo su movimiento (Guardería,
+huevos, escolta, defensa) va por los túneles con `AntSystem.path_field` (campo de distancias hasta
+una celda, en caché) y `step_along`, y recogen el huevo recién al llegar a su lado. Medido en 90 s:
+0 de 7.200 muestras dentro de la tierra (antes 51) y 0 saltos de huevo (antes 10).
+
+**La araña entraba al nido.** Elegía una obrera en la superficie y, si esta bajaba por el pozo, la
+seguía en línea recta a través de la tierra. Ahora suelta a la presa que se mete bajo tierra y solo
+camina a lo largo de la superficie; el daño a la reina sigue llegando por el asedio en la entrada.
+
+**Estaciones.** Se contaban con `(día - 1) % largo`: ganar la batalla el último día hacía que la
+estación siguiente empezara ya en su último día (otra oleada y otra reina al instante: "la reina
+revive"), y una batalla larga le quitaba días a la siguiente. Ahora cada estación cuenta desde su
+propio inicio (`Simulation.season_start_day`, guardado con F6; los guardados viejos lo deducen) y
+la siguiente empieza al día siguiente de ganar. Cada estación tiene su duración
+(`cfg.season_days`): Primavera 20 días, Verano 15, Otoño 25, Invierno 15.
+
+**Vida en %.** Se medía contra la vida base, sin la mejora de Vida: una hormiga sana con la mejora
+comprada figuraba con 115 % o más. Ahora se mide contra su vida máxima real (`AntSystem.max_hp`,
+la misma cuenta con la que nace), en el tooltip, el panel y la barra de arriba.
