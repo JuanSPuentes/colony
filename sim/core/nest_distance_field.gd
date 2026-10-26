@@ -93,10 +93,10 @@ func recompute_storage() -> void:
 ## usa `cmd_move_queen`: distancia de cada celda hasta la celda elegida por el jugador). A
 ## diferencia de `nest_dist`/`surface_dist`/`dig_dist`, no se guarda ni se recalcula solo: cada
 ## llamado es una BFS nueva de principio a fin.
-func bfs_from(sources: Array[int]) -> PackedInt32Array:
+func bfs_from(sources: Array[int], avoid_water := false) -> PackedInt32Array:
 	var out := PackedInt32Array()
 	out.resize(world.w * world.h)
-	_bfs(sources, out)
+	_bfs(sources, out, avoid_water)
 	return out
 
 

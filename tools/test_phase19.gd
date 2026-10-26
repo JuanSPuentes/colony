@@ -13,6 +13,7 @@ func _initialize() -> void:
 	_t_connected_pocket_is_harvested()
 	_t_regrow_rules()
 	_t_save_load_keeps_kinds()
+	_t_flooded_pocket_is_skipped()
 	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -156,3 +157,30 @@ func _t_save_load_keeps_kinds() -> void:
 			same = same and back.plants[k].kind == sim.plants[k].kind and back.plants[k].hue == sim.plants[k].hue \
 				and back.plants[k].pocket.size() == sim.plants[k].pocket.size()
 	_check("guardar/cargar conserva gigantes y bolsones (tipo, color y cueva)", same)
+
+
+## Fase 22: con la cueva inundada, las obreras no se quedan dando vueltas intentando llegar a los
+## hongos (el camino esquiva el agua: el bolsón queda inalcanzable); cuando baja, vuelven a cosechar.
+func _t_flooded_pocket_is_skipped() -> void:
+	var sim := _fresh(7)
+	var m := _nearest_pocket(sim)
+	_connect(sim, m)
+	var w := sim.world
+	var heading_there := 0
+	for t in int(25.0 * sim.cfg.tick_rate):
+		for c in m.pocket:
+			var i := c.y * w.w + c.x
+			if sim.water.level[i] < 0.9:
+				sim.water.add(i, 0.95 - sim.water.level[i])
+		sim.tick()
+	for a in sim.ants.count:
+		if sim.ants.alive[a] == 1 and sim.ants.state[a] == AntSystem.State.GO_TO_FOOD:
+			heading_there += 1
+	var nest_i := (sim.cfg.surface_y + sim.cfg.shaft_depth + 1) * w.w + sim.cfg.nest_x
+	_check("con la cueva inundada, el bolsón figura inalcanzable", sim.ants.mushroom_route(m)[nest_i] >= NestDistanceField.FAR)
+	_check("con la cueva inundada, ninguna obrera se queda intentando ir", heading_there == 0, "yendo a comer=%d" % heading_there)
+	sim.water.clear()
+	var taken0 := m.max_leaves - m.leaves
+	for t in int(60.0 * sim.cfg.tick_rate):
+		sim.tick()
+	_check("cuando baja el agua, vuelven a cosechar el bolsón", m.max_leaves - m.leaves > taken0, "tomados antes=%d después=%d" % [taken0, m.max_leaves - m.leaves])

@@ -689,10 +689,13 @@ func _go_to_plant(i: int, cx: int, cy: int, ci: int, pl: Plant) -> void:
 ## Fase 19: distancia por túnel hasta un bolsón de hongos, recalculada solo cuando cambia el
 ## terreno (se cava o se tapa algo). FAR = no hay camino.
 func mushroom_route(pl: Plant) -> PackedInt32Array:
-	if pl.route_version != sim.world.passable_version or pl.route.is_empty():
+	# Fase 22: el camino esquiva el agua profunda (las obreras no la cruzan): con la cueva inundada
+	# el bolsón queda inalcanzable y las obreras buscan comida en otro lado en vez de dar vueltas.
+	if pl.route_version != sim.world.passable_version or pl.route_water != sim.water_epoch or pl.route.is_empty():
 		var src: Array[int] = [pl.cell.y * sim.world.w + pl.cell.x]
-		pl.route = sim.fields.bfs_from(src)
+		pl.route = sim.fields.bfs_from(src, true)
 		pl.route_version = sim.world.passable_version
+		pl.route_water = sim.water_epoch
 	return pl.route
 
 

@@ -127,6 +127,9 @@ var _storage_terrain_seen := -1
 var _jobs_seen := -1
 var _dig_dirty := true
 var _dig_was_wet := false
+## Fase 22: sube unas veces por segundo mientras hay agua; los caminos que esquivan el agua
+## (bolsones de hongos) se recalculan cuando cambia.
+var water_epoch := 0
 
 
 func _init(config: SimConfig, seed_value: int = -1) -> void:
@@ -504,6 +507,9 @@ func tick() -> void:
 	if _dig_dirty and tick_count % cfg.field_refresh_ticks == 0:
 		_dig_dirty = false
 		fields.recompute_dig()
+		# Fase 22: los caminos a los bolsones de hongos (`AntSystem.mushroom_route`) también esquivan
+		# el agua: se renuevan solos cuando cambia esta época, a la par de `dig_dist`.
+		water_epoch += 1
 	rooms.maybe_recompute()
 	# Fase 17: en Juego normal la comida va al Almacén (ver `AntSystem._use_storage`).
 	if incremental and (world.rooms_version != _storage_rooms_seen or fields.recomputes != _storage_terrain_seen):

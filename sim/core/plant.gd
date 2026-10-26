@@ -22,6 +22,7 @@ var pocket: Array[Vector2i] = []
 ## Hongos: distancia por túnel hasta el bolsón y con qué terreno se calculó (ver `AntSystem`).
 var route := PackedInt32Array()
 var route_version := -1
+var route_water := -1
 
 
 func _init(c: Vector2i, n: int) -> void:
