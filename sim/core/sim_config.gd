@@ -232,7 +232,7 @@ extends Resource
 ## por `growth`. Qué sale al nacer es al azar (`inc_egg_soldier_chance`), no una elección del
 ## jugador — ver README sección 9b.
 @export var inc_egg_cost := 20.0
-@export var inc_egg_cost_growth := 1.15
+@export var inc_egg_cost_growth := 1.07
 ## Probabilidad de que un huevo nazca soldado; el resto, obrera. Las nodrizas no se compran en
 ## este modo (sin cambios: ver sección 9b).
 @export var inc_egg_soldier_chance := 0.3
@@ -250,7 +250,7 @@ extends Resource
 @export var inc_rain_interval_min_s := 450.0
 @export var inc_rain_interval_max_s := 750.0
 ## Hojas que rebrota cada planta por segundo, solo de día y hasta su máximo.
-@export var inc_plant_regrow_per_s := 0.06
+@export var inc_plant_regrow_per_s := 0.1
 ## Fase 19: árbol gigante (solo "Juego normal" con mapa al azar). Lejos del nido, muchas más hojas y
 ## rebrote más rápido: vale la pena un rastro largo y defenderlo.
 @export var giant_count_min := 1
@@ -286,8 +286,8 @@ extends Resource
 
 ## Mejoras de la colonia (`sim/colony/upgrades.gd`), compradas con comida: solo afectan a las
 ## hormigas nuevas desde que se compran. Mismo costo creciente que un huevo (`inc_egg_cost*growth`).
-@export var inc_upgrade_base_cost := 60.0
-@export var inc_upgrade_cost_growth := 1.2
+@export var inc_upgrade_base_cost := 40.0
+@export var inc_upgrade_cost_growth := 1.12
 @export var inc_upgrade_damage_step := 0.15
 @export var inc_upgrade_hp_step := 0.15
 @export var inc_upgrade_speed_step := 0.08
