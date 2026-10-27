@@ -345,13 +345,14 @@ func _recount() -> void:
 
 ## Hormigas vivas por casta, solo para las castas pedidas (las demás no entran en el resultado).
 ## Antes esto estaba duplicado en `hud.gd` (una vez para el modo incremental, otra para el modo
-## con reina), cada copia iterando `count` por su cuenta.
+## con reina), cada copia iterando `count` por su cuenta. Solo cuenta las del jugador: antes sumaba
+## también las rivales (todas soldados) y el HUD mostraba "soldados de más" durante una batalla.
 func count_by_caste(castes: Array) -> Dictionary:
 	var counts := {}
 	for c in castes:
 		counts[c] = 0
 	for i in count:
-		if alive[i] == 1 and counts.has(caste[i]):
+		if alive[i] == 1 and faction[i] == 0 and counts.has(caste[i]):
 			counts[caste[i]] += 1
 	return counts
 

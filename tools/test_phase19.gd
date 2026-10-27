@@ -16,6 +16,7 @@ func _initialize() -> void:
 	_t_flooded_pocket_is_skipped()
 	_t_fog()
 	_t_trees_first()
+	_t_egg_rebalance()
 	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -229,3 +230,24 @@ func _t_trees_first() -> void:
 	for i in int(60.0 * sim.cfg.tick_rate):
 		sim.tick()
 	_check("de noche (los árboles no rebrotan) sí van a los hongos", m.leaves < m.max_leaves, "hongos tomados=%d" % (m.max_leaves - m.leaves))
+
+
+## Pocas obreras (muchos soldados) -> los huevos salen casi siempre obrera; y el HUD no cuenta rivales.
+func _t_egg_rebalance() -> void:
+	var sim := _fresh(11)
+	sim.cmd_add_caste_ants(CasteDefs.Caste.SOLDIER, 12)
+	var before := sim.econ.worker_share()
+	var workers := 0
+	for k in 20:
+		sim.colony.food = 1000.0
+		sim.econ.bought_eggs = 0
+		var n := sim.brood.caste.size()
+		if not sim.econ.buy_egg():
+			_check("se pudo comprar el huevo", false, "queen=%s food=%.0f" % [sim.econ._queen_alive(), sim.colony.food])
+			return
+		if sim.brood.caste[n] == CasteDefs.Caste.WORKER:
+			workers += 1
+	_check("con pocas obreras los huevos salen mayormente obrera", before < 0.6 and workers >= 14, "share %.2f, obreras %d/20" % [before, workers])
+	var mine: int = sim.ants.count_by_caste([CasteDefs.Caste.SOLDIER])[CasteDefs.Caste.SOLDIER]
+	sim.ants.add_ant_at(Vector2i(2, sim.cfg.surface_y - 1), CasteDefs.Caste.SOLDIER, 1)
+	_check("los soldados rivales no se cuentan como propios", sim.ants.count_by_caste([CasteDefs.Caste.SOLDIER])[CasteDefs.Caste.SOLDIER] == mine)

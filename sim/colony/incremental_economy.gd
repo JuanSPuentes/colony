@@ -57,12 +57,34 @@ func buy_egg() -> bool:
 	# Fase 14: también pueden salir zánganos (antes nunca en este modo: no existían en Juego normal).
 	var r := sim.rng.randf()
 	var caste := CasteDefs.Caste.WORKER
-	if r < sim.cfg.inc_egg_soldier_chance:
+	# Si las obreras (vivas + cría en camino) quedan por debajo de su mínimo, el huevo sale obrera
+	# con mucha más probabilidad: el sorteo se corrige solo cuando la colonia pierde recolectoras.
+	if worker_share() < sim.cfg.inc_egg_worker_min_share:
+		if r < sim.cfg.inc_egg_worker_boost_chance:
+			caste = CasteDefs.Caste.WORKER
+		elif r < (1.0 + sim.cfg.inc_egg_worker_boost_chance) * 0.5:
+			caste = CasteDefs.Caste.SOLDIER
+		else:
+			caste = CasteDefs.Caste.DRONE
+	elif r < sim.cfg.inc_egg_soldier_chance:
 		caste = CasteDefs.Caste.SOLDIER
 	elif r < sim.cfg.inc_egg_soldier_chance + sim.cfg.inc_egg_drone_chance:
 		caste = CasteDefs.Caste.DRONE
 	sim.brood.lay_egg(caste, sim.egg_spot())
 	return true
+
+
+## Fracción de obreras entre obreras, soldados y zánganos del jugador, contando también la cría
+## viva (para que varios huevos seguidos no sobrecorrijan). Sin ninguna, 0.
+func worker_share() -> float:
+	var castes := [CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE]
+	var c := sim.ants.count_by_caste(castes)
+	var brood := sim.brood
+	for i in brood.caste.size():
+		if brood.alive[i] and c.has(brood.caste[i]):
+			c[brood.caste[i]] += 1
+	var total: int = c[CasteDefs.Caste.WORKER] + c[CasteDefs.Caste.SOLDIER] + c[CasteDefs.Caste.DRONE]
+	return 0.0 if total == 0 else float(c[CasteDefs.Caste.WORKER]) / total
 
 
 func cycle_auto() -> void:

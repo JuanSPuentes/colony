@@ -304,6 +304,10 @@ extends Resource
 ## Probabilidad de que un huevo comprado en Juego normal nazca zángano (sale de la parte de
 ## obrera: `inc_egg_soldier_chance` no cambia).
 @export var inc_egg_drone_chance := 0.12
+## Si las obreras (vivas + cría) son menos que esta fracción de obreras+soldados+zánganos, el huevo
+## sale obrera con `inc_egg_worker_boost_chance`; el resto se reparte entre soldado y zángano.
+@export var inc_egg_worker_min_share := 0.6
+@export var inc_egg_worker_boost_chance := 0.85
 ## Zángano guardián: si una amenaza llega a esta distancia (px) de la reina o de un huevo, los
 ## zánganos van a pelear ahí; más lejos no persiguen (su lugar es junto a la reina).
 @export var drone_guard_px := 64.0
