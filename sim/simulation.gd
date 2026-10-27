@@ -201,7 +201,10 @@ func spawn_incremental_start(fresh_layout := false) -> void:
 	if fresh_layout:
 		_seal_shaft()
 		_carve_side_chambers()
-		home_tree = HomeTree.new(cfg.nest_x, rng.seed)  # Fase 29: antes que los demás árboles, que lo esquivan
+		# Fase 31: la rival vive del otro lado; el árbol madre va en el medio de los dos nidos.
+		if cfg.rival_home:
+			rival_colony.choose_home()
+		home_tree = HomeTree.new(rival_colony.midpoint_x() if rival_colony.home else cfg.nest_x, rng.seed)  # Fase 29: antes que los demás árboles, que lo esquivan
 		_place_plants_random()
 		enable_fog()
 	# Arranca el reloj ya pasado el amanecer (`DayNight.FADE`): a tick_count=0 el mundo se ve casi
@@ -223,6 +226,8 @@ func spawn_incremental_start(fresh_layout := false) -> void:
 	colony.water = 0.0
 	if cfg.rain_auto:
 		rain_start_tick = int(cfg.inc_rain_first_s * cfg.tick_rate)
+	if rival_colony.home:
+		rival_colony.spawn_home()
 	ants._recount()
 
 
@@ -801,6 +806,11 @@ func cmd_buy_egg() -> bool:
 
 
 ## Fase 9: compra un nivel de mejora de colonia (`Upgrades.Stat`) con comida.
+## Fase 31: "¡Atacar!" — los soldados se reúnen en la salida y marchan contra la reina rival.
+func cmd_attack_rival() -> bool:
+	return rival_colony.cmd_attack()
+
+
 func cmd_buy_upgrade(stat: int) -> bool:
 	var ok := incremental and upgrades.buy(stat)
 	if ok:

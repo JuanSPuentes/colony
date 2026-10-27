@@ -190,7 +190,7 @@ static func think_soldier(ants, i: int, cx: int, cy: int, ci: int, think_dt: flo
 				ants.state[i] = AntSystem.State.ATTACK
 				ants._step(i, cx, cy, ci, AntSystem.Mode.TOWARD, sim.attack)
 				return
-	if sim.rival_colony.battle_active and battle_formation(ants, i, cx, cy, ci):
+	if sim.rival_colony.fighting() and battle_formation(ants, i, cx, cy, ci):
 		return
 	ants.state[i] = AntSystem.State.GUARD
 	patrol(ants, i, cx, cy, ci, think_dt)
@@ -225,12 +225,12 @@ static func battle_formation(ants, i: int, cx: int, cy: int, ci: int) -> bool:
 
 ## Fase 14: patrulla de verdad. Antes el soldado "exploraba" con la misma puntuación que una obrera
 ## (atraído por la feromona de comida, repelido por la de hogar) y terminaba yendo y viniendo por
-## la misma franja junto al rastro. Ahora elige un punto al azar a lo ancho de TODO el mapa, camina
-## por la superficie hasta llegar, y elige otro; de vez en cuando vuelve a revisar el nido.
+## la misma franja junto al rastro. Ahora elige un punto al azar a lo ancho del mapa (Fase 31: de su
+## mitad, si la rival vive en el mapa), camina por la superficie hasta llegar, y elige otro; de vez
+## en cuando vuelve a revisar el nido.
 static func patrol(ants, i: int, cx: int, cy: int, ci: int, think_dt: float) -> void:
 	var sim: Simulation = ants.sim
 	var cfg := sim.cfg
-	var w: int = sim.world.w
 	ants.timer[i] -= think_dt
 	var px: int = ants.patrol_x[i]
 	if px == -2:
@@ -249,7 +249,9 @@ static func patrol(ants, i: int, cx: int, cy: int, ci: int, think_dt: float) -> 
 			ants.timer[i] = cfg.soldier_nest_check_s
 			ants._step(i, cx, cy, ci, AntSystem.Mode.NEST, null)
 			return
-		px = sim.rng.randi_range(3, w - 4)
+		# Fase 31: con la rival en el mapa, solo su mitad (hasta el árbol) mientras no haya ataque.
+		var span: Vector2i = sim.rival_colony.player_patrol_range()
+		px = sim.rng.randi_range(span.x, span.y)
 		ants.patrol_x[i] = px
 		ants.timer[i] = cfg.soldier_patrol_timeout_s
 	if not on_surface:

@@ -314,6 +314,10 @@ func _normal_lessons() -> Array[Dictionary]:
 		# pintar un rastro hasta una planta, que en este modo ya no hay).
 		{"id": "drops", "title": "La comida cae del árbol", "when": func(s: Simulation) -> bool: return _nest_open(s) and _played_s(s) > 20.0, "focus": _nest, "zoom": Z_WIDE,
 			"text": "Hojas, semillas y frutas caen bajo la copa. Las obreras las recogen solas: solo necesitan una salida al exterior."},
+		# Fase 31: la rival vive en el mapa desde el principio (NUCLEO.md, pilar "la carrera").
+		{"id": "rival_home", "title": "La colonia rival", "when": func(s: Simulation) -> bool: return s.rival_colony.home and _played_s(s) > 45.0,
+			"focus": func(s: Simulation) -> Vector2: return s.rival_colony.queen.pos, "zoom": Z_NEAR,
+			"text": "Del otro lado del árbol vive una colonia rival. Crece sola y te manda incursiones. Mata a su reina para ganar la estación: tecla 8 o «¡Atacar!»"},
 		{"id": "harvest", "title": "Cosecha", "when": func(s: Simulation) -> bool: return s.delivered > 0, "focus": _nest, "zoom": Z_NEAR,
 			"text": "Hojas, semillas y frutas son comida. Todas las hormigas comen: que no llegue a 0."},
 		{"id": "pheromones", "title": "Las 5 feromonas", "when": func(s: Simulation) -> bool: return s.delivered > 0,

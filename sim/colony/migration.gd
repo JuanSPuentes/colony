@@ -14,6 +14,8 @@ const CARRIED_CASTES: Array[int] = [CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLD
 
 static func migrate(old: Simulation, seed_value: int) -> Simulation:
 	var sim := Simulation.new(old.cfg, seed_value)
+	# Fase 31: la estación va antes del arranque: la reina rival nace con la fuerza de esta estación.
+	sim.season_index = old.season_index
 	sim.spawn_incremental_start(true)
 	# Mejoras primero: `add_ant_at` aplica `hp_mult` a las hormigas que se crean después.
 	sim.upgrades.levels = old.upgrades.levels.duplicate()
@@ -28,7 +30,6 @@ static func migrate(old: Simulation, seed_value: int) -> Simulation:
 	sim.econ.food_earned = old.econ.food_earned
 	# El reloj sigue: mismo día y hora, la estación nueva arranca cuando ya estaba previsto.
 	sim.tick_count = old.tick_count
-	sim.season_index = old.season_index
 	sim.season_start_day = old.season_start_day
 	sim.era = old.era
 	sim.spiders_spawned = old.spiders_spawned
@@ -59,9 +60,10 @@ static func _carry_ants(old: Simulation, sim: Simulation) -> void:
 	if old.queen_id >= 0 and old.ants.alive[old.queen_id] == 1:
 		var max_hp: float = old.cfg.queen_hp_base * CasteDefs.HP_MULT[CasteDefs.Caste.QUEEN] * old.upgrades.hp_mult
 		queen_frac = clampf(old.ants.hp[old.queen_id] / max_hp, 0.05, 1.0)
-	# Fuera las hormigas y la cría del arranque (la reina se queda: es la misma colonia).
+	# Fuera las hormigas y la cría del arranque del jugador (la reina se queda: es la misma colonia;
+	# las de la rival nueva, también).
 	for i in sim.ants.count:
-		if i != sim.queen_id and sim.ants.alive[i] == 1:
+		if i != sim.queen_id and sim.ants.alive[i] == 1 and sim.ants.faction[i] == 0:  # la rival se queda
 			sim.ants.alive[i] = 0
 			sim.ants.alive_count -= 1  # sin `_kill`: no son muertes (ni cadáveres), solo no viajan
 	sim.ants._members_dirty = true

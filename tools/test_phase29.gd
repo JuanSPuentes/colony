@@ -62,7 +62,9 @@ func _t_layout() -> void:
 					trees += 1
 					if absi(p.cell.x - sim.cfg.nest_x) < sim.cfg.home_tree_clear_cells:
 						too_close += 1
-		_check("semilla %d: árbol madre sobre el nido" % s, sim.home_tree != null and sim.home_tree.x == sim.cfg.nest_x)
+		# Fase 31: con la rival en el mapa, el árbol va en el medio de los dos nidos (test_phase31.gd).
+		_check("semilla %d: hay árbol madre, entre el nido y la rival" % s, sim.home_tree != null
+			and sim.home_tree.x == (sim.cfg.nest_x + sim.rival_colony.home_x) / 2)
 		_check("semilla %d: el árbol madre es el único gigante (y no hay otros árboles si así está configurado)" % s,
 			giants == 0 and too_close == 0 and (trees == 0 if sim.cfg.home_tree_other_trees == 0 else trees <= sim.cfg.home_tree_other_trees + 1),
 			"gigantes=%d cerca=%d árboles=%d" % [giants, too_close, trees])

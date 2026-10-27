@@ -528,8 +528,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			elif tool == 3:
 				room_index = (room_index + 1) % ROOM_TYPES.size()
 		# Fase 3 (modo incremental): 7 compra un huevo (la casta que nace es al azar, ya no la
-		# elige el jugador) y 9 cambia la auto-compra; 8 no hace nada en este modo (antes compraba
-		# soldado directo). En una partida clásica (cargada de un guardado viejo) 7/8/9 siguen
+		# elige el jugador) y 9 cambia la auto-compra; 8 (Fase 31) manda a atacar a la reina rival.
+		# En una partida clásica (cargada de un guardado viejo) 7/8/9 siguen
 		# ajustando el reparto de castas.
 		KEY_7:
 			if sim.incremental:
@@ -537,7 +537,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			else:
 				sim.cmd_nudge_caste(CasteDefs.Caste.WORKER, 0.08)
 		KEY_8:
-			if not sim.incremental:
+			# Fase 31: con la rival en el mapa, 8 es "¡Atacar!" (antes no hacía nada en este modo).
+			if sim.incremental:
+				sim.cmd_attack_rival()
+			else:
 				sim.cmd_nudge_caste(CasteDefs.Caste.NURSE, 0.08)
 		KEY_9:
 			if sim.incremental:

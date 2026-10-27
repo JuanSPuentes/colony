@@ -42,6 +42,9 @@ func _cfg() -> SimConfig:
 	c.rain_auto = false
 	# Fase 29: el juego ya no pone árboles chicos; estas pruebas pintan un rastro hasta uno.
 	c.home_tree_other_trees = 4
+	# Fase 31: sin la rival en el mapa: estas pruebas son de la batalla final y de las entregas, y
+	# las incursiones se meterían en el medio (la rival en el mapa la prueba test_phase31.gd).
+	c.rival_home = false
 	return c
 
 

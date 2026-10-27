@@ -300,6 +300,21 @@ extends Resource
 ## Qué tan lejos del nido (en celdas) aparece la oleada rival, a izquierda o derecha al azar.
 @export var rival_spawn_dist := 45
 
+## Fase 31 (etapa A del núcleo, ver NUCLEO.md): en "Juego normal" la colonia rival está en el mapa
+## desde el principio, en un montículo a `rival_spawn_dist` celdas del nido; el árbol madre queda
+## en el medio. Crece sola (una hormiga cada `rival_grow_s[estación]` segundos, hasta
+## `rival_max_ants`) y cada `rival_raid_s` manda a la mitad (`rival_raid_fraction`) contra tu
+## nido. Se gana la estación matando a su reina cuando el jugador quiera ("¡Atacar!").
+## Apagarla deja la rival como antes (solo la oleada final); lo usan pruebas de otras cosas.
+@export var rival_home := true
+@export var rival_start_ants := 3
+@export var rival_grow_s: Array[float] = [45.0, 38.0, 32.0, 26.0]
+@export var rival_max_ants := 40
+@export var rival_raid_s := 150.0
+@export var rival_raid_fraction := 0.5
+## Qué tan lejos de su montículo deambulan las guardias rivales (celdas).
+@export var rival_guard_radius := 6
+
 ## Mejoras de la colonia (`sim/colony/upgrades.gd`), compradas con comida: solo afectan a las
 ## hormigas nuevas desde que se compran. Mismo costo creciente que un huevo (`inc_egg_cost*growth`).
 @export var inc_upgrade_base_cost := 40.0

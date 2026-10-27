@@ -144,6 +144,10 @@ static func to_dict(sim: Simulation) -> Dictionary:
 		"queen_max_hp": sim.rival_colony.queen.max_hp,
 		"queen_alive": sim.rival_colony.queen.alive,
 		"marching": sim.rival_colony.marching, "rally_s": sim.rival_colony.rally_s,
+		# Fase 31: la rival en el mapa desde el principio.
+		"home": sim.rival_colony.home, "home_x": sim.rival_colony.home_x,
+		"grow_acc": sim.rival_colony.grow_acc, "raid_acc": sim.rival_colony.raid_acc,
+		"player_attack": sim.rival_colony.player_attack,
 	}
 
 	var ants := sim.ants
@@ -162,6 +166,7 @@ static func to_dict(sim: Simulation) -> Dictionary:
 		"stuck_t": Array(ants.stuck_t), "check_acc": Array(ants.check_acc),
 		"max_stuck_seen": ants.max_stuck_seen,
 		"faction": Array(ants.faction),  # Fase 9: 0 jugador, 1 rival.
+		"raiding": Array(ants.raiding),  # Fase 31: rival que va contra el nido (1) o guardia (0).
 	}
 
 	var plants := []
@@ -349,6 +354,12 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 		# Fase 17: ausente en guardados viejos; la formación arranca de nuevo (reunión).
 		sim.rival_colony.marching = bool(rcd.get("marching", false))
 		sim.rival_colony.rally_s = float(rcd.get("rally_s", 0.0))
+		# Fase 31: ausente en guardados viejos: sin montículo (la rival solo llega en la oleada final).
+		sim.rival_colony.home = bool(rcd.get("home", false))
+		sim.rival_colony.home_x = int(rcd.get("home_x", 0))
+		sim.rival_colony.grow_acc = float(rcd.get("grow_acc", 0.0))
+		sim.rival_colony.raid_acc = float(rcd.get("raid_acc", 0.0))
+		sim.rival_colony.player_attack = bool(rcd.get("player_attack", false))
 
 	var ad: Dictionary = d["ants"]
 	var ants := sim.ants
@@ -398,6 +409,13 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	ants.faction = PackedByteArray(faction_in) if faction_in.size() == ants.count else PackedByteArray()
 	if ants.faction.size() != ants.count:
 		ants.faction.resize(ants.count)  # 0 por defecto: bando jugador
+	# Fase 31: ausente en guardados viejos: sin montículo, toda rival viva era de la oleada (ataca).
+	var raiding_in: Array = ad.get("raiding", [])
+	ants.raiding = PackedByteArray(raiding_in)
+	ants.raiding.resize(ants.count)
+	if raiding_in.is_empty():
+		for i in ants.count:
+			ants.raiding[i] = ants.faction[i]
 	ants._members_dirty = true  # los bandos cambiaron por fuera de `_grow`: rehacer la lista
 
 	sim.plants.clear()

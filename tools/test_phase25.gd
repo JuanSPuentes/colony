@@ -56,7 +56,9 @@ func _t_migration() -> void:
 	var moved := Migration.migrate(sim, 99)
 	var after := moved.ants.count_by_caste(CASTES)
 	_check("se conservan las hormigas por casta (la cría llega nacida)", after == before, "%s -> %s" % [before, after])
-	_check("el total de vivas cuadra (reina + las que viajan)", moved.ants.alive_count == 1 + after.values().reduce(func(a, b): return a + b, 0), "alive_count=%d" % moved.ants.alive_count)
+	# Fase 31: el mapa nuevo trae también las guardias de la rival nueva (bando 1).
+	var rivals := moved.cfg.rival_start_ants
+	_check("el total de vivas cuadra (reina + las que viajan + guardias rivales)", moved.ants.alive_count == 1 + rivals + after.values().reduce(func(a, b): return a + b, 0), "alive_count=%d" % moved.ants.alive_count)
 	_check("se conserva la comida", is_equal_approx(moved.colony.food, food))
 	_check("se conservan las mejoras", moved.upgrades.levels == sim.upgrades.levels and is_equal_approx(moved.upgrades.hp_mult, sim.upgrades.hp_mult))
 	_check("se conserva el precio del huevo", moved.econ.egg_cost() == sim.econ.egg_cost())
@@ -67,11 +69,11 @@ func _t_migration() -> void:
 	_check("la vida de las hormigas lleva la mejora", moved.ants.hp[_first_worker(moved)] > moved.cfg.ant_hp * CasteDefs.HP_MULT[CasteDefs.Caste.WORKER])
 	var ok := true
 	for i in moved.ants.count:
-		if moved.ants.alive[i] == 1:
+		if moved.ants.alive[i] == 1 and moved.ants.faction[i] == 0:  # las rivales están en su montículo
 			var c := moved.ants._cell_index(moved.ants.pos[i])
 			if moved.fields.nest_dist[c] >= NestDistanceField.FAR:
 				ok = false
-	_check("todas aparecen dentro del nido", ok)
+	_check("todas las tuyas aparecen dentro del nido", ok)
 	for k in 200:
 		moved.tick()
 	_check("el mapa nuevo sigue andando", moved.ants.alive[moved.queen_id] == 1 and not moved.game_over)

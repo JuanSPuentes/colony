@@ -110,6 +110,8 @@ var _test_panel: PanelContainer
 ## Fase 3: botones de compra (huevo, auto-compra) del modo incremental.
 var _buy_row: HBoxContainer
 var _buy_btns: Array[Button] = []
+## Fase 31: "¡Atacar!" contra la reina rival (solo con la rival en el mapa).
+var _attack_btn: Button
 ## Fase 5: sliders de reparto de castas (modo clásico). Mismo lugar que `_buy_row`: nunca se
 ## muestran a la vez (uno es del modo incremental, el otro de la colonia con reina).
 var _caste_row: VBoxContainer
@@ -198,6 +200,13 @@ func _ready() -> void:
 	_buy_btns[0].add_theme_constant_override("icon_max_width", 26)
 	_buy_btns[0].pressed.connect(func() -> void: _m.sim.cmd_buy_egg())
 	_buy_btns[1].pressed.connect(func() -> void: _m.sim.cmd_cycle_auto_buy())
+	# Fase 31: "¡Atacar!" — los soldados se reúnen y marchan contra la reina rival.
+	_attack_btn = _buy_button()
+	_attack_btn.icon = HudIcons.get_icon("swords", 2)
+	_attack_btn.custom_minimum_size = Vector2(0.0, 9.0 * S)
+	_attack_btn.pressed.connect(func() -> void: _m.sim.cmd_attack_rival())
+	_attack_btn.visible = false  # lo muestra `_update_incremental` solo con la rival en el mapa
+	buy.add_child(_attack_btn)
 
 	_caste_row = VBoxContainer.new()
 	_caste_row.add_theme_constant_override("separation", int(2 * S))
@@ -328,7 +337,10 @@ func _set_top_items(items: Array) -> void:
 		var item := _topbar_row.get_child(i) as HBoxContainer
 		item.visible = i < items.size()
 		if item.visible:
-			(item.get_child(0) as TextureRect).texture = ANT_ICON if items[i][0] == "ant" else HudIcons.get_icon(items[i][0], 3)
+			var icon := item.get_child(0) as TextureRect
+			var is_ant: bool = items[i][0] == "ant" or items[i][0] == "rival_ant"
+			icon.texture = ANT_ICON if is_ant else HudIcons.get_icon(items[i][0], 3)
+			icon.modulate = AntRenderer.RIVAL_COLOR if items[i][0] == "rival_ant" else Color.WHITE
 			(item.get_child(1) as Label).text = items[i][1]
 			item.tooltip_text = items[i][2]  # ya viene con tr()
 
@@ -363,6 +375,10 @@ func _update_top_bar(m: Node, sim: Simulation) -> void:
 		var icons := ["spring", "sun", "autumn", "winter"]
 		items.append([icons[sim.season_index], "%s %d/%d" % [tr(SeasonSystem.SEASON_NAMES[sim.season_index]), sim.season_index + 1, SeasonSystem.SEASON_COUNT], tr("Estación")])
 	var rival := sim.rival_colony
+	# Fase 31: la rival en el mapa: cuántas hormigas tiene (su hormiga, en rojo) y la próxima incursión.
+	if rival.home and rival.queen.alive:
+		items.append(["rival_ant", str(rival.alive_count()),
+			tr("Hormigas de la colonia rival · próxima incursión en %d s") % ceili(rival.raid_eta_s())])
 	if sim.incremental and rival.battle_active:
 		items.append(["swords", tr("¡Batalla! %d%%") % int(100.0 * rival.queen.hp / maxf(rival.queen.max_hp, 0.01)), tr("Vida de la reina rival")])
 	elif sim.incremental and not sim.tutorial_level and sim.season_index < SeasonSystem.SEASON_COUNT:
@@ -697,6 +713,10 @@ func _update_incremental(sim: Simulation) -> void:
 	_buy_btns[0].text = tr("[7] Huevo: %.0f") % econ.egg_cost()
 	_buy_btns[0].disabled = not econ.can_buy_egg()
 	_buy_btns[1].text = tr("[9] Auto: %s") % tr(IncrementalEconomy.AUTO_NAMES[econ.auto_mode])
+	var rival := sim.rival_colony
+	_attack_btn.visible = rival.home and rival.queen.alive
+	_attack_btn.disabled = rival.fighting()
+	_attack_btn.text = tr("Atacando...") if rival.fighting() else tr("[8] ¡Atacar a la reina rival!")
 
 	# Fase 9 (antes sin interfaz): mejoras de colonia.
 	var up := sim.upgrades

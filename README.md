@@ -1125,3 +1125,23 @@ Separado en tres piezas, cada una con una sola responsabilidad:
 - Los puntos de color eran `●`, que la fuente pixel no tiene (salía de otra fuente y desalineaba
   las tablas); ahora el color va en el nombre.
 - Se quitaron del CSV 20 textos que ya no usa nadie.
+
+## Fase 31: la colonia rival desde el principio (etapa A del núcleo, ver NUCLEO.md)
+
+- **Mapa:** en "Juego normal" la rival vive en un montículo a `rival_spawn_dist` celdas del nido
+  (a un lado al azar) y el árbol madre queda en el medio (`RivalColony.choose_home`/`midpoint_x`).
+- **Crece sola:** una hormiga cada `rival_grow_s[estación]` segundos (más rápido en cada
+  estación), hasta `rival_max_ants`. Sus guardias deambulan cerca del montículo
+  (`AntSystem._guard_rival_home`); cada `rival_raid_s` la mitad sale contra tu nido
+  (`AntSystem.raiding`).
+- **Ganar y perder:** la estación se gana en cuanto muere su reina, por la vía que sea; tecla 8 o
+  "¡Atacar a la reina rival!" pone a los soldados en formación (reunión y marcha, la de la Fase 17).
+  Pierdes si muere tu reina. El último día de la estación sigue llegando la oleada final.
+- **Territorio:** sin la orden de atacar, los soldados patrullan solo su mitad del mapa, hasta el
+  árbol (`RivalColony.player_patrol_range`): antes llegaban solos al montículo y ganaban sin
+  decidirlo el jugador.
+- **Se ve:** montículo bajo la reina rival (`RivalQueenView`), sus hormigas en la barra de arriba
+  (sprite de hormiga en rojo; tooltip con la próxima incursión) y una lección nueva.
+- **Fuera de esta etapa:** que la rival recoja comida del árbol (etapa B) y el balance medido.
+  `rival_home = false` deja la rival como antes (lo usan pruebas de otras cosas).
+- Pruebas: `tools/test_phase31.gd`.

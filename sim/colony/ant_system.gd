@@ -86,6 +86,8 @@ var check_acc := PackedFloat32Array()
 ## Fase 9: bando (0 = jugador, 1 = rival — ver `sim/colony/rival_colony.gd`). Aditivo: todo lo que
 ## no pasa `ant_faction` a `add_ant_at` sigue creando hormigas de bando 0, igual que siempre.
 var faction := PackedByteArray()
+## Fase 31: hormiga rival que va contra el nido del jugador (1) o que cuida su montículo (0).
+var raiding := PackedByteArray()
 ## Índices de cada bando ([0] jugador, [1] rival), en orden ascendente. `_nearest_enemy_index` recorre
 ## solo el bando buscado en vez de todas las hormigas: con 300 hormigas y una oleada de 20 rivales,
 ## cada búsqueda pasaba por las 300 (y la llaman todas al pensar, y los zánganos cada tick). Se
@@ -135,6 +137,7 @@ func _grow(n: int) -> void:
 	stuck_t.resize(total)
 	check_acc.resize(total)
 	faction.resize(total)
+	raiding.resize(total)
 
 
 func add_ants(n: int) -> void:
@@ -864,7 +867,8 @@ func _nearest_threat(p: Vector2, max_range: float):
 	# Fase 14: la reina rival también es una amenaza (misma forma `.pos`/`.alive`/`.take_damage()`).
 	# Antes no estaba en esta lista y ninguna hormiga podía dañarla: la batalla de fin de estación
 	# solo se ganaba en las pruebas, que la matan a mano.
-	var rq: RivalQueen = sim.rival_colony.queen if sim.rival_colony != null and sim.rival_colony.battle_active else null
+	# Fase 31: la reina rival vive en su montículo desde el principio: es blanco siempre que viva.
+	var rq: RivalQueen = sim.rival_colony.queen if sim.rival_colony != null and sim.rival_colony.queen.alive else null
 	for t in [sim.spider, sim.centipede, sim.mantis, rq]:
 		if t != null and t.alive:
 			var d: float = p.distance_to(t.pos)
@@ -921,11 +925,24 @@ func _tick_rival(i: int, cx: int, cy: int, ci: int, dt: float) -> void:
 					_kill(target_idx, false)
 			else:
 				_step(i, cx, cy, ci, Mode.PLANT, pos[target_idx])
-		else:
+		elif raiding[i] == 1:
 			state[i] = State.EXPLORE
 			var goal := pos[sim.queen_id] if sim.queen_id >= 0 and alive[sim.queen_id] == 1 else pos[i]
 			_step(i, cx, cy, ci, Mode.PLANT, goal)
+		else:
+			_guard_rival_home(i, cx, cy, ci)
 	_move(i, dt, sim.water.level[ci])
+
+
+## Fase 31: guardia rival. Deambula cerca del montículo de su reina (`rival_guard_radius`), sin
+## alejarse; pelea con lo que se acerque (lo decide `_tick_rival` antes de llegar acá).
+func _guard_rival_home(i: int, cx: int, cy: int, ci: int) -> void:
+	var rival := sim.rival_colony
+	var cfg := sim.cfg
+	state[i] = State.GUARD
+	if patrol_x[i] < 0 or absi(cx - patrol_x[i]) <= 1:
+		patrol_x[i] = clampi(rival.home_x + sim.rng.randi_range(-cfg.rival_guard_radius, cfg.rival_guard_radius), 1, sim.world.w - 2)
+	_step(i, cx, cy, ci, Mode.PLANT, _center(patrol_x[i], cfg.surface_y - 1))
 
 
 ## Obrera y Zángano (en combate activo; el Zángano además pelea pasivo si lo alcanzan, ver
