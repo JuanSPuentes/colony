@@ -23,8 +23,6 @@ const WALL_DESATURATE := 0.35
 ## Borde donde la tierra toca un hueco.
 const EDGE_DARK := Color(0.16, 0.10, 0.06)
 const EDGE_LIGHT_LIFT := 0.18
-const GRASS := Color("4c9a3a")
-const GRASS_DARK := Color("3a7a2c")
 ## Celda marcada para cavar (las grietas las agrega `DigEffectsView`).
 const MARK_LINE := Color("ffd060")
 const MARK_TINT := Color("f0b040")

@@ -10,8 +10,6 @@ extends Node2D
 ## mundo entero: están "lejos", no se acercan ni se alejan con el zoom ni pasan de largo al mover la
 ## cámara. La oscuridad de la noche la sigue poniendo `DayNightView` (CanvasModulate) encima.
 
-const DAY_TOP := Color(0.30, 0.55, 0.92)
-const DAY_BOTTOM := Color(0.66, 0.84, 0.97)
 const WARM_TOP := Color(0.55, 0.45, 0.75)
 const WARM_BOTTOM := Color(1.0, 0.60, 0.38)
 const STORM_TOP := Color(0.36, 0.40, 0.46)
@@ -113,6 +111,9 @@ func _draw() -> void:
 
 	# Degradado: el alto de referencia es el del cielo visible completo hasta el suelo.
 	var sky_h := ground_y - top
+	var season := SeasonStyle.of(sim)  # Fase 26: el color del cielo de día depende de la estación
+	var sky_top: Color = SeasonStyle.SKY_TOP[season]
+	var sky_bottom: Color = SeasonStyle.SKY_BOTTOM[season]
 	for b in BANDS:
 		var f0 := float(b) / BANDS
 		var f1 := float(b + 1) / BANDS
@@ -120,7 +121,7 @@ func _draw() -> void:
 		var y1 := top + sky_h * f1
 		if y0 >= bottom:
 			break
-		var c := DAY_TOP.lerp(DAY_BOTTOM, f1)
+		var c := sky_top.lerp(sky_bottom, f1)
 		c = c.lerp(WARM_TOP.lerp(WARM_BOTTOM, f1), minf(1.0, warm * 1.3))
 		c = c.lerp(STORM_TOP.lerp(STORM_BOTTOM, f1), st * 0.8)
 		draw_rect(Rect2(vr.position.x, y0, vr.size.x, minf(y1, bottom) - y0 + 1.0), c)

@@ -15,6 +15,10 @@ const FALL_SPEED := 170.0   # px de pantalla por segundo
 const SLANT := 0.35         # cuánto se inclina (viento)
 const SPLASH_LIFE := 0.18
 const FLASH_LIFE := 0.22
+## Fase 26: en invierno la lluvia cae como nieve (solo se ve distinto: el agua sigue igual).
+const FLAKE := Color(0.97, 0.98, 1.0, 0.9)
+const FLAKE_SPEED := 38.0
+const FLAKE_SLANT := 0.12
 
 var sim: Simulation
 var _sky: SkyView
@@ -56,7 +60,8 @@ func _process(delta: float) -> void:
 	var intensity := SkyView.storm(sim) if raining else 0.0
 
 	if intensity > 0.0 and vr.position.y < ground_y:
-		_spawn_acc += DROPS_PER_S * intensity * delta
+		# La nieve cae ~4 veces más lento: con menos copos por segundo se ve igual de cargada.
+		_spawn_acc += DROPS_PER_S * intensity * delta * (0.3 if SeasonStyle.snows(sim) else 1.0)
 		while _spawn_acc >= 1.0:
 			_spawn_acc -= 1.0
 			# Un poco más a la izquierda del borde: el viento las trae en diagonal hacia la derecha.
@@ -65,11 +70,17 @@ func _process(delta: float) -> void:
 	else:
 		_spawn_acc = 0.0
 
+	var snow := SeasonStyle.snows(sim)
 	var step := Vector2(SLANT, 1.0) * FALL_SPEED * k * delta
+	if snow:
+		step = Vector2(FLAKE_SLANT, 1.0) * FLAKE_SPEED * k * delta
+	var t := Time.get_ticks_msec() / 1000.0
 	for i in range(_drops.size() - 1, -1, -1):
 		var d := _drops[i] + step
+		if snow:
+			d.x += sin(t * 1.7 + float(i) * 0.9) * 6.0 * k * delta  # vaivén de copo
 		if d.y >= ground_y:
-			if _rng.randf() < 0.5:
+			if not snow and _rng.randf() < 0.5:
 				_splashes.append(Vector3(d.x, ground_y, SPLASH_LIFE))
 			_drops.remove_at(i)
 		elif d.y > vr.end.y + 10.0 * k:
@@ -86,7 +97,7 @@ func _process(delta: float) -> void:
 
 	# Relámpago de vez en cuando, solo con la lluvia ya fuerte.
 	_flash = maxf(0.0, _flash - delta)
-	if intensity > 0.8 and _rng.randf() < delta * 0.07:
+	if not snow and intensity > 0.8 and _rng.randf() < delta * 0.07:
 		_flash = FLASH_LIFE
 		_make_bolt(vr, ground_y)
 	queue_redraw()
@@ -109,9 +120,13 @@ func _draw() -> void:
 		return
 	var vr := _sky.visible_world_rect()
 	var k := vr.size.x / 480.0
-	var tail := Vector2(SLANT, 1.0) * 6.0 * k
-	for d in _drops:
-		draw_line(d - tail, d, DROP, maxf(0.6, 0.7 * k))
+	if SeasonStyle.snows(sim):
+		for d in _drops:
+			draw_rect(Rect2(d, Vector2.ONE * 1.3 * k), FLAKE)
+	else:
+		var tail := Vector2(SLANT, 1.0) * 6.0 * k
+		for d in _drops:
+			draw_line(d - tail, d, DROP, maxf(0.6, 0.7 * k))
 	for s in _splashes:
 		var f := s.z / SPLASH_LIFE
 		var r := (1.0 - f) * 3.0 * k

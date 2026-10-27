@@ -171,10 +171,13 @@ func _hollow_color(x: int, y: int) -> Color:
 
 func _grass(x: int, rect: Rect2i) -> void:
 	var p := rect.position
+	var season := SeasonStyle.of(sim)  # Fase 26: pasto (o nieve) del color de la estación
+	var light: Color = SeasonStyle.GRASS[season]
+	var dark: Color = SeasonStyle.GRASS_DARK[season]
 	for k in rect.size.x:
 		var h := 2 + int(TerrainStyle.noise(x * 8 + k, 0, 51) < 60)
 		for j in h:
-			_img.set_pixel(p.x + k, p.y + j, TerrainStyle.GRASS if j < 2 else TerrainStyle.GRASS_DARK)
+			_img.set_pixel(p.x + k, p.y + j, light if j < 2 else dark)
 
 
 ## Cámaras: tinte suave sobre la pared de fondo y un contorno donde la cámara termina (más tenue

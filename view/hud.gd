@@ -368,7 +368,7 @@ func _update_top_bar(m: Node, sim: Simulation) -> void:
 		var left := SeasonSystem.season_length(sim) - 1 - SeasonSystem.day_in_season(sim)
 		items.append(["⚔", "Hoy" if left <= 0 else ("en %d %s" % [left, "día" if left == 1 else "días"]), "Próxima batalla de fin de estación"])
 	if sim.weather != Simulation.Weather.CLEAR:
-		items.append(["🌧", "¡%ds!" % ceili(sim.rain_eta_s()) if sim.weather == Simulation.Weather.WARNING else "Lloviendo", "Lluvia"])
+		items.append(["🌧", "¡%ds!" % ceili(sim.rain_eta_s()) if sim.weather == Simulation.Weather.WARNING else _rain_word(sim), "Lluvia"])
 	if m.paused:
 		items.append(["⏸", "Pausa", "Espacio para seguir"])
 	elif m.speed > 1:
@@ -522,6 +522,11 @@ func _build_test_panel(root: Control) -> void:
 		var rng := RandomNumberGenerator.new()
 		rng.randomize()
 		_m.start(rng.randi() % 1000000))
+	# Fase 26: para revisar el ambiente de cada estación sin jugar una estación entera. `start` con
+	# la misma simulación vuelve a preparar las vistas (el pasto y la nieve de los árboles se pintan ahí).
+	_test_btn(box, "Siguiente estación", func() -> void:
+		_m.sim.cmd_next_season()
+		_m.start(_m.seed_value, _m.sim))
 	_test_btn(box, "Lluvia ahora", func() -> void: _m.sim.cmd_force_rain())
 	_test_btn(box, "Detener lluvia", func() -> void: _m.sim.cmd_stop_rain())
 	_test_btn(box, "Aparecer araña", func() -> void: _m.sim.cmd_force_spider())
@@ -713,7 +718,7 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 		Simulation.Weather.WARNING:
 			weather += "\n¡Lluvia en %d s!" % ceili(sim.rain_eta_s())
 		Simulation.Weather.RAINING:
-			weather += "\nLloviendo"
+			weather += "\n" + _rain_word(sim)
 	_weather.text = weather
 
 	# Cría en camino, por casta (lo que el jugador compró y aún no nació). La casta de cada huevo
@@ -842,7 +847,7 @@ func _update_classic(m: Node, sim: Simulation) -> void:
 		Simulation.Weather.WARNING:
 			weather = "¡Lluvia en %d s!" % ceili(sim.rain_eta_s())
 		Simulation.Weather.RAINING:
-			weather = "Lloviendo"
+			weather = _rain_word(sim)
 		_:
 			var eta := sim.rain_eta_s()
 			if eta >= 0.0:
@@ -983,3 +988,8 @@ func update_info(m: Node) -> void:
 		_end_reason.custom_minimum_size.x = clampf(world_rect.size.x - 160.0, 280.0, 520.0)
 		_end_panel.reset_size()
 		_end_panel.position = world_rect.position + (world_rect.size - _end_panel.size) * 0.5
+
+
+## Fase 26: en invierno la lluvia se ve como nieve, así que el HUD dice "Nevando".
+func _rain_word(sim: Simulation) -> String:
+	return "Nevando" if SeasonStyle.snows(sim) else "Lloviendo"

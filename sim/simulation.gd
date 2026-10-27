@@ -777,6 +777,13 @@ func cmd_stop_rain() -> void:
 	rain_start_tick = -1
 
 
+## Fase 26: para el panel de pruebas, pasa a la estación siguiente (vuelve a Primavera después del
+## Invierno). Solo cambia el ambiente: en el modo Test no hay batallas de estación.
+func cmd_next_season() -> void:
+	season_index = (season_index + 1) % 4
+	notify("Estación de prueba: %d/4" % (season_index + 1))
+
+
 func cmd_add_ants(n: int) -> void:
 	ants.add_ants(n)
 

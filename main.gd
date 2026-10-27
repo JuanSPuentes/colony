@@ -63,6 +63,7 @@ var day_night_view: DayNightView
 ## Fase 16: cielo vivo (detrás de todo) y lluvia visible (delante de plantas y criaturas).
 var sky_view: SkyView
 var rain_view: RainView
+var ambient_view: AmbientView
 var hud: Hud
 var tutorial: TutorialView
 ## Fase 14: guía contextual (Nivel 0 y Juego normal). Solo actúa si `coach_enabled`.
@@ -165,9 +166,10 @@ func _ready() -> void:
 	day_night_view = DayNightView.new()
 	sky_view = SkyView.new()
 	rain_view = RainView.new()
+	ambient_view = AmbientView.new()  # Fase 26: pétalos, luciérnagas, hojas o nieve según la estación
 	# Fase 16: la cría va después de `overlay` (feromonas y tinte de cámaras), no antes: debajo
 	# de esa capa los huevos quedaban tapados en cuanto había un rastro o una cámara encima.
-	for n in [sky_view, terrain_view, dig_effects_view, plant_view, corpse_view, overlay, brood_view, ant_renderer, spider_view, centipede_view, mantis_view, rival_queen_view, fog_view, rain_view, day_night_view]:
+	for n in [sky_view, terrain_view, dig_effects_view, plant_view, corpse_view, overlay, brood_view, ant_renderer, spider_view, centipede_view, mantis_view, rival_queen_view, fog_view, ambient_view, rain_view, day_night_view]:
 		world_vp.add_child(n)
 	camera = Camera2D.new()
 	world_vp.add_child(camera)
@@ -237,6 +239,7 @@ func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> v
 	rival_queen_view.setup(sim)
 	sky_view.setup(sim)
 	rain_view.setup(sim, sky_view)
+	ambient_view.setup(sim, sky_view)
 	tutorial.step = 0
 	coach.reset(sim)
 	_acc = 0.0

@@ -27,7 +27,6 @@ const SIZE_VARIATION_MIN := 0.7
 const SIZE_VARIATION_MAX := 1.35
 ## Fase 19: árbol gigante — mucho más grande que el más grande de los normales, verde profundo.
 const GIANT_SCALE := 2.3
-const GIANT_TINT := Color(0.24, 0.6, 0.27)
 ## Fase 19: colores de los bolsones de hongos (verde, morado, azul): brillan para que se noten.
 const MUSHROOM_HUES: Array[Color] = [Color(0.45, 1.0, 0.4), Color(0.78, 0.42, 1.0), Color(0.35, 0.75, 1.0)]
 ## Igual que antes: con pocas hojas la planta se ve más chica, nunca por debajo de este piso para
@@ -37,12 +36,8 @@ const MIN_SCALE := 0.45
 ## no tiene margen abajo (1-2 px de 96); el problema era que la punta de las raíces quedaba
 ## exactamente sobre la línea del pasto y se veía apoyado encima, flotando. Así las raíces entran.
 const SINK_FRACTION := 0.1
-## Fase 16: tonos de follaje (multiplican el gris del sprite en `tree_color.gdshader`). Cada árbol
-## toma uno por su celda, como el tamaño y la rotación: verdes distintos y algún otoñal.
-const LEAF_TINTS: Array[Color] = [
-	Color(0.36, 0.72, 0.30), Color(0.25, 0.58, 0.26), Color(0.48, 0.78, 0.28),
-	Color(0.20, 0.48, 0.30), Color(0.62, 0.74, 0.26), Color(0.86, 0.56, 0.20),
-]
+## Los tonos de follaje (multiplican el gris del sprite en `tree_color.gdshader`) dependen de la
+## estación: ver `SeasonStyle.LEAF_TINTS`. Cada árbol toma uno por su celda.
 const TREE_SHADER := preload("res://view/tree_color.gdshader")
 ## Fase 19: sprites del árbol gigante (8 vistas, mismo orden que `DIR_TEXTURES`).
 const GIANT_TEXTURES: Array[Texture2D] = [
@@ -134,11 +129,8 @@ static func draw_string_outline_on(ci: CanvasItem, font: Font, pos: Vector2, tex
 
 func setup(s: Simulation) -> void:
 	sim = s
+	(material as ShaderMaterial).set_shader_parameter("snow", SeasonStyle.SNOW_ON_TREES[SeasonStyle.of(sim)])
 	queue_redraw()
-
-
-static func _tint_for_cell(cell: Vector2i) -> Color:
-	return LEAF_TINTS[absi(cell.x * 1103515245 + cell.y * 12345 + 7) % LEAF_TINTS.size()]
 
 
 func _process(_delta: float) -> void:
@@ -196,7 +188,7 @@ func _draw() -> void:
 		var base := Vector2((p.cell.x + 0.5) * cpx, (p.cell.y + 1) * cpx)
 		var tex: Texture2D = GIANT_TEXTURES[_dir_for_cell(p.cell)] if p.kind == Plant.Kind.GIANT else DIR_TEXTURES[_dir_for_cell(p.cell)]
 		base.y += size.y * SINK_FRACTION
-		var tint := GIANT_TINT if p.kind == Plant.Kind.GIANT else _tint_for_cell(p.cell)
+		var tint := SeasonStyle.GIANT_TINT[SeasonStyle.of(sim)] if p.kind == Plant.Kind.GIANT else SeasonStyle.leaf_tint(sim, p.cell)
 		draw_texture_rect(tex, Rect2(base - Vector2(size.x * 0.5, size.y), size), false, tint)
 
 

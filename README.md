@@ -1044,3 +1044,13 @@ Separado en tres piezas, cada una con una sola responsabilidad:
 - **Cómo se dispara:** `SeasonSystem` marca `sim.migration_pending` y `main.gd` cambia la
   simulación igual que al cargar una partida. El mapa fijo de las pruebas (sin niebla) no se muda.
 - Pruebas: `tools/test_phase25.gd`.
+
+## Fase 26: ambiente de cada estación (solo visual)
+
+- **`view/season_style.gd` (`SeasonStyle`):** una tabla por estación con cielo, pasto, tonos de
+  copa, nieve sobre los árboles y tipo de partícula. Fuera de Juego normal siempre es Primavera.
+- **Quién la lee:** `SkyView` (cielo de día), `TerrainView` (pasto; en invierno, nieve),
+  `PlantView` + `tree_color.gdshader` (copas otoñales o nevadas), `RainView` (en invierno la
+  lluvia cae como nieve; el agua no cambia) y el HUD ("Nevando").
+- **`view/ambient_view.gd` (`AmbientView`):** pétalos que caen de las copas (primavera),
+  luciérnagas de noche (verano), hojas (otoño) y nevada suave (invierno). Se congela en pausa.
