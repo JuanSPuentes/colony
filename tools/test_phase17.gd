@@ -40,6 +40,8 @@ func _cfg() -> SimConfig:
 	var c: SimConfig = load("res://sim/core/default_config.tres")
 	c = c.duplicate()
 	c.rain_auto = false
+	# Fase 29: el juego ya no pone árboles chicos; estas pruebas pintan un rastro hasta uno.
+	c.home_tree_other_trees = 4
 	return c
 
 

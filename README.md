@@ -1099,9 +1099,17 @@ Separado en tres piezas, cada una con una sola responsabilidad:
 - **Lo que cae** es comida en el suelo: `Corpse` con `kind` (LEAF/SEED/FRUIT; los restos de
   bichos son REMAINS). Las obreras lo recogen como los restos y llevan su valor
   (`AntSystem.carry_value`); `IncrementalEconomy` lo suma al llegar. Se pudre a `drop_decay_s`.
-- **Los demás árboles** son pocos (`home_tree_other_trees`) y quedan a `home_tree_clear_cells` o
-  más del tronco. Ya no se reparten gigantes sueltos (cambio intencional; `test_phase19` lo
-  registra). Las cuevas de hongos siguen igual.
+- **Sin árboles chicos:** a pedido del jugador el árbol madre es el único (`home_tree_other_trees`
+  = 0; con más, quedan a `home_tree_clear_cells` del tronco). Ya no hay gigantes sueltos (cambio
+  intencional; `test_phase19` lo registra). Las cuevas de hongos siguen igual.
+- **Cómo se ve:** el tronco es un sprite propio (`view/sprites/home_tree/trunk.png`, en grises,
+  teñido de madera), cortado justo en la línea del pasto: nada se dibuja bajo tierra, así no tapa
+  túneles ni hormigas. Su franja de arriba se repite hasta salir del mapa y de la copa solo cuelga
+  el borde (`tree_color.gdshader`, `leaf_cut`). Por ahora se agranda ×3 (`HOME_TREE_ZOOM`):
+  con un sprite generado a 512×512 volvería a ×1 y se vería tan nítido como el resto.
+- **Raíces bajo tierra:** no son una imagen sino parte del terreno: `HomeTree.root_mask` marca
+  celdas (misma semilla, mismas raíces) y `TerrainView` las pinta con madera (`TerrainStyle.ROOT`;
+  pared de madera si un túnel la cruza). Solo visual: se cavan como tierra.
 - **Pendiente (próximas etapas):** sprites y animación de lo que cargan, frutas entre varias,
   escalar el tronco y las ramas, lecciones del tutorial y el árbol según la estación.
 - Pruebas: `tools/test_phase29.gd`.

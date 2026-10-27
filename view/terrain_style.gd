@@ -11,12 +11,15 @@ extends RefCounted
 
 const TILE := 32
 
-enum Mat { DIRT_1, DIRT_2, DIRT_3, WALL_1, WALL_2, WALL_3, ROCK }
+enum Mat { DIRT_1, DIRT_2, DIRT_3, WALL_1, WALL_2, WALL_3, ROCK, ROOT, ROOT_WALL }
 
 ## Capas de tierra por profundidad (0 = superficie, 1 = fondo del mundo).
 const LAYER_LIMITS: Array[float] = [0.3, 0.62]
 const DIRT_BASE: Array[Color] = [Color("8a5a38"), Color("6b4429"), Color("4f3220")]
 const ROCK_BASE := Color("74747e")
+## Fase 29: raíces del árbol madre metidas en la tierra (madera con veta), y la pared de fondo de un
+## túnel que pasa por una raíz.
+const ROOT_BASE := Color("5b3a20")
 ## Pared de fondo: la tierra de esa capa, oscura y desaturada (se lee como "hueco").
 const WALL_DARKEN := 0.55
 const WALL_DESATURATE := 0.35
@@ -73,6 +76,8 @@ static func _make_tile(mat: int) -> Image:
 			base = ROCK_BASE
 			speck = 0.2
 			blotch = 0.05
+		Mat.ROOT, Mat.ROOT_WALL:
+			return _wood_tile(ROOT_BASE.darkened(WALL_DARKEN) if mat == Mat.ROOT_WALL else ROOT_BASE)
 		Mat.WALL_1, Mat.WALL_2, Mat.WALL_3:
 			var d: Color = DIRT_BASE[mat - Mat.WALL_1]
 			base = d.darkened(WALL_DARKEN).lerp(Color(d.v, d.v, d.v).darkened(WALL_DARKEN), WALL_DESATURATE)
@@ -124,3 +129,18 @@ static func room_color(room_type: int) -> Color:
 			# Fase 17: naranja más marcado; el ocre de antes casi no se distinguía del amarillo de la Real.
 			return Color(0.95, 0.45, 0.15)
 	return Color(0, 0, 0, 0)
+
+
+## Fase 29: madera de raíz — vetas horizontales onduladas (la raíz corre de lado bajo tierra) y algún
+## nudo oscuro. Se repite sin costura como las demás.
+static func _wood_tile(base: Color) -> Image:
+	var img := Image.create(TILE, TILE, false, Image.FORMAT_RGBA8)
+	for y in TILE:
+		for x in TILE:
+			var wave := sin((float(x) / TILE) * TAU * 2.0 + float(noise(0, y, 31) & 7) * 0.4) * 1.5
+			var band := posmod(int(y + wave), 5)
+			var c := base.darkened(0.35) if band == 0 else (base.lightened(0.22) if band == 2 else base)
+			if noise(x, y, 33) < 6:
+				c = c.darkened(0.35)
+			img.set_pixel(x, y, c)
+	return img

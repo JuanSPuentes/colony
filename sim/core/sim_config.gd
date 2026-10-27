@@ -260,7 +260,7 @@ extends Resource
 ## fijo (de noche, la mitad) — comida segura pero limitada. Lo que nadie recoge se pudre.
 @export var home_tree_drop_interval_s := 6.0
 ## Hasta cuántas celdas a cada lado del tronco cae lo que suelta (más o menos el ancho de la copa).
-@export var home_tree_drop_radius := 9
+@export var home_tree_drop_radius := 26
 ## Más que esto en el suelo a la vez y deja de soltar (una colonia chica no aprovecha todo).
 @export var home_tree_max_drops := 18
 ## Probabilidad de cada cosa al caer (el resto, hoja) y cuánta comida vale al llegar al nido.
@@ -270,9 +270,10 @@ extends Resource
 @export var drop_food_seed := 10.0
 @export var drop_food_fruit := 30.0
 @export var drop_decay_s := 120.0
-## Los demás árboles quedan lejos del madre (celdas desde su tronco) y son menos.
+## Los demás árboles quedan lejos del madre (celdas desde su tronco) y son menos. Con 0 no hay otros:
+## pedido del jugador, que el árbol madre sea el único (la escala hormiga/árbol se ve de verdad).
 @export var home_tree_clear_cells := 16
-@export var home_tree_other_trees := 4
+@export var home_tree_other_trees := 0
 ## Fase 19: bolsones de hongos en la primera capa de tierra (solo "Juego normal" con mapa al azar).
 ## Cerrados al empezar: hay que cavar hasta ellos. Rebrotan también de noche.
 @export var mushroom_pockets_min := 3

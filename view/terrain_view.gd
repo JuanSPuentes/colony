@@ -6,6 +6,7 @@ extends Node2D
 ## - Túnel: la "pared de fondo" (tierra oscura). Si es parte de una cámara, un tinte suave del color
 ##   de la cámara y un contorno donde termina — antes eran bloques de color sólido (`OverlayView`).
 ## - Marcada para cavar: tierra con un contorno punteado; las grietas las dibuja `DigEffectsView`.
+## - Fase 29: raíz del árbol madre: madera en vez de tierra (y pared de madera si es túnel).
 ## Los bordes dependen de las vecinas, así que al cambiar una celda se repintan también las 4 de
 ## al lado.
 
@@ -24,6 +25,8 @@ var _sprite: Sprite2D
 var _room_key := ""
 ## Cuadraditos de color semitransparente (uno por cámara y validez) para teñir con `blend_rect`.
 var _tints: Dictionary = {}
+## Fase 29: celdas con raíz del árbol madre (`HomeTree.root_mask`); vacío si no hay árbol.
+var _roots := PackedByteArray()
 
 
 func setup(s: Simulation) -> void:
@@ -32,6 +35,8 @@ func setup(s: Simulation) -> void:
 	_img = Image.create(sim.world.w * cpx, sim.world.h * cpx, false, Image.FORMAT_RGBA8)
 	_img.fill(AIR_CLEAR)
 	_room_key = _rooms_key()
+	# Fase 29: raíces del árbol madre dibujadas como parte de la tierra (no una imagen encima).
+	_roots = sim.home_tree.root_mask(sim.world.w, sim.world.h, sim.cfg.surface_y) if sim.home_tree != null else PackedByteArray()
 	for y in sim.world.h:
 		for x in sim.world.w:
 			_paint(x, y)
@@ -94,7 +99,7 @@ func _paint(x: int, y: int) -> void:
 		WorldGrid.Cell.AIR:
 			_img.fill_rect(rect, AIR_CLEAR)
 		WorldGrid.Cell.DIRT:
-			_blit(TerrainStyle.dirt_mat(x, y, depth), rect)
+			_blit(TerrainStyle.Mat.ROOT if _is_root(x, y) else TerrainStyle.dirt_mat(x, y, depth), rect)
 			_edges(x, y, rect)
 			if y == sim.cfg.surface_y:
 				_grass(x, rect)
@@ -109,8 +114,12 @@ func _paint(x: int, y: int) -> void:
 			_blit(TerrainStyle.Mat.ROCK, rect)
 			_edges(x, y, rect)
 		WorldGrid.Cell.TUNNEL:
-			_blit(TerrainStyle.wall_mat(x, y, depth), rect)
+			_blit(TerrainStyle.Mat.ROOT_WALL if _is_root(x, y) else TerrainStyle.wall_mat(x, y, depth), rect)
 			_room(x, y, rect)
+
+
+func _is_root(x: int, y: int) -> bool:
+	return not _roots.is_empty() and _roots[y * sim.world.w + x] == 1
 
 
 ## Copia el trozo de la textura del material que cae en esta celda (por coordenadas de mundo, así

@@ -12,6 +12,10 @@ uniform float trunk_from = 0.58;
 uniform float trunk_to = 0.72;
 uniform float snow = 0.0;
 uniform vec3 snow_color = vec3(0.93, 0.96, 1.0);
+// Fase 29: corta el sprite desde esta altura (0 arriba, 1 abajo) con un borde irregular en
+// escalones de pixel: la copa del árbol madre se dibuja sin su tronco y sin un corte recto.
+// 2.0 = no corta (los demás árboles).
+uniform float leaf_cut = 2.0;
 
 varying vec4 leaf_tint;
 
@@ -21,6 +25,13 @@ void vertex() {
 
 void fragment() {
 	vec4 t = texture(TEXTURE, UV);
+	if (leaf_cut < 1.5) {
+		vec2 px = floor(UV / TEXTURE_PIXEL_SIZE / 2.0);
+		float jag = fract(sin(px.x * 12.9898) * 43758.5453) * 0.1 + fract(sin(px.x * 3.17) * 1913.7) * 0.05;
+		if (UV.y > leaf_cut - jag) {
+			discard;
+		}
+	}
 	float l = t.r;
 	vec3 leaves = mix(leaf_tint.rgb * 0.22, min(leaf_tint.rgb * 1.25, vec3(1.0)), l);
 	// La nieve se queda en lo iluminado (luz del sprite) y más en la mitad de arriba de la copa.

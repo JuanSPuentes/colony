@@ -1204,10 +1204,13 @@ func _mushroom_ok(pl: Plant, ci: int) -> bool:
 		return true
 	if sim.food.data[pl.cell.y * sim.world.w + pl.cell.x] > sim.cfg.food_follow_threshold:
 		return true
-	return not _trees_have_leaves()
+	return not _food_above()
 
 
-func _trees_have_leaves() -> bool:
+## ¿Hay comida arriba? Árboles con hojas o, Fase 29, algo caído del árbol madre en el suelo.
+func _food_above() -> bool:
+	if sim.home_tree != null and sim.home_tree.drops_on_ground(sim) > 0:
+		return true
 	for pl in sim.plants:
 		if not pl.is_mushroom() and pl.leaves > 0:
 			return true

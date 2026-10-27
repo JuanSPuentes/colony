@@ -339,16 +339,13 @@ func _carve_side_chambers() -> void:
 
 
 ## Fase 15: árboles al azar — cantidad, lado y distancia al nido sin un patrón fijo, solo con una
-## separación mínima para que no se encimen y sin tapar la superficie justo encima del nido.
+## separación mínima para que no se encimen. Fase 29: se llama con el árbol madre ya plantado; los
+## demás son pocos (`home_tree_other_trees`, 0 = ninguno) y quedan fuera de su copa.
 func _place_plants_random() -> void:
 	plants.clear()
 	total_leaves_left = 0
-	var n := cfg.plant_count + rng.randi_range(-2, 3)
-	# Fase 29: con árbol madre, los demás son pocos y quedan fuera de su copa (alternativa lejana).
-	var clear := 6
-	if home_tree != null:
-		n = cfg.home_tree_other_trees + rng.randi_range(-1, 1)
-		clear = cfg.home_tree_clear_cells
+	var n := maxi(0, cfg.home_tree_other_trees + rng.randi_range(-1, 1)) if cfg.home_tree_other_trees > 0 else 0
+	var clear := cfg.home_tree_clear_cells
 	var used: Array[int] = []
 	var tries := 0
 	while plants.size() < n and tries < 400:

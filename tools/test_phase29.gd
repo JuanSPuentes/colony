@@ -12,6 +12,7 @@ func _initialize() -> void:
 	_t_pickup_and_food()
 	_t_rot()
 	_t_save_and_migrate()
+	_t_roots()
 	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -62,8 +63,8 @@ func _t_layout() -> void:
 					if absi(p.cell.x - sim.cfg.nest_x) < sim.cfg.home_tree_clear_cells:
 						too_close += 1
 		_check("semilla %d: árbol madre sobre el nido" % s, sim.home_tree != null and sim.home_tree.x == sim.cfg.nest_x)
-		_check("semilla %d: sin otros gigantes, pocos árboles y lejos" % s,
-			giants == 0 and too_close == 0 and trees >= 1 and trees <= sim.cfg.home_tree_other_trees + 1,
+		_check("semilla %d: el árbol madre es el único gigante (y no hay otros árboles si así está configurado)" % s,
+			giants == 0 and too_close == 0 and (trees == 0 if sim.cfg.home_tree_other_trees == 0 else trees <= sim.cfg.home_tree_other_trees + 1),
 			"gigantes=%d cerca=%d árboles=%d" % [giants, too_close, trees])
 		_check("semilla %d: siguen las cuevas de hongos" % s, mushrooms > 0)
 	var classic := Simulation.new(_cfg(), 1)
@@ -142,3 +143,25 @@ func _t_save_and_migrate() -> void:
 		and is_equal_approx(loaded.home_tree.drop_acc, 2.5) and same)
 	var moved := Migration.migrate(sim, 99)
 	_check("al mudarse, el mapa nuevo también tiene árbol madre", moved.home_tree != null)
+
+
+## Las raíces son parte del dibujo de la tierra: salen del tronco, nunca sobre el pasto, y con la
+## misma semilla (también tras guardar y cargar) son las mismas.
+func _t_roots() -> void:
+	var sim := _fresh(8)
+	var w := sim.world.w
+	var mask := sim.home_tree.root_mask(w, sim.world.h, sim.cfg.surface_y)
+	var cells := 0
+	var above := 0
+	var near_trunk := false
+	for i in mask.size():
+		if mask[i] == 1:
+			cells += 1
+			if i / w <= sim.cfg.surface_y:
+				above += 1
+			if i / w == sim.cfg.surface_y + 1 and absi(i % w - sim.home_tree.x) <= 6:
+				near_trunk = true
+	_check("hay raíces bajo tierra, que salen del tronco", cells > 100 and near_trunk, "celdas=%d" % cells)
+	_check("ninguna raíz queda sobre el pasto", above == 0)
+	var loaded := SaveSystem.from_dict(SaveSystem.to_dict(sim), sim.cfg)
+	_check("tras guardar y cargar, las mismas raíces", loaded.home_tree.root_mask(w, sim.world.h, sim.cfg.surface_y) == mask)

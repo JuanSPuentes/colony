@@ -87,11 +87,25 @@ func _ready() -> void:
 	_mushroom_sprites.material = mmat
 	add_child(_mushroom_sprites)
 	_mushroom_sprites.draw.connect(_draw_mushroom_sprites)
+	_home_trunk = Node2D.new()
+	_home_trunk.show_behind_parent = true
+	add_child(_home_trunk)
+	_home_trunk.draw.connect(_draw_home_trunk)
+	_home_canopy = Node2D.new()
+	var cmat := ShaderMaterial.new()
+	cmat.shader = TREE_SHADER
+	cmat.set_shader_parameter("leaf_cut", HOME_CANOPY_CUT)
+	_home_canopy.material = cmat
+	add_child(_home_canopy)
+	_home_canopy.draw.connect(_draw_home_canopy)
 
 
 var _counters: Node2D
 var _mushrooms: Node2D
 var _mushroom_sprites: Node2D
+## Fase 29: tronco del árbol madre, detrás de la copa y sin el shader de los árboles.
+var _home_trunk: Node2D
+var _home_canopy: Node2D
 const COUNTER_FONT_VP := 9  # tamaño en píxeles del viewport del mundo (constante con cualquier zoom)
 const COUNTER_FULL := Color(0.92, 1.0, 0.86)
 const COUNTER_EMPTY := Color(1.0, 0.55, 0.45)
@@ -130,7 +144,11 @@ static func draw_string_outline_on(ci: CanvasItem, font: Font, pos: Vector2, tex
 func setup(s: Simulation) -> void:
 	sim = s
 	(material as ShaderMaterial).set_shader_parameter("snow", SeasonStyle.SNOW_ON_TREES[SeasonStyle.of(sim)])
+	(_home_canopy.material as ShaderMaterial).set_shader_parameter("snow", SeasonStyle.SNOW_ON_TREES[SeasonStyle.of(sim)])
 	queue_redraw()
+	# El árbol madre no cambia solo: se redibuja al preparar la partida (mapa nuevo, estación).
+	_home_trunk.queue_redraw()
+	_home_canopy.queue_redraw()
 
 
 func _process(_delta: float) -> void:
@@ -181,7 +199,6 @@ func _draw() -> void:
 	if sim == null:
 		return
 	var cpx := sim.cfg.cell_px
-	_draw_home_tree(cpx)
 	for p in sim.plants:
 		if p.is_mushroom():
 			continue  # los dibuja `_mushrooms` (sin el shader de los árboles)
@@ -261,16 +278,55 @@ func _draw_mushroom_sprites() -> void:
 			_mushroom_sprites.draw_texture_rect(tex, Rect2(bx - s * 0.5, by - s, s, s), false, mcol)
 
 
-## Fase 29: cuánto más grande que un gigante es el árbol madre. Por ahora reusa el sprite del
-## gigante (la etapa de escalarlo trae su propio arte con tronco y ramas).
-const HOME_TREE_SCALE := 1.7
+## Fase 29: el árbol madre. El tronco y las raíces son el sprite propio (`home_tree/trunk.png`,
+## 168×168, en grises: se tiñe de madera); de él se repite la franja de arriba hacia el cielo, así
+## el tronco sigue subiendo y sale del mapa por arriba — no se ve entero, que es la idea: es
+## colosal. De la copa solo cuelga el borde de abajo desde el techo del mapa (la copa del gigante,
+## agrandada y con el color de la estación).
+const HOME_TRUNK := preload("res://view/sprites/home_tree/trunk.png")
+const HOME_TRUNK_TINT := Color("c49a6c")
+## Cuántas veces se agranda el sprite del tronco (168 px). Provisorio: con un sprite más grande
+## generado a la escala del juego volvería a 1 y se vería igual de nítido que el resto.
+const HOME_TREE_ZOOM := 3.0
+## Filas de arriba del sprite que se repiten para alargar el tronco (son solo corteza, sin raíces).
+const HOME_TRUNK_STRIP := 30
+## Fracción de abajo del sprite que se descarta: lo que quedaría bajo la línea del pasto. Nada del
+## tronco se dibuja bajo tierra (taparía túneles y hormigas); las raíces de abajo son parte del
+## terreno (`TerrainView`, `HomeTree.root_mask`).
+const HOME_ROOT_SINK := 0.12
+## Copa: el sprite del gigante cortado por el shader (`leaf_cut`) donde terminan las hojas, y su
+## tamaño en el mundo.
+const HOME_CANOPY_CUT := 0.56
+const HOME_CANOPY_SIZE := Vector2(1100, 1100)
+## Cuánto de la copa cuelga dentro del mapa, desde el borde de arriba del mundo (px).
+const HOME_CANOPY_HANG := 60.0
 
 
-## Fase 29: el árbol madre, centrado sobre el nido y siempre con la copa llena (no se cosecha).
-func _draw_home_tree(cpx: int) -> void:
-	if sim.home_tree == null:
+## Fase 29: copa del árbol madre, en su propio nodo (`_home_canopy`) con una copia del shader de
+## los árboles que la corta donde terminan las hojas; el tronco va en `_home_trunk`, detrás, sin
+## shader (es todo madera).
+func _draw_home_canopy() -> void:
+	if sim == null or sim.home_tree == null:
 		return
-	var size := TREE_SIZE * GIANT_SCALE * HOME_TREE_SCALE
-	var base := Vector2((sim.home_tree.x + 0.5) * cpx, sim.cfg.surface_y * cpx + size.y * SINK_FRACTION)
-	draw_texture_rect(GIANT_TEXTURES[0], Rect2(base - Vector2(size.x * 0.5, size.y), size), false,
-		SeasonStyle.GIANT_TINT[SeasonStyle.of(sim)])
+	var cx := (sim.home_tree.x + 0.5) * sim.cfg.cell_px
+	var top := HOME_CANOPY_HANG - HOME_CANOPY_SIZE.y * HOME_CANOPY_CUT
+	_home_canopy.draw_texture_rect(GIANT_TEXTURES[0], Rect2(Vector2(cx - HOME_CANOPY_SIZE.x * 0.5, top), HOME_CANOPY_SIZE),
+		false, SeasonStyle.GIANT_TINT[SeasonStyle.of(sim)])
+
+
+func _draw_home_trunk() -> void:
+	if sim == null or sim.home_tree == null:
+		return
+	var cpx := sim.cfg.cell_px
+	var w := HOME_TRUNK.get_width() * HOME_TREE_ZOOM
+	var left := (sim.home_tree.x + 0.5) * cpx - w * 0.5
+	var kept := HOME_TRUNK.get_height() * (1.0 - HOME_ROOT_SINK)  # filas del sprite sobre el pasto
+	var y := sim.cfg.surface_y * cpx - kept * HOME_TREE_ZOOM
+	_home_trunk.draw_texture_rect_region(HOME_TRUNK, Rect2(left, y, w, kept * HOME_TREE_ZOOM),
+		Rect2(0, 0, HOME_TRUNK.get_width(), kept), HOME_TRUNK_TINT)
+	# Hacia arriba, la franja de corteza repetida hasta pasar el borde del mundo.
+	var strip := Rect2(0, 0, HOME_TRUNK.get_width(), HOME_TRUNK_STRIP)
+	var strip_h := HOME_TRUNK_STRIP * HOME_TREE_ZOOM
+	while y > -strip_h:
+		y -= strip_h
+		_home_trunk.draw_texture_rect_region(HOME_TRUNK, Rect2(left, y, w, strip_h), strip, HOME_TRUNK_TINT)

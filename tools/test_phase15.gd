@@ -35,6 +35,9 @@ func _check(label: String, ok: bool, detail := "") -> void:
 func _cfg() -> SimConfig:
 	var c := SimConfig.new()
 	c.rain_auto = false
+	# Fase 29: el juego ya no pone árboles chicos (solo el árbol madre); se activan acá para seguir
+	# probando cómo se reparten al azar.
+	c.home_tree_other_trees = 4
 	return c
 
 
