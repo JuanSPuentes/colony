@@ -328,7 +328,7 @@ func _set_top_items(items: Array) -> void:
 		l.visible = i < items.size()
 		if l.visible:
 			l.text = "%s %s" % [items[i][0], items[i][1]]
-			l.tooltip_text = items[i][2]
+			l.tooltip_text = items[i][2]  # ya viene con tr()
 
 
 func _fmt_time(sec: float) -> String:
@@ -343,36 +343,36 @@ func _update_top_bar(m: Node, sim: Simulation) -> void:
 	for i in sim.ants.count:
 		if sim.ants.alive[i] == 1 and sim.ants.faction[i] == 0:
 			mine += 1
-	items.append(["🐜", str(mine), "Hormigas de tu colonia"])
-	items.append(["🍃", "%.0f" % sim.colony.food, "Comida"])
+	items.append(["🐜", str(mine), tr("Hormigas de tu colonia")])
+	items.append(["🍃", "%.0f" % sim.colony.food, tr("Comida")])
 	if sim.queen_id >= 0:
 		var q_max := sim.ants.max_hp(sim.queen_id)
 		var q_hp := sim.ants.hp[sim.queen_id] if sim.ants.alive[sim.queen_id] == 1 else 0.0
-		items.append(["👑", "%d%%" % int(100.0 * q_hp / maxf(q_max, 0.01)), "Vida de la reina"])
+		items.append(["👑", "%d%%" % int(100.0 * q_hp / maxf(q_max, 0.01)), tr("Vida de la reina")])
 	if sim.incremental or sim.test_mode:
 		var night := sim.is_night()
 		items.append(["🌙" if night else "☀", _fmt_time(DayNight.seconds_to_change(sim.time_s(), cfg)),
-			"Falta para que amanezca" if night else "Falta para que anochezca"])
-		items.append(["📅", "Día %d" % sim.day_number(), "Día actual"])
+			tr("Falta para que amanezca") if night else tr("Falta para que anochezca")])
+		items.append(["📅", tr("Día %d") % sim.day_number(), tr("Día actual")])
 	else:
-		items.append(["💧", "%.0f" % sim.colony.water, "Agua"])
-		items.append(["🏛", ERA_NAMES[sim.era], "Era de la colonia"])
+		items.append(["💧", "%.0f" % sim.colony.water, tr("Agua")])
+		items.append(["🏛", tr(ERA_NAMES[sim.era]), tr("Era de la colonia")])
 	if sim.incremental and not sim.tutorial_level and sim.season_index < SeasonSystem.SEASON_COUNT:
 		var icons := ["🌱", "☀", "🍂", "❄"]
-		items.append([icons[sim.season_index], "%s %d/%d" % [SeasonSystem.SEASON_NAMES[sim.season_index], sim.season_index + 1, SeasonSystem.SEASON_COUNT], "Estación"])
+		items.append([icons[sim.season_index], "%s %d/%d" % [tr(SeasonSystem.SEASON_NAMES[sim.season_index]), sim.season_index + 1, SeasonSystem.SEASON_COUNT], tr("Estación")])
 	var rival := sim.rival_colony
 	if sim.incremental and rival.battle_active:
-		items.append(["⚔", "¡Batalla! %d%%" % int(100.0 * rival.queen.hp / maxf(rival.queen.max_hp, 0.01)), "Vida de la reina rival"])
+		items.append(["⚔", tr("¡Batalla! %d%%") % int(100.0 * rival.queen.hp / maxf(rival.queen.max_hp, 0.01)), tr("Vida de la reina rival")])
 	elif sim.incremental and not sim.tutorial_level and sim.season_index < SeasonSystem.SEASON_COUNT:
 		# La batalla empieza al llegar al último día de la estación (`SeasonSystem.update`).
 		var left := SeasonSystem.season_length(sim) - 1 - SeasonSystem.day_in_season(sim)
-		items.append(["⚔", "Hoy" if left <= 0 else ("en %d %s" % [left, "día" if left == 1 else "días"]), "Próxima batalla de fin de estación"])
+		items.append(["⚔", tr("Hoy") if left <= 0 else (tr("en %d %s") % [left, tr("día") if left == 1 else tr("días")]), tr("Próxima batalla de fin de estación")])
 	if sim.weather != Simulation.Weather.CLEAR:
-		items.append(["🌧", "¡%ds!" % ceili(sim.rain_eta_s()) if sim.weather == Simulation.Weather.WARNING else _rain_word(sim), "Lluvia"])
+		items.append(["🌧", tr("¡%ds!") % ceili(sim.rain_eta_s()) if sim.weather == Simulation.Weather.WARNING else _rain_word(sim), tr("Lluvia")])
 	if m.paused:
-		items.append(["⏸", "Pausa", "Espacio para seguir"])
+		items.append(["⏸", tr("Pausa"), tr("Espacio para seguir")])
 	elif m.speed > 1:
-		items.append(["⏩", "x%d" % m.speed, "Velocidad"])
+		items.append(["⏩", "x%d" % m.speed, tr("Velocidad")])
 	_set_top_items(items)
 	var r := _world_rect(m)
 	var gear_w := 15.0 * S
@@ -694,29 +694,29 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 	var cfg := sim.cfg
 	var t := sim.time_s()
 	var night := sim.is_night()
-	_top.text = "Día %d · %s\nHormigas: %d   ·   %s   ·   %d FPS" % [
-		sim.day_number(), "de noche" if night else "de día", sim.ants.alive_count,
-		"En pausa" if m.paused else "Velocidad x%d" % m.speed, Engine.get_frames_per_second()]
+	_top.text = tr("Día %d · %s\nHormigas: %d   ·   %s   ·   %d FPS") % [
+		sim.day_number(), tr("de noche") if night else tr("de día"), sim.ants.alive_count,
+		tr("En pausa") if m.paused else tr("Velocidad x%d") % m.speed, Engine.get_frames_per_second()]
 
 	var c := sim.ants.count_by_caste([CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE])
 	var queen_alive := sim.ants.alive[sim.queen_id] == 1
 	var queen_hp := sim.ants.hp[sim.queen_id] if queen_alive else 0.0
 	var queen_hp_max := sim.ants.max_hp(sim.queen_id)
 	# Fase 14: zánganos también en Juego normal.
-	_colony.text = "[color=#%s]●[/color] %s   [color=#%s]●[/color] %s   [color=#%s]●[/color] %s\n[color=#%s]●[/color] Reina %d%%" % [
-		CasteDefs.COLORS[CasteDefs.Caste.WORKER].to_html(false), _plural(c[CasteDefs.Caste.WORKER], "obrera", "obreras"),
-		CasteDefs.COLORS[CasteDefs.Caste.SOLDIER].to_html(false), _plural(c[CasteDefs.Caste.SOLDIER], "soldado", "soldados"),
-		CasteDefs.COLORS[CasteDefs.Caste.DRONE].to_html(false), _plural(c[CasteDefs.Caste.DRONE], "zángano", "zánganos"),
+	_colony.text = tr("[color=#%s]●[/color] %s   [color=#%s]●[/color] %s   [color=#%s]●[/color] %s\n[color=#%s]●[/color] Reina %d%%") % [
+		CasteDefs.COLORS[CasteDefs.Caste.WORKER].to_html(false), _plural(c[CasteDefs.Caste.WORKER], tr("obrera"), tr("obreras")),
+		CasteDefs.COLORS[CasteDefs.Caste.SOLDIER].to_html(false), _plural(c[CasteDefs.Caste.SOLDIER], tr("soldado"), tr("soldados")),
+		CasteDefs.COLORS[CasteDefs.Caste.DRONE].to_html(false), _plural(c[CasteDefs.Caste.DRONE], tr("zángano"), tr("zánganos")),
 		CasteDefs.COLORS[CasteDefs.Caste.QUEEN].to_html(false), int(100.0 * queen_hp / maxf(queen_hp_max, 0.01))]
-	_resources.text = "Comida: %.0f / %.0f\n+%.0f/min por hojas · −%.0f/min de consumo%s" % [
+	_resources.text = tr("Comida: %.0f / %.0f\n+%.0f/min por hojas · −%.0f/min de consumo%s") % [
 		sim.colony.food, sim.colony.food_cap, sim.econ.income_per_min, sim.econ.upkeep_per_min,
-		"\n¡HAMBRE!" if sim.colony.starving else ""]
+		tr("\n¡HAMBRE!") if sim.colony.starving else ""]
 
 	var change := ceili(DayNight.seconds_to_change(t, cfg))
-	var weather := ("De noche: amanece en %d s" if night else "De día: anochece en %d s") % change
+	var weather := (tr("De noche: amanece en %d s") if night else tr("De día: anochece en %d s")) % change
 	match sim.weather:
 		Simulation.Weather.WARNING:
-			weather += "\n¡Lluvia en %d s!" % ceili(sim.rain_eta_s())
+			weather += tr("\n¡Lluvia en %d s!") % ceili(sim.rain_eta_s())
 		Simulation.Weather.RAINING:
 			weather += "\n" + _rain_word(sim)
 	_weather.text = weather
@@ -735,35 +735,35 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 			egg_dots += "[color=#%s]●[/color]" % CasteDefs.COLORS[sim.brood.caste[i]].to_html(false)
 	var st := sim.brood.counts_by_stage
 	if coming[CasteDefs.Caste.WORKER] + coming[CasteDefs.Caste.SOLDIER] + coming[CasteDefs.Caste.DRONE] == 0:
-		_threats.text = "Nada en camino: compra un huevo abajo"
+		_threats.text = tr("Nada en camino: compra un huevo abajo")
 	else:
-		_threats.text = "En camino: %s, %s, %s\nLarvas: %d   ·   Pupas: %d" % [
-			_plural(coming[CasteDefs.Caste.WORKER], "obrera", "obreras"),
-			_plural(coming[CasteDefs.Caste.SOLDIER], "soldado", "soldados"),
-			_plural(coming[CasteDefs.Caste.DRONE], "zángano", "zánganos"),
+		_threats.text = tr("En camino: %s, %s, %s\nLarvas: %d   ·   Pupas: %d") % [
+			_plural(coming[CasteDefs.Caste.WORKER], tr("obrera"), tr("obreras")),
+			_plural(coming[CasteDefs.Caste.SOLDIER], tr("soldado"), tr("soldados")),
+			_plural(coming[CasteDefs.Caste.DRONE], tr("zángano"), tr("zánganos")),
 			st[BroodSystem.Stage.LARVA], st[BroodSystem.Stage.PUPA]]
 	if egg_dots != "":
-		_colony.text += "   Huevos: " + egg_dots
+		_colony.text += tr("   Huevos: ") + egg_dots
 	# La araña también aparece en este modo (por población, sin eras: ver
 	# cfg.inc_spider_first_population). Reusa la línea de "en camino" en vez de sumar una línea
 	# nueva: el panel tiene la altura de siempre calculada para una sola línea acá, y agregar una
 	# de más (como se probó primero) tapaba la línea de comida de abajo.
 	if sim.spider.alive:
-		var state_names := {Spider.State.SEARCH: "buscando presas", Spider.State.ATTACK: "atacando",
-			Spider.State.SIEGE: "en la entrada", Spider.State.RETREAT: "huyendo"}
-		_threats.text = "¡Araña %s! (%d%%)" % [
-			state_names.get(sim.spider.state, "cerca"), int(100.0 * sim.spider.hp / maxf(sim.spider.max_hp, 0.01))]
+		var state_names := {Spider.State.SEARCH: tr("buscando presas"), Spider.State.ATTACK: tr("atacando"),
+			Spider.State.SIEGE: tr("en la entrada"), Spider.State.RETREAT: tr("huyendo")}
+		_threats.text = tr("¡Araña %s! (%d%%)") % [
+			state_names.get(sim.spider.state, tr("cerca")), int(100.0 * sim.spider.hp / maxf(sim.spider.max_hp, 0.01))]
 
 	var econ := sim.econ
-	_buy_btns[0].text = "[7] Huevo: %.0f" % econ.egg_cost()
+	_buy_btns[0].text = tr("[7] Huevo: %.0f") % econ.egg_cost()
 	_buy_btns[0].disabled = not econ.can_buy_egg()
-	_buy_btns[1].text = "[9] Auto: %s" % IncrementalEconomy.AUTO_NAMES[econ.auto_mode]
+	_buy_btns[1].text = tr("[9] Auto: %s") % tr(IncrementalEconomy.AUTO_NAMES[econ.auto_mode])
 
 	# Fase 9 (antes sin interfaz): mejoras de colonia.
 	var up := sim.upgrades
 	for stat in Upgrades.STAT_COUNT:
 		var b := _upgrade_btns[stat]
-		b.text = "%s\nNv.%d · %.0f comida" % [Upgrades.STAT_NAMES[stat], up.levels[stat], up.cost(stat)]
+		b.text = tr("%s\nNv.%d · %.0f comida") % [tr(Upgrades.STAT_NAMES[stat]), up.levels[stat], up.cost(stat)]
 		b.disabled = not up.can_buy(stat)
 
 	# Fase 14: estadísticas reales por casta, con las mejoras ya aplicadas — vida/velocidad/daño
@@ -773,26 +773,26 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 	# cavando una celda marcada, sin importar quién sea.
 	# Tabla: la casta a la izquierda y una columna por número, para leerlos de un vistazo.
 	var dim := "[color=#9a94a0]%s[/color]"
-	var stats_text := "[table=4][cell][/cell][cell]%s  [/cell][cell]%s  [/cell][cell]%s[/cell]" % [dim % "Vida", dim % "Vel.", dim % "Daño/s"]
+	var stats_text := "[table=4][cell][/cell][cell]%s  [/cell][cell]%s  [/cell][cell]%s[/cell]" % [dim % tr("Vida"), dim % tr("Vel."), dim % tr("Daño/s")]
 	for stat_caste in [CasteDefs.Caste.QUEEN, CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE]:
 		var base_hp: float = cfg.queen_hp_base if stat_caste == CasteDefs.Caste.QUEEN else cfg.ant_hp
 		var hp_val := base_hp * CasteDefs.HP_MULT[stat_caste] * up.hp_mult
 		var speed_val := cfg.ant_speed * CasteDefs.SPEED_MULT[stat_caste] * up.speed_mult
 		var dmg_val := CasteDefs.DAMAGE_PER_S[stat_caste] * up.damage_mult
 		stats_text += "[cell][color=#%s]●[/color] %s  [/cell][cell]%.0f[/cell][cell]%.1f[/cell][cell]%.1f[/cell]" % [
-			CasteDefs.COLORS[stat_caste].to_html(false), CasteDefs.NAMES[stat_caste], hp_val, speed_val, dmg_val]
-	stats_text += "[/table]\n" + dim % ("Cavar una celda: %.1f s" % (cfg.dig_seconds / up.work_mult))
+			CasteDefs.COLORS[stat_caste].to_html(false), tr(CasteDefs.NAMES[stat_caste]), hp_val, speed_val, dmg_val]
+	stats_text += "[/table]\n" + dim % (tr("Cavar una celda: %.1f s") % (cfg.dig_seconds / up.work_mult))
 	_stats_label.text = stats_text
 
 	# Fase 9 (antes sin interfaz): estación actual + colonia rival.
-	_season_label.text = "%s (día %d/%d)" % [
-		SeasonSystem.SEASON_NAMES[sim.season_index], maxi(1, SeasonSystem.day_in_season(sim) + 1),
-		SeasonSystem.season_length(sim)] if sim.season_index < SeasonSystem.SEASON_COUNT else "¡Las 4 estaciones superadas!"
+	_season_label.text = tr("%s (día %d/%d)") % [
+		tr(SeasonSystem.SEASON_NAMES[sim.season_index]), maxi(1, SeasonSystem.day_in_season(sim) + 1),
+		SeasonSystem.season_length(sim)] if sim.season_index < SeasonSystem.SEASON_COUNT else tr("¡Las 4 estaciones superadas!")
 	var rival := sim.rival_colony
 	if rival.battle_active:
-		_rival_label.text = "¡Batalla! Reina rival %d%%" % int(100.0 * rival.queen.hp / maxf(rival.queen.max_hp, 0.01))
+		_rival_label.text = tr("¡Batalla! Reina rival %d%%") % int(100.0 * rival.queen.hp / maxf(rival.queen.max_hp, 0.01))
 	else:
-		_rival_label.text = "Sin ataque en curso"
+		_rival_label.text = tr("Sin ataque en curso")
 
 
 ## Fase 5: tooltip al pasar el mouse. Se recalcula cada frame (barato: una hormiga cercana y una
@@ -823,13 +823,13 @@ func _process(_delta: float) -> void:
 				nearest = i
 		if nearest >= 0:
 			var nc: int = sim.ants.caste[nearest]
-			text = "%s   %d%% vida" % [CasteDefs.NAMES[nc],
+			text = tr("%s   %d%% vida") % [tr(CasteDefs.NAMES[nc]),
 				int(100.0 * sim.ants.hp[nearest] / maxf(sim.ants.max_hp(nearest), 0.01))]
 	if text == "" and sim.world.in_bounds(cell.x, cell.y):
 		var room_type: int = sim.world.room[cell.y * sim.world.w + cell.x]
 		if room_type != WorldGrid.Room.NONE:
 			var valid: bool = sim.rooms.valid[room_type]
-			text = "%s — %s" % [WorldGrid.ROOM_NAMES[room_type], "válida" if valid else "inválida (falta espacio)"]
+			text = "%s — %s" % [tr(WorldGrid.ROOM_NAMES[room_type]), tr("válida") if valid else tr("inválida (falta espacio)")]
 	_tooltip.text = text
 	_tooltip.visible = text != ""
 	if text != "":
@@ -838,20 +838,20 @@ func _process(_delta: float) -> void:
 
 ## Modo con reina ("Modo infinito", Test y partidas clásicas): castas, cría, comida y agua, reparto.
 func _update_classic(m: Node, sim: Simulation) -> void:
-	_top.text = "Hormigas: %d   ·   %s   ·   %d FPS\nSemilla: %d" % [
-		sim.ants.alive_count, "En pausa" if m.paused else "Velocidad x%d" % m.speed, Engine.get_frames_per_second(), sim.rng.seed]
+	_top.text = tr("Hormigas: %d   ·   %s   ·   %d FPS\nSemilla: %d") % [
+		sim.ants.alive_count, tr("En pausa") if m.paused else tr("Velocidad x%d") % m.speed, Engine.get_frames_per_second(), sim.rng.seed]
 
 	# --- Clima: despejado, aviso de lluvia o lluvia. (La sequía llega en una fase futura.)
-	var weather := "Sin novedades"
+	var weather := tr("Sin novedades")
 	match sim.weather:
 		Simulation.Weather.WARNING:
-			weather = "¡Lluvia en %d s!" % ceili(sim.rain_eta_s())
+			weather = tr("¡Lluvia en %d s!") % ceili(sim.rain_eta_s())
 		Simulation.Weather.RAINING:
 			weather = _rain_word(sim)
 		_:
 			var eta := sim.rain_eta_s()
 			if eta >= 0.0:
-				weather = "Sin novedades (lluvia en %d s)" % int(eta)
+				weather = tr("Sin novedades (lluvia en %d s)") % int(eta)
 	_weather.text = weather
 
 	# --- Amenazas: quién anda rondando la colonia. Fase 5: ya puede haber dos a la vez (araña y
@@ -860,21 +860,21 @@ func _update_classic(m: Node, sim: Simulation) -> void:
 	if sim.queen_id >= 0:
 		var threat_parts: Array[String] = []
 		if sim.spider.alive:
-			var spider_states := {Spider.State.SEARCH: "buscando presas", Spider.State.ATTACK: "atacando",
-				Spider.State.SIEGE: "en la entrada", Spider.State.RETREAT: "huyendo"}
-			threat_parts.append("Araña %s (%d%%)" % [spider_states.get(sim.spider.state, "cerca"),
+			var spider_states := {Spider.State.SEARCH: tr("buscando presas"), Spider.State.ATTACK: tr("atacando"),
+				Spider.State.SIEGE: tr("en la entrada"), Spider.State.RETREAT: tr("huyendo")}
+			threat_parts.append(tr("Araña %s (%d%%)") % [spider_states.get(sim.spider.state, tr("cerca")),
 				int(100.0 * sim.spider.hp / maxf(sim.spider.max_hp, 0.01))])
 		if sim.centipede.alive:
-			var cent_states := {Centipede.State.SEARCH: "buscando presas", Centipede.State.CHASE: "persiguiendo",
-				Centipede.State.ATTACK: "atacando", Centipede.State.RETREAT: "huyendo"}
-			threat_parts.append("Ciempiés %s (%d%%)" % [cent_states.get(sim.centipede.state, "cerca"),
+			var cent_states := {Centipede.State.SEARCH: tr("buscando presas"), Centipede.State.CHASE: tr("persiguiendo"),
+				Centipede.State.ATTACK: tr("atacando"), Centipede.State.RETREAT: tr("huyendo")}
+			threat_parts.append(tr("Ciempiés %s (%d%%)") % [cent_states.get(sim.centipede.state, tr("cerca")),
 				int(100.0 * sim.centipede.hp / maxf(sim.centipede.max_hp, 0.01))])
 		if sim.mantis.alive:
-			var mantis_states := {Mantis.State.HIDDEN: "camuflada", Mantis.State.ATTACK: "atacando",
-				Mantis.State.RETREAT: "huyendo"}
-			threat_parts.append("Mantis %s (%d%%)" % [mantis_states.get(sim.mantis.state, "cerca"),
+			var mantis_states := {Mantis.State.HIDDEN: tr("camuflada"), Mantis.State.ATTACK: tr("atacando"),
+				Mantis.State.RETREAT: tr("huyendo")}
+			threat_parts.append(tr("Mantis %s (%d%%)") % [mantis_states.get(sim.mantis.state, tr("cerca")),
 				int(100.0 * sim.mantis.hp / maxf(sim.mantis.max_hp, 0.01))])
-		_threats.text = " · ".join(threat_parts) if not threat_parts.is_empty() else "Ninguna a la vista"
+		_threats.text = " · ".join(threat_parts) if not threat_parts.is_empty() else tr("Ninguna a la vista")
 
 	if sim.queen_id >= 0:
 		var c := sim.ants.count_by_caste([CasteDefs.Caste.WORKER, CasteDefs.Caste.NURSE, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE])
@@ -888,12 +888,12 @@ func _update_classic(m: Node, sim: Simulation) -> void:
 			CasteDefs.COLORS[CasteDefs.Caste.SOLDIER].to_html(false), c[CasteDefs.Caste.SOLDIER],
 			CasteDefs.COLORS[CasteDefs.Caste.DRONE].to_html(false), c[CasteDefs.Caste.DRONE],
 			CasteDefs.COLORS[CasteDefs.Caste.QUEEN].to_html(false), int(100.0 * queen_hp / maxf(queen_hp_max, 0.01)),
-			ERA_NAMES[sim.era]]
-		_resources.text = "Cría %d/%d/%d   Comida %.0f%s  Agua %.0f%s" % [
+			tr(ERA_NAMES[sim.era])]
+		_resources.text = tr("Cría %d/%d/%d   Comida %.0f%s  Agua %.0f%s") % [
 			sim.brood.counts_by_stage[BroodSystem.Stage.EGG], sim.brood.counts_by_stage[BroodSystem.Stage.LARVA], sim.brood.counts_by_stage[BroodSystem.Stage.PUPA],
 			sim.colony.food, _trend_arrow(sim.colony.food_trend), sim.colony.water, _trend_arrow(sim.colony.water_trend)]
 		var t := sim.colony.target_pct
-		_ratio.text = "Reparto → Obreras %d%%  Nodrizas %d%%  Soldados %d%%  Zánganos %d%%" % [
+		_ratio.text = tr("Reparto → Obreras %d%%  Nodrizas %d%%  Soldados %d%%  Zánganos %d%%") % [
 			int(t[CasteDefs.Caste.WORKER] * 100), int(t[CasteDefs.Caste.NURSE] * 100), int(t[CasteDefs.Caste.SOLDIER] * 100), int(t[CasteDefs.Caste.DRONE] * 100)]
 		var castes := [CasteDefs.Caste.WORKER, CasteDefs.Caste.NURSE, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE]
 		for i in castes.size():
@@ -909,7 +909,7 @@ func _update_log(sim: Simulation) -> void:
 	var lines := ""
 	if sim.queen_id >= 0:
 		for n in sim.notifications:
-			lines += "[color=#ffd43c]• %s[/color]\n" % n
+			lines += "[color=#ffd43c]• %s[/color]\n" % note_text(n)
 	_log.text = lines
 	_log_card.visible = lines != ""
 
@@ -943,21 +943,21 @@ func update_info(m: Node) -> void:
 	_test_panel.visible = sim.test_mode
 	if _test_panel.visible:
 		_test_panel.position = world_rect.position + Vector2(world_rect.size.x - _test_panel.size.x - 10.0 * S, 10.0 * S)
-	_threat_header.text = "CRÍA" if sim.incremental else "AMENAZAS"
+	_threat_header.text = tr("CRÍA") if sim.incremental else tr("AMENAZAS")
 
-	var tool_names := ["", "Cavar [1]", "Feromona [2]", "Cámara [3]", "Borrar [4]", "Mover reina [5]"]
+	var tool_names := ["", tr("Cavar [1]"), tr("Feromona [2]"), tr("Cámara [3]"), tr("Borrar [4]"), tr("Mover reina [5]")]
 	var sub := ""
 	if m.tool == 2:
-		sub = " · %s (Q/E)" % OverlayView.LAYER_NAMES[m.phero_index + 1]
+		sub = " · %s (Q/E)" % tr(OverlayView.LAYER_NAMES[m.phero_index + 1])
 	elif m.tool == 3:
-		sub = " · %s (Q/E)" % WorldGrid.ROOM_NAMES[m.ROOM_TYPES[m.room_index]]
-	_tools.text = "%s%s\nCapa: %s\nZoom %sx   ·   Marcadas: %d" % [
-		tool_names[m.tool], sub, OverlayView.LAYER_NAMES[m.overlay.layer], "%.2f" % m.camera.zoom.x, sim.world.marked_count]
+		sub = " · %s (Q/E)" % tr(WorldGrid.ROOM_NAMES[m.ROOM_TYPES[m.room_index]])
+	_tools.text = tr("%s%s\nCapa: %s\nZoom %sx   ·   Marcadas: %d") % [
+		tool_names[m.tool], sub, tr(OverlayView.LAYER_NAMES[m.overlay.layer]), "%.2f" % m.camera.zoom.x, sim.world.marked_count]
 
 	_phero_badge.visible = m.tool == 2
 	if _phero_badge.visible:
 		_phero_swatch.color = OverlayView.PHERO_COLORS[m.phero_index]
-		var name: String = OverlayView.LAYER_NAMES[m.phero_index + 1]
+		var name: String = tr(OverlayView.LAYER_NAMES[m.phero_index + 1])
 		_phero_label.text = name[0].to_upper() + name.substr(1)
 		_phero_badge.position = world_rect.position + Vector2((world_rect.size.x - _phero_badge.size.x) * 0.5, TOPBAR_H + 12.0)
 
@@ -965,13 +965,13 @@ func update_info(m: Node) -> void:
 		var parts := ""
 		for k in AntSystem.State.size():
 			var col: Color = AntSystem.STATE_COLORS[k]
-			parts += "[color=#%s]■ %s[/color]  " % [col.to_html(false), AntSystem.STATE_NAMES[k]]
+			parts += "[color=#%s]■ %s[/color]  " % [col.to_html(false), tr(AntSystem.STATE_NAMES[k])]
 		_legend.text = parts
 	elif m.overlay.layer == OverlayView.Layer.CASTES:
 		var parts2 := ""
 		for k in CasteDefs.NAMES.size():
 			var col2: Color = CasteDefs.COLORS[k]
-			parts2 += "[color=#%s]■ %s[/color]  " % [col2.to_html(false), CasteDefs.NAMES[k]]
+			parts2 += "[color=#%s]■ %s[/color]  " % [col2.to_html(false), tr(CasteDefs.NAMES[k])]
 		_legend.text = parts2
 	else:
 		_legend.text = ""
@@ -982,7 +982,7 @@ func update_info(m: Node) -> void:
 	_end_panel.visible = sim.game_over
 	if sim.game_over:
 		var won := sim.victory
-		_defeat.text = ("¡VICTORIA!" if sim.tutorial_level else "¡LA COLONIA PROSPERÓ!") if won else "LA COLONIA CAYÓ"
+		_defeat.text = (tr("¡VICTORIA!") if sim.tutorial_level else tr("¡LA COLONIA PROSPERÓ!")) if won else tr("LA COLONIA CAYÓ")
 		_defeat.add_theme_color_override("font_color", Color("7fe08a") if won else Color("ff6a6a"))
 		_end_reason.text = sim.game_over_reason
 		_end_reason.custom_minimum_size.x = clampf(world_rect.size.x - 160.0, 280.0, 520.0)
@@ -992,4 +992,17 @@ func update_info(m: Node) -> void:
 
 ## Fase 26: en invierno la lluvia se ve como nieve, así que el HUD dice "Nevando".
 func _rain_word(sim: Simulation) -> String:
-	return "Nevando" if SeasonStyle.snows(sim) else "Lloviendo"
+	return tr("Nevando") if SeasonStyle.snows(sim) else tr("Lloviendo")
+
+
+## Fase 27: un aviso de `Simulation.notify` en el idioma actual. Viene como "clave␟dato␟dato": se
+## traduce la clave y cada dato de texto (un número queda igual).
+func note_text(note: String) -> String:
+	var parts := note.split(Simulation.NOTE_SEP)
+	var msg := tr(parts[0])
+	if parts.size() == 1:
+		return msg
+	var args := []
+	for k in range(1, parts.size()):
+		args.append(tr(parts[k]))
+	return msg % args

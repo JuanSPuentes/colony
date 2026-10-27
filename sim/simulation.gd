@@ -476,8 +476,20 @@ func time_s() -> float:
 	return tick_count * dt
 
 
-func notify(msg: String) -> void:
-	notifications.append(msg)
+## Fase 27: separa el texto de sus datos dentro de un aviso guardado (ver `notify`).
+const NOTE_SEP := "\u001f"
+
+
+## Agrega un aviso. `msg` es el texto en español (la clave de `translations/strings.csv`) y `args`
+## lo que va en sus `%s`. Se guardan juntos en un solo String ("clave␟dato␟dato") para que el HUD
+## lo traduzca al mostrarlo en el idioma de ese momento (`Hud.note_text`); los datos que son texto
+## (por ejemplo el nombre de una estación) también se traducen. Así los avisos siguen siendo un
+## `Array[String]` y las partidas guardadas de antes cargan igual.
+func notify(msg: String, args: Array = []) -> void:
+	var parts := PackedStringArray([msg])
+	for a in args:
+		parts.append(str(a))
+	notifications.append(NOTE_SEP.join(parts))
 	if notifications.size() > MAX_NOTIFICATIONS:
 		notifications.pop_front()
 
@@ -781,7 +793,7 @@ func cmd_stop_rain() -> void:
 ## Invierno). Solo cambia el ambiente: en el modo Test no hay batallas de estación.
 func cmd_next_season() -> void:
 	season_index = (season_index + 1) % 4
-	notify("Estación de prueba: %d/4" % (season_index + 1))
+	notify("Estación de prueba: %s/4", [season_index + 1])
 
 
 func cmd_add_ants(n: int) -> void:

@@ -27,7 +27,7 @@ static func update(sim) -> void:
 		var ant_count: int = cfg.rival_wave_base_ants + sim.season_index * cfg.rival_wave_ants_growth
 		var strength: float = 1.0 + cfg.rival_queen_strength_growth * sim.season_index
 		rival.start_battle(ant_count, strength)
-		sim.notify("¡La colonia rival de %s ataca!" % SEASON_NAMES[sim.season_index])
+		sim.notify("¡La colonia rival de %s ataca!", [SEASON_NAMES[sim.season_index]])
 
 
 ## Día dentro de la estación actual, 0-based (negativo: la estación todavía no empezó, ver
@@ -54,7 +54,7 @@ static func _advance_season(sim) -> void:
 		sim.victory = true
 		sim.game_over_reason = "Derrotaste a las 4 colonias rivales."
 	else:
-		sim.notify("¡Batalla ganada! %s empieza mañana." % SEASON_NAMES[sim.season_index])
+		sim.notify("¡Batalla ganada! %s empieza mañana.", [SEASON_NAMES[sim.season_index]])
 		# Fase 25: con el mapa al azar (el que tiene niebla) la colonia se muda a un territorio
 		# nuevo; lo hace `main.gd` con `Migration.migrate`. El mapa fijo de las pruebas no se muda.
 		if sim.fog != null:

@@ -1068,5 +1068,8 @@ Separado en tres piezas, cada una con una sola responsabilidad:
   si no inglés). Selector en Opciones → Ajustes.
 - **Pruebas:** `tools/test_translation.gd` revisa que todo `tr("...")` esté en el CSV y que las
   pantallas ya traducidas (`SCREENS`) no muestren texto suelto en inglés.
-- **Avance:** traducidos el menú principal, Opciones, los diálogos y "Cómo jugar". Faltan el HUD,
-  las notificaciones de la simulación y el tutorial.
+- **Avisos:** `sim.notify("texto con %s", [datos])` guarda la clave y los datos juntos; el HUD
+  los traduce al mostrarlos (`Hud.note_text`), así un aviso cambia de idioma aunque ya esté en
+  pantalla. Las partidas guardadas de antes cargan igual (un aviso viejo es solo la clave).
+- **Avance:** traducidos el menú principal, Opciones, los diálogos, "Cómo jugar", el HUD, los
+  avisos y los motivos de fin de partida. Faltan la guía en partida (`CoachView`) y el Nivel 0.

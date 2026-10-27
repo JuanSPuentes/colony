@@ -19,6 +19,9 @@ func _initialize() -> void:
 	_load_keys()
 	_t_tr_calls_have_rows()
 	_t_screens_in_english()
+	await _t_hud_in_english("incremental")
+	await _t_hud_in_english("test")
+	_t_notes()
 	_t_language_setting()
 	TranslationServer.set_locale("es")
 	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
@@ -53,7 +56,8 @@ func _load_keys() -> void:
 
 
 func _t_tr_calls_have_rows() -> void:
-	var re := RegEx.create_from_string("\\btr\\(\"((?:[^\"\\\\]|\\\\.)*)\"\\)")
+	# tr("..."), avisos (notify("...")) y motivos de fin de partida: todos se muestran traducidos.
+	var re := RegEx.create_from_string("(?:\\btr\\(|\\bnotify\\(|game_over_reason = )\"((?:[^\"\\\\]|\\\\.)*)\"")
 	var missing: Array[String] = []
 	for path in _scripts("res://"):
 		var text := FileAccess.get_file_as_string(path)
@@ -61,7 +65,7 @@ func _t_tr_calls_have_rows() -> void:
 			var key := m.get_string(1).c_unescape()
 			if not _keys.has(key):
 				missing.append("%s: %s" % [path.get_file(), key])
-	_check("todo tr(\"...\") del código está en el CSV", missing.is_empty(), "\n  " + "\n  ".join(missing))
+	_check("todo tr/notify/motivo del código está en el CSV", missing.is_empty(), "\n  " + "\n  ".join(missing))
 
 
 func _scripts(dir: String) -> Array[String]:
@@ -104,6 +108,45 @@ func _ok_in_english(text: String) -> bool:
 	return RegEx.create_from_string("[A-Za-zÁÉÍÓÚáéíóúñÑ]").search(text) == null
 
 
+## Palabras que solo aparecen en un texto si quedó en español (los textos del HUD se arman con
+## `tr()` y formato, así que no se pueden buscar por clave como los botones fijos).
+const SPANISH_WORDS := ["de", "la", "el", "en", "y", "las", "los", "del", "por", "sin", "con", "hormigas",
+	"comida", "reina", "obreras", "soldados", "día", "noche", "lluvia", "pausa", "velocidad", "vida"]
+
+
+## Juega unos cuadros con el HUD en inglés y busca textos (también BBCode) que sigan en español.
+func _t_hud_in_english(mode: String) -> void:
+	TranslationServer.set_locale("en")
+	var m: Node = load("res://main.tscn").instantiate()
+	m.auto_start = false
+	m.fresh_layout_enabled = mode == "incremental"
+	root.add_child(m)
+	await process_frame
+	m.start(5, null, mode)
+	for k in 5:
+		await process_frame
+	var found: Array[String] = []
+	_collect_spanish(m.hud, found)
+	_check("HUD de %s en inglés sin español" % mode, found.is_empty(), "\n  " + "\n  ".join(found))
+	m.free()
+
+
+func _collect_spanish(node: Node, out: Array[String]) -> void:
+	var text := ""
+	if node is Label or node is Button:
+		text = TranslationServer.translate(node.text) if node.can_auto_translate() else node.text
+	elif node is RichTextLabel:
+		text = node.get_parsed_text()
+	if text != "" and node is CanvasItem and node.is_visible_in_tree():
+		var words := text.to_lower().replace("\n", " ").split(" ", false)
+		for w in words:
+			if w.strip_edges().trim_suffix(":").trim_suffix(",") in SPANISH_WORDS or RegEx.create_from_string("[áéíóúñ¿¡]").search(w) != null:
+				out.append(text.replace("\n", " / "))
+				break
+	for child in node.get_children():
+		_collect_spanish(child, out)
+
+
 func _t_language_setting() -> void:
 	var s := AppSettings.new()
 	s.language = "en"
@@ -112,3 +155,15 @@ func _t_language_setting() -> void:
 	s.language = "es"
 	s.apply_language()
 	_check("en español queda el texto original", TranslationServer.translate("Opciones") == "Opciones")
+
+
+## Un aviso con datos se traduce entero, también el nombre de la estación que lleva adentro.
+func _t_notes() -> void:
+	TranslationServer.set_locale("en")
+	var sim := Simulation.new(SimConfig.new(), 1)
+	sim.notify("¡La colonia rival de %s ataca!", ["Verano"])
+	var hud := Hud.new()
+	var text := hud.note_text(sim.notifications[-1])
+	_check("un aviso con datos sale traducido", text == "The Summer rival colony attacks!", text)
+	_check("un aviso viejo (sin datos) también", hud.note_text("La reina murió.") == "The queen died.")
+	hud.free()

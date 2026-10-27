@@ -259,7 +259,7 @@ func save_game() -> void:
 	if err == OK:
 		sim.notify("Partida guardada.")
 	else:
-		sim.notify("No se pudo guardar (error %d)." % err)
+		sim.notify("No se pudo guardar (error %s).", [err])
 
 
 func load_game() -> void:
