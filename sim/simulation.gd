@@ -45,6 +45,11 @@ var plants: Array[Plant] = []
 ## Punto 4: restos de hormigas y amenazas muertas, recolectables por obreras (ver `AntSystem`).
 var corpses: Array[Corpse] = []
 var corpse_parts_stored := 0
+## Fase 29: comida de lo que cae del árbol madre que llegó al nido y todavía no se sumó (la suma
+## `IncrementalEconomy.tick`, igual que las hojas).
+var drop_food_stored := 0.0
+## Fase 29: el árbol gigante encima del nido (solo "Juego normal" con mapa al azar; null si no hay).
+var home_tree: HomeTree
 var rooms: RoomSystem
 var colony: Colony
 var brood: BroodSystem
@@ -196,6 +201,7 @@ func spawn_incremental_start(fresh_layout := false) -> void:
 	if fresh_layout:
 		_seal_shaft()
 		_carve_side_chambers()
+		home_tree = HomeTree.new(cfg.nest_x, rng.seed)  # Fase 29: antes que los demás árboles, que lo esquivan
 		_place_plants_random()
 		enable_fog()
 	# Arranca el reloj ya pasado el amanecer (`DayNight.FADE`): a tick_count=0 el mundo se ve casi
@@ -338,12 +344,17 @@ func _place_plants_random() -> void:
 	plants.clear()
 	total_leaves_left = 0
 	var n := cfg.plant_count + rng.randi_range(-2, 3)
+	# Fase 29: con árbol madre, los demás son pocos y quedan fuera de su copa (alternativa lejana).
+	var clear := 6
+	if home_tree != null:
+		n = cfg.home_tree_other_trees + rng.randi_range(-1, 1)
+		clear = cfg.home_tree_clear_cells
 	var used: Array[int] = []
 	var tries := 0
 	while plants.size() < n and tries < 400:
 		tries += 1
 		var x := rng.randi_range(3, world.w - 4)
-		if absi(x - cfg.nest_x) < 6:
+		if absi(x - cfg.nest_x) < clear:
 			continue
 		var clash := false
 		for ux in used:
@@ -356,36 +367,10 @@ func _place_plants_random() -> void:
 		var leaves := cfg.leaves_per_plant + rng.randi_range(-10, 15)
 		plants.append(Plant.new(Vector2i(x, cfg.surface_y - 1), leaves))
 		total_leaves_left += leaves
-	_place_giants(used)
 	_carve_mushroom_pockets()
 	econ.known_plants = PackedByteArray()
 	econ.known_plants.resize(plants.size())
 
-
-## Fase 19: 1-2 árboles gigantes, lejos del nido (`giant_min_dist`), con mucho más para cosechar.
-func _place_giants(used: Array[int]) -> void:
-	var n := rng.randi_range(cfg.giant_count_min, cfg.giant_count_max)
-	var placed := 0
-	var tries := 0
-	while placed < n and tries < 300:
-		tries += 1
-		var x := rng.randi_range(4, world.w - 5)
-		if absi(x - cfg.nest_x) < cfg.giant_min_dist:
-			continue
-		var clash := false
-		for ux in used:
-			if absi(ux - x) < 7:
-				clash = true
-				break
-		if clash:
-			continue
-		used.append(x)
-		var leaves := int(round(cfg.leaves_per_plant * cfg.giant_leaves_mult))
-		var g := Plant.new(Vector2i(x, cfg.surface_y - 1), leaves)
-		g.kind = Plant.Kind.GIANT
-		plants.append(g)
-		total_leaves_left += leaves
-		placed += 1
 
 
 ## Fase 19: cuevitas cerradas en la primera capa de tierra con un bolsón de hongos cada una. Se
@@ -543,6 +528,8 @@ func tick() -> void:
 		# Fase 3: sin eras (la araña ya sí aparece, con su propio umbral de población).
 		econ.tick(dt)
 		econ.regrow_plants(dt)
+		if home_tree != null:
+			home_tree.update(self, dt)
 		brood.tick(dt)
 		if tick_count % 3 == 0 and not tutorial_level:
 			_update_spider(dt * 3.0, cfg.inc_spider_first_population)
@@ -586,7 +573,8 @@ func _update_corpses(step_dt: float) -> void:
 	for i in range(corpses.size() - 1, -1, -1):
 		var c := corpses[i]
 		c.age += step_dt
-		if c.food_value <= 0.0 or c.age >= cfg.corpse_decay_s:
+		var life := cfg.drop_decay_s if c.is_tree_drop() else cfg.corpse_decay_s  # Fase 29
+		if c.food_value <= 0.0 or c.age >= life:
 			corpses.remove_at(i)
 
 

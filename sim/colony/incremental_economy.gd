@@ -112,6 +112,13 @@ func tick(dt: float) -> void:
 		food_earned += gain_c
 		_income_acc += gain_c
 		colony.food = minf(colony.food_cap, colony.food + gain_c)
+	# Fase 29: lo caído del árbol madre trae su propio valor (hoja, semilla o fruta).
+	if sim.drop_food_stored > 0.0:
+		var gain_d := sim.drop_food_stored
+		sim.drop_food_stored = 0.0
+		food_earned += gain_d
+		_income_acc += gain_d
+		colony.food = minf(colony.food_cap, colony.food + gain_d)
 	# Consumo: solo comida (el agua no es un recurso en este modo).
 	var consumed := 0.0
 	var ants := sim.ants

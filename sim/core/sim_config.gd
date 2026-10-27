@@ -251,13 +251,28 @@ extends Resource
 @export var inc_rain_interval_max_s := 750.0
 ## Hojas que rebrota cada planta por segundo, solo de día y hasta su máximo.
 @export var inc_plant_regrow_per_s := 0.1
-## Fase 19: árbol gigante (solo "Juego normal" con mapa al azar). Lejos del nido, muchas más hojas y
-## rebrote más rápido: vale la pena un rastro largo y defenderlo.
-@export var giant_count_min := 1
-@export var giant_count_max := 2
-@export var giant_min_dist := 28
+## Fase 19: árbol gigante (más hojas, rebrote más rápido). Fase 29: ya no se reparten gigantes por
+## el mapa (los reemplaza el árbol madre); quedan estos valores para los de partidas guardadas antes.
 @export var giant_leaves_mult := 4.0
 @export var giant_regrow_mult := 2.5
+## Fase 29: árbol madre, un solo árbol gigante encima del nido (solo "Juego normal" con mapa al
+## azar). No se cosecha directo: deja caer hojas, semillas y frutas alrededor del tronco a un ritmo
+## fijo (de noche, la mitad) — comida segura pero limitada. Lo que nadie recoge se pudre.
+@export var home_tree_drop_interval_s := 6.0
+## Hasta cuántas celdas a cada lado del tronco cae lo que suelta (más o menos el ancho de la copa).
+@export var home_tree_drop_radius := 9
+## Más que esto en el suelo a la vez y deja de soltar (una colonia chica no aprovecha todo).
+@export var home_tree_max_drops := 18
+## Probabilidad de cada cosa al caer (el resto, hoja) y cuánta comida vale al llegar al nido.
+@export var home_tree_seed_chance := 0.28
+@export var home_tree_fruit_chance := 0.07
+@export var drop_food_leaf := 4.0
+@export var drop_food_seed := 10.0
+@export var drop_food_fruit := 30.0
+@export var drop_decay_s := 120.0
+## Los demás árboles quedan lejos del madre (celdas desde su tronco) y son menos.
+@export var home_tree_clear_cells := 16
+@export var home_tree_other_trees := 4
 ## Fase 19: bolsones de hongos en la primera capa de tierra (solo "Juego normal" con mapa al azar).
 ## Cerrados al empezar: hay que cavar hasta ellos. Rebrotan también de noche.
 @export var mushroom_pockets_min := 3

@@ -22,6 +22,9 @@ const ANT_COLOR := Color("120b08")
 ## una batalla de fin de estación sin arte nuevo (mismo sprite, otro color de instancia).
 const RIVAL_COLOR := Color("8b1a1a")
 const LEAF_COLOR := Color("5fe05f")
+## Fase 29: color de lo que carga según `AntSystem.carry_kind` (hoja de árbol, restos, hoja caída,
+## semilla, fruta). Provisorio: la etapa 2 trae sprites propios con animación.
+const CARRY_COLORS: Array[Color] = [LEAF_COLOR, Color("4a2a1f"), LEAF_COLOR, Color("a8743a"), Color("d8402f")]
 ## Dos alas finas y translúcidas por zángano vivo (ver `CasteDefs`), la única casta con alas: así
 ## se distingue de un vistazo sin depender solo del color morado.
 const WING_COLOR := Color(0.88, 0.8, 0.95, 0.55)
@@ -180,7 +183,7 @@ func update(alpha: float, frame_start_pos: PackedVector2Array = PackedVector2Arr
 		body_n[dir] += 1
 		if ants.carry[i] == 1:
 			_leaf_mm.set_instance_transform_2d(leaves, Transform2D(0.0, p + Vector2(0, -2.0)))
-			_leaf_mm.set_instance_color(leaves, LEAF_COLOR)
+			_leaf_mm.set_instance_color(leaves, CARRY_COLORS[mini(ants.carry_kind[i], CARRY_COLORS.size() - 1)])
 			leaves += 1
 		if ants.caste[i] == CasteDefs.Caste.DRONE:
 			var fwd := Vector2(cos(delta.angle()), sin(delta.angle())) if delta.length_squared() > TURN_EPS2 else Vector2.RIGHT

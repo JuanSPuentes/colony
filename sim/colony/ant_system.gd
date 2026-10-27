@@ -55,9 +55,14 @@ var last_cell := PackedInt32Array()
 var ignore_until := PackedInt32Array()
 var alive := PackedByteArray()
 var carry := PackedByteArray()
-## Qué está cargando mientras `carry[i] == 1`: 0 = hoja, 1 = restos de un cadáver (Punto 4, valen
-## más comida al entregarse). Solo importa en el momento de `_deliver()`.
+## Qué está cargando mientras `carry[i] == 1`: 0 = hoja de árbol, 1 = restos de un cadáver (Punto 4,
+## valen más comida al entregarse); Fase 29: 2/3/4 = hoja/semilla/fruta caída del árbol madre
+## (`CARRY_DROP + Corpse.Kind - 1`). Lo usan `_deliver()` y el dibujo de lo que carga.
 var carry_kind := PackedByteArray()
+## Fase 29: comida que vale lo caído del árbol madre que lleva (solo con `carry_kind >= CARRY_DROP`).
+var carry_value := PackedFloat32Array()
+const CARRY_REMAINS := 1
+const CARRY_DROP := 2
 ## Solo lo usa el Zángano: índice en `BroodSystem` del huevo que está cargando ahora, -1 si
 ## ninguno (ver `_think_drone`).
 var carry_egg := PackedInt32Array()
@@ -122,6 +127,7 @@ func _grow(n: int) -> void:
 	alive.resize(total)
 	carry.resize(total)
 	carry_kind.resize(total)
+	carry_value.resize(total)
 	carry_egg.resize(total)
 	patrol_x.resize(total)
 	hp.resize(total)
@@ -461,7 +467,9 @@ func _at_drop(ci: int) -> bool:
 
 
 func _deliver(i: int) -> void:
-	if carry_kind[i] == 1:
+	if carry_kind[i] >= CARRY_DROP:
+		sim.drop_food_stored += carry_value[i]  # Fase 29: lo caído del árbol madre
+	elif carry_kind[i] == CARRY_REMAINS:
 		sim.corpse_parts_stored += 1
 	else:
 		sim.leaves_stored += 1
@@ -622,9 +630,11 @@ func _corpse_logic(i: int, cx: int, cy: int, ci: int) -> bool:
 	if c == null:
 		return false
 	if pos[i].distance_to(c.pos) <= cfg.pickup_cells * cfg.cell_px:
+		# Fase 29: lo caído del árbol madre lleva su propio valor; los restos, el fijo de siempre.
+		carry_value[i] = c.food_value
+		carry_kind[i] = CARRY_DROP + c.kind - 1 if c.is_tree_drop() else CARRY_REMAINS
 		c.food_value = 0.0
 		carry[i] = 1
-		carry_kind[i] = 1
 		trip_steps[i] = 0
 		state[i] = State.CARRY_HOME
 		_step(i, cx, cy, ci, Mode.NEST, null)

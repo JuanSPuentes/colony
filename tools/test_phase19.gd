@@ -58,14 +58,14 @@ func _t_generation() -> void:
 		var sim := _fresh(s)
 		var giants := _of_kind(sim, Plant.Kind.GIANT)
 		var mush := _of_kind(sim, Plant.Kind.MUSHROOM)
-		ok_giants = ok_giants and giants.size() >= sim.cfg.giant_count_min and giants.size() <= sim.cfg.giant_count_max
-		for g in giants:
-			ok_giants = ok_giants and absi(g.cell.x - sim.cfg.nest_x) >= sim.cfg.giant_min_dist and g.max_leaves > sim.cfg.leaves_per_plant * 3
+		# Fase 29 (cambio intencional): los gigantes sueltos se reemplazaron por un solo árbol madre
+		# encima del nido (ver tools/test_phase29.gd).
+		ok_giants = ok_giants and giants.is_empty() and sim.home_tree != null
 		ok_pockets = ok_pockets and mush.size() >= sim.cfg.mushroom_pockets_min and mush.size() <= sim.cfg.mushroom_pockets_max
 		for m in mush:
 			ok_closed = ok_closed and sim.fields.nest_dist[m.cell.y * sim.world.w + m.cell.x] >= NestDistanceField.FAR
 			ok_layer = ok_layer and m.cell.y > sim.cfg.surface_y and m.cell.y < sim.cfg.surface_y + 18 and not m.pocket.is_empty()
-	_check("hay 1-2 árboles gigantes, lejos del nido y con muchas más hojas", ok_giants)
+	_check("en vez de gigantes sueltos, un solo árbol madre sobre el nido (Fase 29)", ok_giants)
 	_check("hay 3-5 bolsones de hongos", ok_pockets)
 	_check("los bolsones arrancan cerrados (sin camino desde el nido)", ok_closed)
 	_check("los bolsones están en la primera capa de tierra", ok_layer)

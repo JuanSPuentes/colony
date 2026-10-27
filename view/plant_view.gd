@@ -181,6 +181,7 @@ func _draw() -> void:
 	if sim == null:
 		return
 	var cpx := sim.cfg.cell_px
+	_draw_home_tree(cpx)
 	for p in sim.plants:
 		if p.is_mushroom():
 			continue  # los dibuja `_mushrooms` (sin el shader de los árboles)
@@ -258,3 +259,18 @@ func _draw_mushroom_sprites() -> void:
 			var bx := (c.x + 0.5) * cpx
 			var by := (c.y + 1) * cpx
 			_mushroom_sprites.draw_texture_rect(tex, Rect2(bx - s * 0.5, by - s, s, s), false, mcol)
+
+
+## Fase 29: cuánto más grande que un gigante es el árbol madre. Por ahora reusa el sprite del
+## gigante (la etapa de escalarlo trae su propio arte con tronco y ramas).
+const HOME_TREE_SCALE := 1.7
+
+
+## Fase 29: el árbol madre, centrado sobre el nido y siempre con la copa llena (no se cosecha).
+func _draw_home_tree(cpx: int) -> void:
+	if sim.home_tree == null:
+		return
+	var size := TREE_SIZE * GIANT_SCALE * HOME_TREE_SCALE
+	var base := Vector2((sim.home_tree.x + 0.5) * cpx, sim.cfg.surface_y * cpx + size.y * SINK_FRACTION)
+	draw_texture_rect(GIANT_TEXTURES[0], Rect2(base - Vector2(size.x * 0.5, size.y), size), false,
+		SeasonStyle.GIANT_TINT[SeasonStyle.of(sim)])

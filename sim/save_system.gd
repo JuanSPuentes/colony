@@ -51,6 +51,10 @@ static func to_dict(sim: Simulation) -> Dictionary:
 	# Fase 14: Nivel 0.
 	d["tutorial_level"] = sim.tutorial_level
 	d["fog"] = sim.fog != null
+	# Fase 29: árbol madre y lo caído que ya llegó al nido.
+	d["drop_food_stored"] = sim.drop_food_stored
+	if sim.home_tree != null:
+		d["home_tree"] = {"x": sim.home_tree.x, "drop_acc": sim.home_tree.drop_acc, "rng_seed": sim.home_tree.rng.seed, "rng_state": sim.home_tree.rng.state}
 	d["tutorial_battle_started"] = sim.tutorial_battle_started
 	d["econ"] = {
 		"bought_eggs": sim.econ.bought_eggs,
@@ -152,6 +156,7 @@ static func to_dict(sim: Simulation) -> Dictionary:
 		"trip_steps": Array(ants.trip_steps), "job": Array(ants.job),
 		"last_cell": Array(ants.last_cell), "ignore_until": Array(ants.ignore_until),
 		"alive": Array(ants.alive), "carry": Array(ants.carry), "carry_kind": Array(ants.carry_kind),
+		"carry_value": Array(ants.carry_value),
 		"carry_egg": Array(ants.carry_egg), "patrol_x": Array(ants.patrol_x),
 		"hp": Array(ants.hp), "timer": Array(ants.timer),
 		"stuck_t": Array(ants.stuck_t), "check_acc": Array(ants.check_acc),
@@ -167,7 +172,7 @@ static func to_dict(sim: Simulation) -> Dictionary:
 
 	var corpses := []
 	for c in sim.corpses:
-		corpses.append({"pos": _v2(c.pos), "food_value": c.food_value, "age": c.age})
+		corpses.append({"pos": _v2(c.pos), "food_value": c.food_value, "age": c.age, "kind": c.kind})
 	d["corpses"] = corpses
 	return d
 
@@ -368,6 +373,9 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	ants.carry_kind = PackedByteArray(carry_kind_in) if carry_kind_in.size() == ants.count else PackedByteArray()
 	if ants.carry_kind.size() != ants.count:
 		ants.carry_kind.resize(ants.count)  # 0 por defecto: hoja, igual que antes de que esto existiera
+	var carry_value_in: Array = ad.get("carry_value", [])
+	ants.carry_value = PackedFloat32Array(carry_value_in)
+	ants.carry_value.resize(ants.count)  # partidas de antes de la Fase 29: 0
 	var carry_egg_in: Array = ad.get("carry_egg", [])
 	ants.carry_egg = PackedInt32Array(carry_egg_in) if carry_egg_in.size() == ants.count else PackedInt32Array()
 	if ants.carry_egg.size() != ants.count:
@@ -406,7 +414,7 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 
 	sim.corpses.clear()
 	for corpse_d in d.get("corpses", []):
-		var c := Corpse.new(_to_v2(corpse_d["pos"]), float(corpse_d["food_value"]))
+		var c := Corpse.new(_to_v2(corpse_d["pos"]), float(corpse_d["food_value"]), int(corpse_d.get("kind", Corpse.Kind.REMAINS)))
 		c.age = float(corpse_d.get("age", 0.0))
 		sim.corpses.append(c)
 
@@ -422,6 +430,12 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	# Fase 24: la niebla también es derivada del terreno.
 	if bool(d.get("fog", false)):
 		sim.enable_fog()
+	sim.drop_food_stored = float(d.get("drop_food_stored", 0.0))
+	if d.has("home_tree"):
+		sim.home_tree = HomeTree.new(int(d["home_tree"]["x"]))
+		sim.home_tree.drop_acc = float(d["home_tree"].get("drop_acc", 0.0))
+		sim.home_tree.rng.seed = int(d["home_tree"].get("rng_seed", 0))
+		sim.home_tree.rng.state = int(d["home_tree"].get("rng_state", 0))
 	ants._recount()
 	return sim
 

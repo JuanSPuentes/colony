@@ -1089,3 +1089,19 @@ Separado en tres piezas, cada una con una sola responsabilidad:
 - **Quién lo usa:** el HUD (panel lateral, barra de arriba, botones, pausa, Test, fin de partida),
   la guía en partida (`CoachView`) y las pistas del Nivel 0. El menú, Opciones y "Cómo jugar"
   todavía tienen el estilo anterior.
+
+## Fase 29: árbol madre (etapa 1 de 5)
+
+- **`sim/core/home_tree.gd` (`HomeTree`):** en "Juego normal" con mapa al azar hay un solo árbol
+  gigante encima del nido. No se cosecha directo: suelta hojas, semillas y frutas bajo la copa
+  (`home_tree_drop_interval_s`, la mitad de noche; tope `home_tree_max_drops`). Usa su propio
+  azar (derivado de la semilla), así no cambia cómo se comporta el resto de la simulación.
+- **Lo que cae** es comida en el suelo: `Corpse` con `kind` (LEAF/SEED/FRUIT; los restos de
+  bichos son REMAINS). Las obreras lo recogen como los restos y llevan su valor
+  (`AntSystem.carry_value`); `IncrementalEconomy` lo suma al llegar. Se pudre a `drop_decay_s`.
+- **Los demás árboles** son pocos (`home_tree_other_trees`) y quedan a `home_tree_clear_cells` o
+  más del tronco. Ya no se reparten gigantes sueltos (cambio intencional; `test_phase19` lo
+  registra). Las cuevas de hongos siguen igual.
+- **Pendiente (próximas etapas):** sprites y animación de lo que cargan, frutas entre varias,
+  escalar el tronco y las ramas, lecciones del tutorial y el árbol según la estación.
+- Pruebas: `tools/test_phase29.gd`.
