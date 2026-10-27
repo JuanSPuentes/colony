@@ -123,6 +123,8 @@ var season_index := 0
 ## Fase 17: día (`day_number()`) en que empezó la estación actual (ver `SeasonSystem.day_in_season`).
 var season_start_day := 1
 var rival_colony: RivalColony
+## Fase 25: se ganó la batalla de la estación y toca mudarse (ver `Migration`); lo atiende `main.gd`.
+var migration_pending := false
 
 var _terrain_seen := -1
 var _storage_rooms_seen := -1

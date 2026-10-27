@@ -270,6 +270,13 @@ func load_game() -> void:
 	sim.notify("Partida cargada.")
 
 
+## Fase 25: la colonia ganó la estación y se muda a un mapa nuevo (ver `Migration`).
+func _migrate() -> void:
+	var new_sim := Migration.migrate(sim, sim.rng.randi())
+	start(new_sim.rng.seed, new_sim)
+	_frame_start_pos = sim.ants.pos.duplicate()  # la interpolación no mezcla hormigas de los dos mapas
+
+
 func _resize_world_container() -> void:
 	# Las pruebas (`world_size_override`) fijan un tamaño exacto para que el mapeo de clics sea 1:1
 	# y predecible; en ese modo el panel lateral NO se reserva, para no cambiarles el mapeo de
@@ -338,8 +345,14 @@ func _process(delta: float) -> void:
 			for k in speed:
 				sim.tick()
 				ran += 1
+				if sim.migration_pending:
+					break
+			if sim.migration_pending:
+				break
 		if ran >= MAX_TICKS_PER_FRAME:
 			_acc = 0.0
+		if sim.migration_pending:
+			_migrate()
 	terrain_view.refresh()
 	day_night_view.refresh()
 	_overlay_acc += delta

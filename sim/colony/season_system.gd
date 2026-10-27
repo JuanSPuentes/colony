@@ -55,3 +55,7 @@ static func _advance_season(sim) -> void:
 		sim.game_over_reason = "Derrotaste a las 4 colonias rivales."
 	else:
 		sim.notify("¡Batalla ganada! %s empieza mañana." % SEASON_NAMES[sim.season_index])
+		# Fase 25: con el mapa al azar (el que tiene niebla) la colonia se muda a un territorio
+		# nuevo; lo hace `main.gd` con `Migration.migrate`. El mapa fijo de las pruebas no se muda.
+		if sim.fog != null:
+			sim.migration_pending = true

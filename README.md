@@ -1025,10 +1025,22 @@ Separado en tres piezas, cada una con una sola responsabilidad:
   `max_s`, al azar). Antes llovía cada 200 s con días de 300 s y el agua (que tarda ~2,75 min en
   secarse) casi no llegaba a irse.
 - **Niebla bajo tierra** (`sim/core/fog.gd`, `view/fog_view.gd`; solo Juego normal con mapa al
-  azar): se ve la superficie y lo que está a 2 celdas de un hueco al que se puede llegar; lo
+  azar): se ven la fila del pasto y los huecos a los que se puede llegar (no la tierra de alrededor); lo
   descubierto queda. Un bolsón de hongos recién existe para las obreras cuando se descubre. Si un
   túnel pasa a 5 celdas o menos de un bolsón oculto, titilan unas esporas de su color sobre la
   niebla. Se deduce del terreno: no se guarda, se recalcula al cargar.
 - **Primero lo de arriba** (`AntSystem._mushroom_ok`): las obreras van a los hongos solo si el nido
   no tiene salida, es de noche, no quedan árboles con hojas, o el jugador pintó Comida hasta el
   bolsón. Antes iban siempre a lo más cercano, y los bolsones conectados solían ganarle a los árboles.
+
+## Fase 25: la colonia se muda al ganar una estación
+
+- **`sim/colony/migration.gd` (`Migration.migrate`):** al vencer a la colonia rival de una
+  estación (salvo la última, que gana la partida) el mapa se genera de cero con otra semilla —
+  terreno, árboles llenos, hongos, niebla — con el mismo arranque de Juego normal.
+- **Se conserva:** comida, hormigas por casta (la cría en camino llega nacida), la vida de la
+  reina en proporción, mejoras, precio del huevo, compra automática, estación, día y estadísticas.
+  Las hormigas aparecen repartidas por la cámara Real, la Guardería y el Almacén.
+- **Cómo se dispara:** `SeasonSystem` marca `sim.migration_pending` y `main.gd` cambia la
+  simulación igual que al cargar una partida. El mapa fijo de las pruebas (sin niebla) no se muda.
+- Pruebas: `tools/test_phase25.gd`.
