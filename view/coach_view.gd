@@ -171,7 +171,7 @@ func _open(main, lesson: Dictionary) -> void:
 	_count.text = "%d/%d" % [step + 1, lessons.size()] if _mode == "level0" else ""
 	var has_goal: bool = lesson.has("goal")
 	_goal_label.visible = has_goal
-	_goal_label.text = "▶ " + String(lesson.get("goal", ""))
+	_goal_label.text = "▶ " + tr(String(lesson.get("goal", "")))  # armado: no se traduce solo (Fase 27)
 	_ok.visible = not has_goal
 	_ok.text = String(lesson.get("button", "Siguiente  ⏎" if _mode == "level0" else "Entendido  ⏎"))
 	_card.visible = true

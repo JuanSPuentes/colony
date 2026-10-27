@@ -1071,5 +1071,6 @@ Separado en tres piezas, cada una con una sola responsabilidad:
 - **Avisos:** `sim.notify("texto con %s", [datos])` guarda la clave y los datos juntos; el HUD
   los traduce al mostrarlos (`Hud.note_text`), así un aviso cambia de idioma aunque ya esté en
   pantalla. Las partidas guardadas de antes cargan igual (un aviso viejo es solo la clave).
-- **Avance:** traducidos el menú principal, Opciones, los diálogos, "Cómo jugar", el HUD, los
-  avisos y los motivos de fin de partida. Faltan la guía en partida (`CoachView`) y el Nivel 0.
+- **Avance:** todo el juego está en inglés: menú, Opciones, diálogos, "Cómo jugar", HUD, avisos,
+  motivos de fin de partida, la guía en partida (`CoachView`) y las pistas del Nivel 0.
+  `test_translation` también juega unos cuadros en inglés y busca palabras en español en pantalla.

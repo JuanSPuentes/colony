@@ -19,6 +19,7 @@ func _initialize() -> void:
 	_load_keys()
 	_t_tr_calls_have_rows()
 	_t_screens_in_english()
+	_t_lessons_have_rows()
 	await _t_hud_in_english("incremental")
 	await _t_hud_in_english("test")
 	_t_notes()
@@ -120,14 +121,15 @@ func _t_hud_in_english(mode: String) -> void:
 	var m: Node = load("res://main.tscn").instantiate()
 	m.auto_start = false
 	m.fresh_layout_enabled = mode == "incremental"
+	m.coach_enabled = mode == "incremental"  # que también se vea la guía en partida
 	root.add_child(m)
 	await process_frame
 	m.start(5, null, mode)
 	for k in 5:
 		await process_frame
 	var found: Array[String] = []
-	_collect_spanish(m.hud, found)
-	_check("HUD de %s en inglés sin español" % mode, found.is_empty(), "\n  " + "\n  ".join(found))
+	_collect_spanish(m, found)  # HUD, guía en partida y pistas
+	_check("partida (%s) en inglés sin español" % mode, found.is_empty(), "\n  " + "\n  ".join(found))
 	m.free()
 
 
@@ -167,3 +169,21 @@ func _t_notes() -> void:
 	_check("un aviso con datos sale traducido", text == "The Summer rival colony attacks!", text)
 	_check("un aviso viejo (sin datos) también", hud.note_text("La reina murió.") == "The queen died.")
 	hud.free()
+
+
+## La guía en partida (`CoachView`) y las pistas del Nivel 0 (`TutorialView`) guardan sus textos en
+## diccionarios y listas: los busca en el código (título, texto, objetivo, botón y cada pista).
+func _t_lessons_have_rows() -> void:
+	var missing: Array[String] = []
+	var coach := FileAccess.get_file_as_string("res://view/coach_view.gd")
+	var re := RegEx.create_from_string("\"(?:title|text|goal|button)\":\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
+	for m in re.search_all(coach):
+		missing.append(m.get_string(1).c_unescape())
+	var pheromones := RegEx.create_from_string("PHEROMONES_TEXT := \"((?:[^\"\\\\]|\\\\.)*)\"").search(coach)
+	missing.append(pheromones.get_string(1).c_unescape())
+	var steps := RegEx.create_from_string("(?m)^\\s*\"([^\"]+)\",?\\s*$")
+	for m in steps.search_all(FileAccess.get_file_as_string("res://view/tutorial_view.gd")):
+		missing.append(m.get_string(1))
+	var total := missing.size()
+	missing = missing.filter(func(k: String) -> bool: return not _keys.has(k))
+	_check("las %d lecciones y pistas están en el CSV" % total, missing.is_empty(), "\n  " + "\n  ".join(missing))

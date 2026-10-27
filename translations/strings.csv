@@ -279,3 +279,82 @@ Zoom %sx   ·   Marked: %d"
 "Derrotaste a la reina rival y superaste el Nivel 0.
 En Juego normal, así termina cada estación.","You defeated the rival queen and cleared Level 0.
 In the normal game, this is how each season ends."
+"Siguiente  ⏎","Next  ⏎"
+"Entendido  ⏎","Got it  ⏎"
+"¡A la batalla!  ⏎","To battle!  ⏎"
+"Nivel 0","Level 0"
+"La reina","The queen"
+"Castas","Castes"
+"Cámara","Camera"
+"Feromona de Comida","Food pheromone"
+"Cosecha","Harvest"
+"Las 5 feromonas","The 5 pheromones"
+"Cavar","Digging"
+"Huevos","Eggs"
+"Día y noche","Day and night"
+"Fin de estación","End of season"
+"La reina rival","The rival queen"
+"Juego normal","Normal game"
+"Abre el nido","Open the nest"
+"Consigue comida","Get food"
+"Compra un huevo","Buy an egg"
+"Amplía el nido","Expand the nest"
+"Nació un zángano","A drone hatched"
+"Cae la noche","Night falls"
+"¡Una araña!","A spider!"
+"Tecla 2, luego Q/E para elegir:
+Comida → obreras a la planta
+Hogar → «ya explorado»: buscan más lejos
+Peligro → todas se alejan
+Ataque → los soldados van ahí
+Evacuar → huyen de la zona","Key 2, then Q/E to choose:
+Food → workers go to the plant
+Home → ""already explored"": they search farther
+Danger → everyone stays away
+Attack → soldiers go there
+Evacuate → they flee the area"
+"No controlas a las hormigas: les das señales (feromonas) y diseñas el nido. Termina con una batalla.","You don't control the ants: you give them signals (pheromones) and design the nest. It ends with a battle."
+"La más grande. Pone todos los huevos. Si muere, pierdes.","The biggest one. She lays every egg. If she dies, you lose."
+"Todo cuesta comida y todas comen. Si llega a 0, la reina y los soldados se debilitan.","Everything costs food and every ant eats. If it hits 0, the queen and soldiers grow weak."
+"Obrera: cava y trae hojas.
+Soldado: patrulla y defiende.
+Zángano: lleva huevos a la Guardería y defiende a la reina.
+Ante un enemigo pelean todas.","Worker: digs and brings leaves.
+Soldier: patrols and defends.
+Drone: carries eggs to the Nursery and defends the queen.
+Against an enemy, they all fight."
+"Clic izq. arrastra · WASD/flechas (Shift: rápido) · rueda: zoom · H: la reina.","Left-click drags · WASD/arrows (Shift: fast) · wheel: zoom · H: the queen."
+"Mueve la cámara","Move the camera"
+"Las obreras siguen rastros. Empieza en el nido y termina en la planta.","Workers follow trails. Start at the nest and end at the plant."
+"Pulsa 2 y arrastra con clic derecho","Press 2 and drag with right-click"
+"Cada hoja que llega al nido es comida. Las plantas rebrotan de día.","Every leaf that reaches the nest is food. Plants regrow during the day."
+"Marca desde un túnel hacia la tierra; las obreras cavan. La roca gris no se cava.","Mark from a tunnel into the dirt; workers dig it. Gray rock can't be dug."
+"Pulsa 1 y arrastra con clic derecho","Press 1 and drag with right-click"
+"Huevo → larva → pupa → adulta. Sale obrera, soldado o zángano al azar. 9: auto-compra.","Egg → larva → pupa → adult. A worker, soldier or drone hatches at random. 9: auto-buy."
+"Compra un huevo (tecla 7)","Buy an egg (key 7)"
+"De noche no rebrotan las plantas. Arriba ves cuánto falta para que cambie.","Plants don't regrow at night. The top bar shows how long until it changes."
+"Con comida extra, mejora daño, vida, velocidad o trabajo (panel izquierdo).","With extra food, upgrade damage, health, speed or work (left panel)."
+"Araña, ciempiés, mantis y lluvia. Feromona de Peligro: alejar. De Ataque: llamar soldados.","Spiders, centipedes, mantises and rain. Danger pheromone: keep away. Attack: call soldiers."
+"Cada estación termina con un ataque rival: gana quien mate a la reina. Te mandamos 3 soldados.","Each season ends with a rival attack: whoever kills the other queen wins. We're sending you 3 soldiers."
+"Lleva a tu colonia hasta ella con la feromona de Ataque (2, luego Q/E).","Lead your colony to her with the Attack pheromone (2, then Q/E)."
+"Derrota a la reina rival","Defeat the rival queen"
+"Sobrevive a 4 estaciones. Tu nido ya tiene Real (reina), Guardería (huevos) y Almacén (comida). Clic izq. arrastra el mapa; clic derecho usa la herramienta.","Survive 4 seasons. Your nest already has a Royal chamber (queen), Nursery (eggs) and Storage (food). Left-click drags the map; right-click uses the tool."
+"El nido está cerrado. Marca un túnel desde la cámara hasta la superficie, por donde quieras salir.","The nest is sealed. Mark a tunnel from the chamber up to the surface, wherever you want the exit."
+"Pulsa 1 y arrastra con clic derecho hasta arriba","Press 1 and drag with right-click up to the surface"
+"Las obreras siguen rastros de feromona del nido a la planta.","Workers follow pheromone trails from the nest to the plant."
+"Cada hoja es comida. Todas comen: que no llegue a 0.","Every leaf is food. Every ant eats: don't let it hit 0."
+"Nace obrera, soldado o zángano al azar. 9: auto-compra.","A worker, soldier or drone hatches at random. 9: auto-buy."
+"Tecla 7 o botón del panel","Key 7 or the panel button"
+"Desde un túnel hacia la tierra.","From a tunnel into the dirt."
+"Escolta a la reina y la defiende si algo se acerca a ella o a los huevos. Pinta una Guardería (3) y llevará los huevos ahí.","It escorts the queen and defends her if something gets close to her or the eggs. Paint a Nursery (3) and it will carry the eggs there."
+"De noche no rebrotan las plantas.","Plants don't regrow at night."
+"Ya te alcanza para una mejora (panel izquierdo).","You can afford an upgrade (left panel)."
+"Inunda los túneles bajos y borra feromonas. El agua se evapora sola.","It floods low tunnels and washes away pheromones. The water evaporates on its own."
+"Caza obreras sueltas. Feromona de Ataque (2, Q/E) manda a los soldados.","It hunts stray workers. The Attack pheromone (2, Q/E) sends the soldiers."
+"Mata a la reina rival para pasar de estación. Tus soldados se juntan en la salida del nido y salen juntos a buscarla.","Kill the rival queen to move on to the next season. Your soldiers gather at the nest exit and head out together to find her."
+"Pinta un rastro de Comida (tecla 2) hacia una planta","Paint a Food trail (key 2) toward a plant"
+"Espera a que una obrera cargada de hojas llegue al nido","Wait for a worker carrying leaves to reach the nest"
+"Cava (tecla 1) para ampliar el nido","Dig (key 1) to expand the nest"
+"Una araña ronda la superficie: pon soldados de guardia junto a la entrada","A spider is roaming the surface: post soldiers on guard by the entrance"
+"Compra un huevo con comida (botón [7] del panel)","Buy an egg with food (button [7] on the panel)"
+"Compra una mejora de colonia con comida (sección Mejoras del panel)","Buy a colony upgrade with food (Upgrades section of the panel)"
