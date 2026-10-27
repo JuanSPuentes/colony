@@ -1,0 +1,114 @@
+extends SceneTree
+## Pruebas de la Fase 27: traducción. Revisa que todo `tr("...")` del código tenga su fila en
+## `translations/strings.csv` y que, con el juego en inglés, las pantallas ya pasadas a la tabla no
+## muestren ningún texto sin traducir. Las pantallas que todavía no se pasaron no se revisan acá
+## (se agregan a `SCREENS` a medida que se traducen).
+## Uso: godot --headless --path . --script tools/test_translation.gd      (código de salida 1 si algo falla)
+
+const CSV := "res://translations/strings.csv"
+const SCREENS := ["res://app/main_menu.gd", "res://app/options_screen.gd", "res://app/guide_screen.gd"]
+## Textos que se muestran tal cual en cualquier idioma.
+const SAME_IN_ALL := ["Colony: Under the Earth", "Español", "English", "•"]
+
+var _pass := 0
+var _fail := 0
+var _keys := {}
+
+
+func _initialize() -> void:
+	_load_keys()
+	_t_tr_calls_have_rows()
+	_t_screens_in_english()
+	_t_language_setting()
+	TranslationServer.set_locale("es")
+	print("RESULTADO: %d correctas, %d fallidas" % [_pass, _fail])
+	quit(1 if _fail > 0 else 0)
+
+
+func _check(label: String, ok: bool, detail := "") -> void:
+	if ok:
+		_pass += 1
+	else:
+		_fail += 1
+	print("[%s] %s %s" % ["OK " if ok else "FALLA", label, detail])
+
+
+func _load_keys() -> void:
+	var f := FileAccess.open(CSV, FileAccess.READ)
+	f.get_csv_line()  # encabezado
+	var dupes: Array[String] = []
+	while not f.eof_reached():
+		var row := f.get_csv_line()
+		if row.size() < 2 or row[0] == "":
+			continue
+		if _keys.has(row[0]):
+			dupes.append(row[0])
+		_keys[row[0]] = row[1]
+	_check("el CSV no repite claves", dupes.is_empty(), str(dupes))
+	var empty: Array[String] = []
+	for k in _keys:
+		if str(_keys[k]).strip_edges() == "":
+			empty.append(k)
+	_check("toda fila tiene su inglés", empty.is_empty(), str(empty))
+
+
+func _t_tr_calls_have_rows() -> void:
+	var re := RegEx.create_from_string("\\btr\\(\"((?:[^\"\\\\]|\\\\.)*)\"\\)")
+	var missing: Array[String] = []
+	for path in _scripts("res://"):
+		var text := FileAccess.get_file_as_string(path)
+		for m in re.search_all(text):
+			var key := m.get_string(1).c_unescape()
+			if not _keys.has(key):
+				missing.append("%s: %s" % [path.get_file(), key])
+	_check("todo tr(\"...\") del código está en el CSV", missing.is_empty(), "\n  " + "\n  ".join(missing))
+
+
+func _scripts(dir: String) -> Array[String]:
+	var out: Array[String] = []
+	for d in DirAccess.get_directories_at(dir):
+		if not d.begins_with(".") and d != "tools" and d != "addons":
+			out.append_array(_scripts(dir.path_join(d)))
+	for f in DirAccess.get_files_at(dir):
+		if f.ends_with(".gd"):
+			out.append(dir.path_join(f))
+	return out
+
+
+func _t_screens_in_english() -> void:
+	TranslationServer.set_locale("en")
+	for path in SCREENS:
+		var screen: Node = load(path).new()
+		root.add_child(screen)
+		var untranslated: Array[String] = []
+		_collect_untranslated(screen, untranslated)
+		_check("%s en inglés sin textos sueltos" % path.get_file(), untranslated.is_empty(), "\n  " + "\n  ".join(untranslated))
+		screen.free()
+
+
+func _collect_untranslated(node: Node, out: Array[String]) -> void:
+	var text := ""
+	if node is Label or node is Button:
+		text = node.text
+	if text != "" and node.can_auto_translate() and not _ok_in_english(text):
+		out.append(text)
+	for child in node.get_children():
+		_collect_untranslated(child, out)
+
+
+## Un texto se ve bien en inglés si tiene fila en el CSV, es igual en todo idioma o no tiene letras
+## (números, porcentajes, flechas).
+func _ok_in_english(text: String) -> bool:
+	if _keys.has(text) or text in SAME_IN_ALL:
+		return true
+	return RegEx.create_from_string("[A-Za-zÁÉÍÓÚáéíóúñÑ]").search(text) == null
+
+
+func _t_language_setting() -> void:
+	var s := AppSettings.new()
+	s.language = "en"
+	s.apply_language()
+	_check("aplicar el idioma cambia la traducción", TranslationServer.translate("Opciones") == "Options")
+	s.language = "es"
+	s.apply_language()
+	_check("en español queda el texto original", TranslationServer.translate("Opciones") == "Opciones")

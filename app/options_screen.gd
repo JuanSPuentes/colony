@@ -10,6 +10,8 @@ extends CanvasLayer
 signal back_pressed
 signal volume_changed(v: float)
 signal brightness_changed(b: float)
+## Fase 27: código de idioma (`AppSettings.LANGUAGES`).
+signal language_changed(code: String)
 signal quit_requested
 ## Fase 17: acciones de la partida en curso, solo visibles si Opciones se abrió desde el juego
 ## (`set_in_game(true)`). `app.gd` decide qué hacer y pide confirmación donde se pierde progreso.
@@ -28,6 +30,8 @@ var _volume_slider: HSlider
 var _volume_value: Label
 var _brightness_slider: HSlider
 var _brightness_value: Label
+var _language: OptionButton
+var _controls_cols: HBoxContainer
 var _game_card: PanelContainer
 var _save_status: Label
 
@@ -109,15 +113,15 @@ func _ready() -> void:
 		func(v: float) -> void: brightness_changed.emit(v))
 	_brightness_slider = _last_slider
 	_brightness_value = _last_value_label
+	_language_row(settings_body)
 
 	var controls_card := _card("Controles")
 	content.add_child(controls_card)
 	var controls_body := controls_card.get_meta("body") as VBoxContainer
-	var cols := HBoxContainer.new()
-	cols.add_theme_constant_override("separation", 28)
-	controls_body.add_child(cols)
-	for group in Hud.CONTROLS:
-		cols.add_child(_controls_column(group[0], group[1]))
+	_controls_cols = HBoxContainer.new()
+	_controls_cols.add_theme_constant_override("separation", 28)
+	controls_body.add_child(_controls_cols)
+	_fill_controls()
 
 	var quit_btn := Button.new()
 	quit_btn.text = "Salir del juego"
@@ -201,7 +205,7 @@ func _controls_column(header_text: String, rows: Array) -> VBoxContainer:
 		line.fit_content = true
 		line.scroll_active = false
 		line.add_theme_font_size_override("normal_font_size", 13)
-		line.text = "[color=#ffd43c]%s[/color]  %s" % [row[0], row[1]]
+		line.text = "[color=#ffd43c]%s[/color]  %s" % [tr(row[0]), tr(row[1])]
 		col.add_child(line)
 	return col
 
@@ -254,3 +258,41 @@ func set_values(volume: float, brightness: float) -> void:
 	_volume_value.text = "%d%%" % int(volume * 100.0)
 	_brightness_slider.set_value_no_signal(brightness)
 	_brightness_value.text = "%d%%" % int(brightness * 100.0)
+
+
+## Fase 27: las líneas de controles son BBCode armado a mano (no se traducen solas como un botón):
+## se vuelven a armar cuando cambia el idioma.
+func _fill_controls() -> void:
+	for child in _controls_cols.get_children():
+		child.queue_free()
+	for group in Hud.CONTROLS:
+		_controls_cols.add_child(_controls_column(group[0], group[1]))
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED and _controls_cols != null:
+		_fill_controls()
+
+
+## Fase 27: selector de idioma (los nombres van en su propio idioma, no se traducen).
+func _language_row(parent: VBoxContainer) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	parent.add_child(row)
+	var label := Label.new()
+	label.text = "Idioma"
+	label.custom_minimum_size = Vector2(80, 0)
+	label.add_theme_font_size_override("font_size", 16)
+	label.add_theme_color_override("font_color", CREAM)
+	row.add_child(label)
+	_language = OptionButton.new()
+	_language.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	_language.add_theme_font_size_override("font_size", 16)
+	for name in AppSettings.LANGUAGE_NAMES:
+		_language.add_item(name)
+	_language.item_selected.connect(func(i: int) -> void: language_changed.emit(AppSettings.LANGUAGES[i]))
+	row.add_child(_language)
+
+
+func set_language(code: String) -> void:
+	_language.select(maxi(0, AppSettings.LANGUAGES.find(code)))

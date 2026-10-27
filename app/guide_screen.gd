@@ -132,12 +132,20 @@ func _card(header_text: String, lines: Array) -> PanelContainer:
 	header.add_theme_color_override("font_color", Color("7fd0ff"))
 	body.add_child(header)
 
+	# Viñeta aparte: el texto de la línea queda solo, así Godot lo traduce entero (Fase 27).
 	for line_text in lines:
+		var row := HBoxContainer.new()
+		var bullet := Label.new()
+		bullet.text = "•"
+		bullet.add_theme_color_override("font_color", CREAM)
+		row.add_child(bullet)
 		var line := Label.new()
-		line.text = "•  " + line_text
+		line.text = line_text
 		line.add_theme_font_size_override("font_size", 14)
 		line.add_theme_color_override("font_color", CREAM)
 		line.autowrap_mode = TextServer.AUTOWRAP_WORD
-		body.add_child(line)
+		line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(line)
+		body.add_child(row)
 
 	return card

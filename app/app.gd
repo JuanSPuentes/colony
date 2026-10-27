@@ -28,6 +28,7 @@ var _pending: Callable
 func _ready() -> void:
 	settings = AppSettings.load_settings()
 	settings.apply_volume()
+	settings.apply_language()
 
 	menu = MainMenu.new()
 	add_child(menu)
@@ -48,6 +49,7 @@ func _ready() -> void:
 	options.back_pressed.connect(_on_options_back)
 	options.volume_changed.connect(_on_volume_changed)
 	options.brightness_changed.connect(_on_brightness_changed)
+	options.language_changed.connect(_on_language_changed)
 	options.quit_requested.connect(_ask_quit)
 
 	guide = GuideScreen.new()
@@ -152,6 +154,7 @@ func _open_options(return_to: String) -> void:
 	if game != null and return_to == "game":
 		game.paused = true
 	options.set_values(settings.volume, settings.brightness)
+	options.set_language(settings.language)
 	options.set_in_game(game != null and return_to == "game")
 	options.visible = true
 	menu.visible = false
@@ -189,6 +192,12 @@ func _on_brightness_changed(b: float) -> void:
 		game.set_brightness(b)
 
 
+func _on_language_changed(code: String) -> void:
+	settings.language = code
+	settings.apply_language()
+	settings.save()
+
+
 func _ask_quit() -> void:
 	quit_dialog.popup_centered()
 
@@ -207,7 +216,7 @@ func _on_save_requested() -> void:
 		return
 	game.save_game()
 	var ok := FileAccess.file_exists(game.SAVE_PATH)
-	options.show_save_status("Partida guardada." if ok else "No se pudo guardar.")
+	options.show_save_status(tr("Partida guardada.") if ok else tr("No se pudo guardar."))
 
 
 ## Cierra la partida actual (sin guardar). Deja `game` en null.

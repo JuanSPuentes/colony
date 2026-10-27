@@ -19,6 +19,11 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 window/size/viewport_width=1440
 window/size/viewport_height=810
 
+[internationalization]
+
+locale/translations=PackedStringArray("res://translations/strings.en.translation")
+locale/fallback="es"
+
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0

@@ -1054,3 +1054,19 @@ Separado en tres piezas, cada una con una sola responsabilidad:
   lluvia cae como nieve; el agua no cambia) y el HUD ("Nevando").
 - **`view/ambient_view.gd` (`AmbientView`):** pétalos que caen de las copas (primavera),
   luciérnagas de noche (verano), hojas (otoño) y nevada suave (invierno). Se congela en pausa.
+
+## Fase 27: traducción (español / inglés)
+
+- **Cómo funciona:** los textos se siguen escribiendo en español en el código; ese texto es la
+  clave de `translations/strings.csv` (columna `en`). Godot lo importa a
+  `strings.en.translation` (no se sube: se genera al abrir el proyecto o con `--import`). En
+  español no hay traducción: se muestra la clave tal cual (`locale/fallback = "es"`).
+- **Qué hay que hacer al escribir un texto nuevo:** si es fijo (botón, etiqueta), basta con
+  agregar su fila al CSV — Godot traduce solo el `text` del control, también al cambiar de idioma
+  en vivo. Si se arma con formato, va `tr("Día %d") % n` y su fila en el CSV.
+- **Idioma:** `AppSettings.language` (se guarda; la primera vez, el del sistema si es español,
+  si no inglés). Selector en Opciones → Ajustes.
+- **Pruebas:** `tools/test_translation.gd` revisa que todo `tr("...")` esté en el CSV y que las
+  pantallas ya traducidas (`SCREENS`) no muestren texto suelto en inglés.
+- **Avance:** traducidos el menú principal, Opciones, los diálogos y "Cómo jugar". Faltan el HUD,
+  las notificaciones de la simulación y el tutorial.

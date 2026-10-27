@@ -87,7 +87,7 @@ func _ready() -> void:
 	if OS.has_feature("editor"):
 		_option(box, "Modo infinito", "(desarrollo) Colonia completa con reina y castas.", play_infinite.emit)
 		_option(box, "Test", "(desarrollo) Hormigas y amenazas a voluntad.", play_test.emit)
-	_option(box, "Opciones", "Controles, volumen y brillo.", open_options.emit)
+	_option(box, "Opciones", "Controles, volumen, brillo e idioma.", open_options.emit)
 	_option(box, "Salir", "Cierra el juego.", quit_requested.emit)
 
 
