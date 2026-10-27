@@ -327,7 +327,7 @@ func _normal_lessons() -> Array[Dictionary]:
 			"focus": func(s: Simulation) -> Vector2: return _first_of(s, CasteDefs.Caste.DRONE), "zoom": Z_CLOSE,
 			"text": "Escolta a la reina y la defiende si algo se acerca a ella o a los huevos. Pinta una Guardería (3) y llevará los huevos ahí."},
 		{"id": "night", "title": "Cae la noche", "when": func(s: Simulation) -> bool: return s.is_night(),
-			"text": "De noche no rebrotan las plantas."},
+			"text": "De noche el árbol suelta la mitad de comida. Los hongos de abajo siguen creciendo: un túnel hasta una cueva ayuda."},
 		{"id": "upgrade", "title": "Mejoras", "when": func(s: Simulation) -> bool: return s.upgrades_bought == 0 and _can_buy_any_upgrade(s),
 			"text": "Ya te alcanza para una mejora (panel izquierdo)."},
 		{"id": "rain", "title": "Lluvia", "when": func(s: Simulation) -> bool: return s.weather != Simulation.Weather.CLEAR,
