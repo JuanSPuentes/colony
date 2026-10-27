@@ -20,13 +20,15 @@ extends CanvasLayer
 const SeasonSystem = preload("res://sim/colony/season_system.gd")
 
 const ERA_NAMES: Array[String] = ["Fundación", "Colonia joven", "Colonia madura"]
-const HEADER_COLOR := Color("7fd0ff")
+const HEADER_COLOR := PixelUI.HEADER
+## Fase 28: ícono de cada mejora, en el orden de `Upgrades.Stat` (daño, vida, velocidad, trabajo).
+const UPGRADE_ICONS: Array[String] = ["damage", "health", "speed", "work"]
 ## Factor de escala del layout: ventana real / 480, reducido para que los paneles ocupen menos
 ## pantalla (antes 3.0 daba paneles casi a media ventana con la barra de abajo todavía puesta).
 const S := 2.3
-const FONT := 8.0 * S
+const FONT := 22.0  # Fase 28: tamaños enteros: la fuente pixel se rompe en tamaños intermedios
 ## El panel lateral usa letra más chica que el resto del HUD para caber en menos espacio.
-const PANEL_FONT := 6.0 * S
+const PANEL_FONT := 18
 const OUTLINE := 3
 ## Ancho del panel lateral en píxeles reales de ventana. Debe coincidir con `Main.SIDEBAR_W` (ese
 ## archivo reserva exactamente este ancho al achicar el `SubViewport` del mundo); documentado en
@@ -130,16 +132,14 @@ var _topbar_row: HBoxContainer
 
 
 func _ready() -> void:
-	var theme := Theme.new()
-	theme.set_default_font_size(FONT)
 	var root := Control.new()
-	root.theme = theme
+	root.theme = PixelUI.theme(int(FONT))  # Fase 28: fuente pixel en todo el HUD
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 
 	_sidebar = Panel.new()
-	_sidebar.add_theme_stylebox_override("panel", _panel_style(1.0))
+	_sidebar.add_theme_stylebox_override("panel", _panel_style())
 	_sidebar.position = Vector2.ZERO
 	_sidebar.size = Vector2(PANEL_W, 270.0) * S  # alto real lo fija `_layout()` cada frame.
 	_sidebar.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -198,6 +198,9 @@ func _ready() -> void:
 		b.custom_minimum_size = Vector2(0.0, 9.0 * S)
 		_buy_row.add_child(b)
 		_buy_btns.append(b)
+	# Fase 28: el botón de huevo lleva el mismo sprite de huevos que se ve en el nido.
+	_buy_btns[0].icon = BroodView.EGG_TEXTURE
+	_buy_btns[0].add_theme_constant_override("icon_max_width", 26)
 	_buy_btns[0].pressed.connect(func() -> void: _m.sim.cmd_buy_egg())
 	_buy_btns[1].pressed.connect(func() -> void: _m.sim.cmd_cycle_auto_buy())
 
@@ -234,6 +237,7 @@ func _ready() -> void:
 		var ub := _buy_button()
 		ub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		ub.custom_minimum_size = Vector2(0.0, 13.0 * S)
+		ub.icon = HudIcons.get_icon(UPGRADE_ICONS[stat], 2)  # Fase 28
 		grid.add_child(ub)
 		_upgrade_btns.append(ub)
 		ub.pressed.connect(func() -> void: _m.sim.cmd_buy_upgrade(stat))
@@ -257,7 +261,7 @@ func _ready() -> void:
 	# gigante: un motivo largo (el del Nivel 0) se salía de la pantalla por los costados. Ahora es
 	# una tarjeta: título grande, el motivo en letra normal con salto de línea y cómo seguir.
 	_end_panel = PanelContainer.new()
-	var end_style := _panel_style(0.94)
+	var end_style := _panel_style()
 	end_style.content_margin_left = 28.0
 	end_style.content_margin_right = 28.0
 	end_style.content_margin_top = 18.0
@@ -301,11 +305,9 @@ func _ready() -> void:
 
 func _build_top_bar(root: Control) -> void:
 	_topbar = PanelContainer.new()
-	var st := StyleBoxFlat.new()
-	st.bg_color = Color(0.07, 0.06, 0.08, 0.78)
-	st.set_corner_radius_all(4)
-	st.content_margin_left = 10.0
-	st.content_margin_right = 10.0
+	var st := _panel_style()
+	st.content_margin_top = 0.0
+	st.content_margin_bottom = 0.0
 	_topbar.add_theme_stylebox_override("panel", st)
 	_topbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_topbar)
@@ -315,20 +317,29 @@ func _build_top_bar(root: Control) -> void:
 	_topbar.add_child(_topbar_row)
 
 
-## Cada dato: [símbolo, texto, tooltip]. Rehace las etiquetas solo si cambió cuántas hay.
+## Cada dato: [ícono, texto, tooltip]. Fase 28: el ícono es un nombre de `HudIcons` (antes un
+## emoji). Rehace las piezas solo si cambió cuántas hay.
 func _set_top_items(items: Array) -> void:
 	while _topbar_row.get_child_count() < items.size():
+		var item := HBoxContainer.new()
+		item.add_theme_constant_override("separation", 6)
+		item.mouse_filter = Control.MOUSE_FILTER_PASS
+		var icon := TextureRect.new()
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+		icon.mouse_filter = Control.MOUSE_FILTER_PASS
+		item.add_child(icon)
 		var l := Label.new()
-		l.add_theme_font_size_override("font_size", 17)
-		l.add_theme_color_override("font_color", Color("f4ecd8"))
+		l.add_theme_font_size_override("font_size", 24)
 		l.mouse_filter = Control.MOUSE_FILTER_PASS
-		_topbar_row.add_child(l)
+		item.add_child(l)
+		_topbar_row.add_child(item)
 	for i in _topbar_row.get_child_count():
-		var l := _topbar_row.get_child(i) as Label
-		l.visible = i < items.size()
-		if l.visible:
-			l.text = "%s %s" % [items[i][0], items[i][1]]
-			l.tooltip_text = items[i][2]  # ya viene con tr()
+		var item := _topbar_row.get_child(i) as HBoxContainer
+		item.visible = i < items.size()
+		if item.visible:
+			(item.get_child(0) as TextureRect).texture = HudIcons.get_icon(items[i][0], 2)
+			(item.get_child(1) as Label).text = items[i][1]
+			item.tooltip_text = items[i][2]  # ya viene con tr()
 
 
 func _fmt_time(sec: float) -> String:
@@ -343,39 +354,39 @@ func _update_top_bar(m: Node, sim: Simulation) -> void:
 	for i in sim.ants.count:
 		if sim.ants.alive[i] == 1 and sim.ants.faction[i] == 0:
 			mine += 1
-	items.append(["🐜", str(mine), tr("Hormigas de tu colonia")])
-	items.append(["🍃", "%.0f" % sim.colony.food, tr("Comida")])
+	items.append(["ant", str(mine), tr("Hormigas de tu colonia")])
+	items.append(["leaf", "%.0f" % sim.colony.food, tr("Comida")])
 	if sim.queen_id >= 0:
 		var q_max := sim.ants.max_hp(sim.queen_id)
 		var q_hp := sim.ants.hp[sim.queen_id] if sim.ants.alive[sim.queen_id] == 1 else 0.0
-		items.append(["👑", "%d%%" % int(100.0 * q_hp / maxf(q_max, 0.01)), tr("Vida de la reina")])
+		items.append(["crown", "%d%%" % int(100.0 * q_hp / maxf(q_max, 0.01)), tr("Vida de la reina")])
 	if sim.incremental or sim.test_mode:
 		var night := sim.is_night()
-		items.append(["🌙" if night else "☀", _fmt_time(DayNight.seconds_to_change(sim.time_s(), cfg)),
+		items.append(["moon" if night else "sun", _fmt_time(DayNight.seconds_to_change(sim.time_s(), cfg)),
 			tr("Falta para que amanezca") if night else tr("Falta para que anochezca")])
-		items.append(["📅", tr("Día %d") % sim.day_number(), tr("Día actual")])
+		items.append(["calendar", tr("Día %d") % sim.day_number(), tr("Día actual")])
 	else:
-		items.append(["💧", "%.0f" % sim.colony.water, tr("Agua")])
-		items.append(["🏛", tr(ERA_NAMES[sim.era]), tr("Era de la colonia")])
+		items.append(["water", "%.0f" % sim.colony.water, tr("Agua")])
+		items.append(["era", tr(ERA_NAMES[sim.era]), tr("Era de la colonia")])
 	if sim.incremental and not sim.tutorial_level and sim.season_index < SeasonSystem.SEASON_COUNT:
-		var icons := ["🌱", "☀", "🍂", "❄"]
+		var icons := ["spring", "sun", "autumn", "winter"]
 		items.append([icons[sim.season_index], "%s %d/%d" % [tr(SeasonSystem.SEASON_NAMES[sim.season_index]), sim.season_index + 1, SeasonSystem.SEASON_COUNT], tr("Estación")])
 	var rival := sim.rival_colony
 	if sim.incremental and rival.battle_active:
-		items.append(["⚔", tr("¡Batalla! %d%%") % int(100.0 * rival.queen.hp / maxf(rival.queen.max_hp, 0.01)), tr("Vida de la reina rival")])
+		items.append(["swords", tr("¡Batalla! %d%%") % int(100.0 * rival.queen.hp / maxf(rival.queen.max_hp, 0.01)), tr("Vida de la reina rival")])
 	elif sim.incremental and not sim.tutorial_level and sim.season_index < SeasonSystem.SEASON_COUNT:
 		# La batalla empieza al llegar al último día de la estación (`SeasonSystem.update`).
 		var left := SeasonSystem.season_length(sim) - 1 - SeasonSystem.day_in_season(sim)
-		items.append(["⚔", tr("Hoy") if left <= 0 else (tr("en %d %s") % [left, tr("día") if left == 1 else tr("días")]), tr("Próxima batalla de fin de estación")])
+		items.append(["swords", tr("Hoy") if left <= 0 else (tr("en %d %s") % [left, tr("día") if left == 1 else tr("días")]), tr("Próxima batalla de fin de estación")])
 	if sim.weather != Simulation.Weather.CLEAR:
-		items.append(["🌧", tr("¡%ds!") % ceili(sim.rain_eta_s()) if sim.weather == Simulation.Weather.WARNING else _rain_word(sim), tr("Lluvia")])
+		items.append(["snow" if SeasonStyle.snows(sim) else "rain", tr("¡%ds!") % ceili(sim.rain_eta_s()) if sim.weather == Simulation.Weather.WARNING else _rain_word(sim), tr("Lluvia")])
 	if m.paused:
-		items.append(["⏸", tr("Pausa"), tr("Espacio para seguir")])
+		items.append(["pause", tr("Pausa"), tr("Espacio para seguir")])
 	elif m.speed > 1:
-		items.append(["⏩", "x%d" % m.speed, tr("Velocidad")])
+		items.append(["fast", "x%d" % m.speed, tr("Velocidad")])
 	_set_top_items(items)
 	var r := _world_rect(m)
-	var gear_w := 15.0 * S
+	var gear_w := TOPBAR_H + 8.0  # la tuerca (Fase 28) es un cuadrado del alto de la barra
 	_topbar.position = r.position + Vector2(8.0, 6.0)
 	_topbar.size = Vector2(r.size.x - 16.0 - gear_w, TOPBAR_H)
 
@@ -407,17 +418,15 @@ var _sidebar_btn: Button
 ## o salir en cualquier momento de la partida.
 func _build_gear_button(root: Control) -> void:
 	var b := Button.new()
-	b.text = "⚙"
+	b.icon = HudIcons.get_icon("gear", 2)  # Fase 28: ícono pixel en vez del carácter ⚙
+	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	b.focus_mode = Control.FOCUS_NONE
 	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	b.add_theme_font_size_override("font_size", PANEL_FONT)
 	b.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	b.position = Vector2(-13.0, 2.0) * S
-	b.custom_minimum_size = Vector2(11.0, 8.0) * S
+	b.position = Vector2(-TOPBAR_H - 8.0, 6.0)
+	b.custom_minimum_size = Vector2(TOPBAR_H, TOPBAR_H)
 	b.size = b.custom_minimum_size
-	var style := _panel_style()
-	for s in ["normal", "hover", "pressed"]:
-		b.add_theme_stylebox_override(s, style)
+	PixelUI.style_button(b)
 	b.pressed.connect(func() -> void: gear_pressed.emit())
 	root.add_child(b)
 
@@ -457,7 +466,7 @@ func _build_phero_badge(root: Control) -> void:
 ## persona nueva no dependa de saber que Shift+F5 o la tuerca existen (prompt_fase3_godot.md 4.4).
 func _build_pause_panel(root: Control) -> void:
 	var panel := PanelContainer.new()
-	var style := _panel_style(0.95)
+	var style := _panel_style()
 	style.content_margin_left = 16.0 * S
 	style.content_margin_right = 16.0 * S
 	style.content_margin_top = 10.0 * S
@@ -556,18 +565,7 @@ func _buy_button() -> Button:
 	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	b.custom_minimum_size = Vector2(CONTENT_W, 8.0) * S
 	b.add_theme_font_size_override("font_size", PANEL_FONT)
-	for s in ["normal", "hover", "pressed", "disabled"]:
-		var st := StyleBoxFlat.new()
-		st.bg_color = {"normal": Color(0.16, 0.14, 0.1), "hover": Color(0.28, 0.24, 0.12),
-			"pressed": Color(0.4, 0.33, 0.12), "disabled": Color(0.1, 0.1, 0.11)}[s]
-		st.border_color = Color("ffd43c") if s != "disabled" else Color(0.35, 0.35, 0.38)
-		st.set_border_width_all(1)
-		st.set_corner_radius_all(int(2 * S))
-		st.content_margin_left = 2.0 * S
-		st.content_margin_right = 2.0 * S
-		b.add_theme_stylebox_override(s, st)
-	b.add_theme_color_override("font_color", Color("f4ecd8"))
-	b.add_theme_color_override("font_disabled_color", Color(0.55, 0.55, 0.58))
+	PixelUI.style_button(b)  # Fase 28: tablita de madera
 	return b
 
 
@@ -587,29 +585,17 @@ func _layout() -> void:
 		_scroll.size = Vector2(PANEL_W * S, _sidebar.size.y - _scroll.position.y)
 
 
-## Mismo fondo oscuro y borde dorado en todos los recuadros de la interfaz (paneles, botones de
-## compra, tuerca, insignia de feromona, panel de pausa), para que se lean como una sola familia
-## en vez de cada uno inventando su propio estilo.
-func _panel_style(bg_alpha: float = 0.92) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.07, 0.06, 0.08, bg_alpha)
-	style.border_color = Color("ffd43c")
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(int(3 * S))
-	return style
+## Mismo marco en todos los recuadros que flotan (panel lateral, tuerca, insignia de feromona,
+## pausa, Test, fin de partida), para que se lean como una sola familia. Fase 28: marco pixel de
+## madera con fondo de tierra (`PixelUI.frame`); se copia porque cada uno ajusta sus márgenes.
+func _panel_style() -> StyleBox:
+	return PixelUI.frame().duplicate()
 
 
 ## Fase 14: piezas del panel lateral en columna (ver `_ready`). Cada sección es una tarjeta con
 ## fondo un poco más claro que el panel, encabezado en `HEADER_COLOR` y su contenido debajo.
-func _card_style() -> StyleBoxFlat:
-	var st := StyleBoxFlat.new()
-	st.bg_color = Color(0.12, 0.11, 0.13, 1.0)
-	st.set_corner_radius_all(int(2 * S))
-	st.content_margin_left = 3.0 * S
-	st.content_margin_right = 3.0 * S
-	st.content_margin_top = 2.0 * S
-	st.content_margin_bottom = 2.5 * S
-	return st
+func _card_style() -> StyleBox:
+	return PixelUI.card(3)  # Fase 28: tarjeta de tierra con borde de madera
 
 
 ## Tarjeta sin encabezado; devuelve la columna donde van sus líneas.
@@ -629,7 +615,8 @@ func _section_card(parent: Control, title: String) -> PanelContainer:
 	var box := _card(parent)
 	var h := Label.new()
 	h.text = title
-	h.add_theme_font_size_override("font_size", int(PANEL_FONT * 0.85))
+	h.add_theme_font_override("font", PixelUI.title_font())
+	h.add_theme_font_size_override("font_size", 14)
 	h.add_theme_color_override("font_color", HEADER_COLOR)
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(h)
@@ -763,7 +750,8 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 	var up := sim.upgrades
 	for stat in Upgrades.STAT_COUNT:
 		var b := _upgrade_btns[stat]
-		b.text = tr("%s\nNv.%d · %.0f comida") % [tr(Upgrades.STAT_NAMES[stat]), up.levels[stat], up.cost(stat)]
+		# Fase 28: sin "comida" (el precio siempre es comida): con el ícono no entraba en el botón.
+		b.text = tr("%s\nNv.%d · %.0f") % [tr(Upgrades.STAT_NAMES[stat]), up.levels[stat], up.cost(stat)]
 		b.disabled = not up.can_buy(stat)
 
 	# Fase 14: estadísticas reales por casta, con las mejoras ya aplicadas — vida/velocidad/daño

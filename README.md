@@ -1074,3 +1074,18 @@ Separado en tres piezas, cada una con una sola responsabilidad:
 - **Avance:** todo el juego está en inglés: menú, Opciones, diálogos, "Cómo jugar", HUD, avisos,
   motivos de fin de partida, la guía en partida (`CoachView`) y las pistas del Nivel 0.
   `test_translation` también juega unos cuadros en inglés y busca palabras en español en pantalla.
+
+## Fase 28: HUD pixel art ("tierra y madera")
+
+- **`view/ui/pixel_ui.gd` (`PixelUI`):** paleta, fuentes y recuadros 9-slice generados por código
+  (marco de madera con fondo de tierra, tarjeta de sección, botón de tablita). Cada píxel de arte
+  mide `PX` = 3 píxeles de pantalla, sin suavizado.
+- **Fuentes** (`view/ui/fonts/`, licencia SIL OFL, libres para uso comercial): VT323 para texto y
+  números (angosta, dígitos claros) y Pixelify Sans solo para títulos (sus dígitos se confunden).
+  Van en tamaños enteros: en tamaños intermedios la letra pixel se rompe.
+- **`view/ui/hud_icons.gd` (`HudIcons`):** íconos de 12×12 dibujados como mapas de texto (una letra
+  por color); reemplazan a los emojis de la barra de arriba y a la tuerca, que cada sistema
+  dibujaba distinto o no dibujaba.
+- **Quién lo usa:** el HUD (panel lateral, barra de arriba, botones, pausa, Test, fin de partida),
+  la guía en partida (`CoachView`) y las pistas del Nivel 0. El menú, Opciones y "Cómo jugar"
+  todavía tienen el estilo anterior.

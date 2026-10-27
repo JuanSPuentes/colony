@@ -36,15 +36,7 @@ var _label: Label
 
 
 func _ready() -> void:
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.07, 0.06, 0.08, 0.92)
-	style.border_color = Color("ffd43c")
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(4)
-	style.content_margin_left = 10.0
-	style.content_margin_right = 10.0
-	style.content_margin_top = 6.0
-	style.content_margin_bottom = 6.0
+	var style := PixelUI.frame(4)  # Fase 28: marco de madera como el HUD
 
 	var panel := PanelContainer.new()
 	panel.add_theme_stylebox_override("panel", style)
@@ -55,7 +47,8 @@ func _ready() -> void:
 
 	_label = Label.new()
 	_label.custom_minimum_size = Vector2(440, 0)
-	_label.add_theme_font_size_override("font_size", 16)
+	_label.add_theme_font_override("font", PixelUI.font())
+	_label.add_theme_font_size_override("font_size", 20)
 	_label.add_theme_color_override("font_color", Color("f4ecd8"))
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_label.autowrap_mode = TextServer.AUTOWRAP_WORD

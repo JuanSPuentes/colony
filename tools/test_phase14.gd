@@ -296,11 +296,14 @@ func _coach_tests() -> void:
 	# Barra de arriba: símbolos y números de la colonia.
 	_main.start(12345, null, "incremental")
 	await _frames(3)
+	# Fase 28: cada dato es un ícono pixel (`HudIcons`) más su texto, ya no un emoji en el texto.
 	var bar_text := ""
-	for l in _main.hud._topbar_row.get_children():
-		if (l as Label).visible:
-			bar_text += (l as Label).text + " | "
-	_check("la barra de arriba muestra hormigas, comida, día y la próxima batalla", bar_text.contains("🐜") and bar_text.contains("🍃") and bar_text.contains("Día 1") and bar_text.contains("⚔ en %d días" % (_main.cfg.season_days[0] - 1)), bar_text)
+	var icons_ok := true
+	for item in _main.hud._topbar_row.get_children():
+		if (item as Control).visible:
+			bar_text += (item.get_child(1) as Label).text + " | "
+			icons_ok = icons_ok and (item.get_child(0) as TextureRect).texture != null
+	_check("la barra de arriba muestra hormigas, comida, día y la próxima batalla", icons_ok and bar_text.contains("Día 1") and bar_text.contains("en %d días" % (_main.cfg.season_days[0] - 1)), bar_text)
 
 
 ## Mapa a pantalla completa: ningún zoom deja ver más allá del mundo (sin franjas negras).

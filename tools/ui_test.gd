@@ -83,7 +83,9 @@ func _wheel(up: bool) -> void:
 	var e := InputEventMouseButton.new()
 	e.button_index = MOUSE_BUTTON_WHEEL_UP if up else MOUSE_BUTTON_WHEEL_DOWN
 	e.pressed = true
-	e.position = Vector2(240, 135)
+	# Sobre el mapa, a la derecha del panel lateral (300 px): sobre el panel la rueda lo desplaza a
+	# él, no al zoom (Fase 28: con la letra pixel más grande el panel tiene más para desplazar).
+	e.position = Vector2(400, 135)
 	root.push_input(e)
 	await process_frame
 	# La rueda ahora anima el zoom en vez de aplicarlo de golpe (fluidez, ver main.gd _set_zoom).

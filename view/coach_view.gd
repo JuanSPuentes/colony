@@ -54,16 +54,9 @@ var _ok: Button
 func _ready() -> void:
 	layer = 5
 	_card = PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.07, 0.06, 0.08, 0.9)
-	style.border_color = GOLD
-	style.border_width_left = 3
-	style.set_corner_radius_all(4)
-	style.content_margin_left = 12.0
-	style.content_margin_right = 10.0
-	style.content_margin_top = 8.0
-	style.content_margin_bottom = 8.0
-	_card.add_theme_stylebox_override("panel", style)
+	# Fase 28: mismo marco de madera y fuente pixel que el HUD.
+	_card.theme = PixelUI.theme(18)
+	_card.add_theme_stylebox_override("panel", PixelUI.frame(5))
 	_card.custom_minimum_size = Vector2(CARD_W, 0)
 	add_child(_card)
 	var box := VBoxContainer.new()
@@ -72,23 +65,24 @@ func _ready() -> void:
 	var head := HBoxContainer.new()
 	box.add_child(head)
 	_title = Label.new()
-	_title.add_theme_font_size_override("font_size", 17)
+	_title.add_theme_font_override("font", PixelUI.title_font())
+	_title.add_theme_font_size_override("font_size", 18)
 	_title.add_theme_color_override("font_color", GOLD)
 	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	head.add_child(_title)
 	_count = Label.new()
-	_count.add_theme_font_size_override("font_size", 12)
+	_count.add_theme_font_size_override("font_size", 16)
 	_count.add_theme_color_override("font_color", Color(CREAM, 0.55))
 	head.add_child(_count)
 	_body = Label.new()
-	_body.add_theme_font_size_override("font_size", 14)
+	_body.add_theme_font_size_override("font_size", 19)
 	_body.add_theme_color_override("font_color", CREAM)
 	_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_body.custom_minimum_size = Vector2(CARD_W - 24.0, 0)
 	box.add_child(_body)
 	_goal_label = Label.new()
-	_goal_label.add_theme_font_size_override("font_size", 14)
+	_goal_label.add_theme_font_size_override("font_size", 19)
 	_goal_label.add_theme_color_override("font_color", GOLD)
 	_goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_goal_label.custom_minimum_size = Vector2(CARD_W - 24.0, 0)
@@ -97,8 +91,8 @@ func _ready() -> void:
 	_ok.text = "Siguiente  ⏎"
 	_ok.focus_mode = Control.FOCUS_NONE
 	_ok.size_flags_horizontal = Control.SIZE_SHRINK_END
-	_ok.add_theme_font_size_override("font_size", 13)
-	_ok.add_theme_color_override("font_color", CREAM)
+	_ok.add_theme_font_size_override("font_size", 18)
+	PixelUI.style_button(_ok)
 	_ok.pressed.connect(close_card)
 	box.add_child(_ok)
 	_card.visible = false

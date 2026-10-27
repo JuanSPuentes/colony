@@ -128,8 +128,8 @@ Larvae: %d   ·   Pupae: %d"
 "apagada","off"
 "encendida","on"
 "%s
-Nv.%d · %.0f comida","%s
-Lv.%d · %.0f food"
+Nv.%d · %.0f","%s
+Lv.%d · %.0f"
 "Daño","Damage"
 "Vida","Health"
 "Trabajo","Work"
