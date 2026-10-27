@@ -1113,3 +1113,15 @@ Separado en tres piezas, cada una con una sola responsabilidad:
 - **Pendiente (próximas etapas):** sprites y animación de lo que cargan, frutas entre varias,
   escalar el tronco y las ramas, lecciones del tutorial y el árbol según la estación.
 - Pruebas: `tools/test_phase29.gd`.
+
+## Fase 30: panel lateral simplificado y barra de arriba más grande
+
+- **Fuera del panel** (ya estaban en la barra de arriba): la tarjeta de día/hormigas/FPS, la de
+  clima y la de estación. Amenazas solo se ve en el modo con reina.
+- **Colonia** junta lo que antes eran dos tarjetas: una tabla con cada casta (nombre en su color),
+  cuántas hay y en verde cuántas vienen en camino; la reina; la comida y su ritmo; y si hay araña.
+- **Barra de arriba**: más alta (`TOPBAR_H`), íconos ×3 y la hormiga es el sprite del juego de
+  costado (`ANT_ICON`). El ícono pixel de hormiga de `HudIcons` se quitó (ya no se usaba).
+- Los puntos de color eran `●`, que la fuente pixel no tiene (salía de otra fuente y desalineaba
+  las tablas); ahora el color va en el nombre.
+- Se quitaron del CSV 20 textos que ya no usa nadie.

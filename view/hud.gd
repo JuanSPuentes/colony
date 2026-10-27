@@ -3,8 +3,8 @@ extends CanvasLayer
 ## HUD en español. Fase 1: dibuja directo a la resolución real de la ventana (ver nota en
 ## main.gd sobre el SubViewport del mundo), así que el texto se ve nítido en vez de
 ## borroso/bloqueado. `S` escala el layout, pensado originalmente para 480x270, a la ventana real
-## (1440x810 por defecto). `_top`/`_tools`/`_help`/`_legend` se conservan con los mismos
-## nombres que en la Fase 0 porque `tools/ui_test.gd` los lee directamente.
+## (1440x810 por defecto). `_tools`/`_legend` se conservan con los mismos nombres que en la
+## Fase 0 porque `tools/ui_test.gd` los lee directamente.
 ##
 ## Fase 10: panel lateral único, fijo y estático a la izquierda, AFUERA del mundo (`main.gd` reduce
 ## el `SubViewport` del mundo para dejarle sitio en vez de dibujar el panel encima, ver
@@ -23,6 +23,11 @@ const ERA_NAMES: Array[String] = ["Fundación", "Colonia joven", "Colonia madura
 const HEADER_COLOR := PixelUI.HEADER
 ## Fase 28: ícono de cada mejora, en el orden de `Upgrades.Stat` (daño, vida, velocidad, trabajo).
 const UPGRADE_ICONS: Array[String] = ["damage", "health", "speed", "work"]
+## Fase 30: la barra de arriba cuenta las hormigas con el sprite de hormiga del juego, de costado.
+const ANT_ICON := preload("res://view/sprites/ant/east.png")
+const TOP_ICON_PX := 36
+## Fase 30: nombre en plural de cada casta para la tabla de Colonia (clave: `CasteDefs.Caste`).
+const CASTE_PLURALS := {CasteDefs.Caste.WORKER: "Obreras", CasteDefs.Caste.SOLDIER: "Soldados", CasteDefs.Caste.DRONE: "Zánganos"}
 ## Factor de escala del layout: ventana real / 480, reducido para que los paneles ocupen menos
 ## pantalla (antes 3.0 daba paneles casi a media ventana con la barra de abajo todavía puesta).
 const S := 2.3
@@ -44,7 +49,7 @@ const MARGIN_Y := 3.0
 const CONTENT_W := PANEL_W - MARGIN_X * 2.0
 ## Fase 14: alto de la barra de estadísticas de arriba del mapa (píxeles reales de ventana). La
 ## guía (`CoachView`) y la insignia de feromona se ubican debajo de ella.
-const TOPBAR_H := 36.0
+const TOPBAR_H := 52.0  # Fase 30: más alta, para que los íconos se lean (pedido del jugador)
 ## Columnas de la barra de controles: encabezado y pares [tecla, qué hace]. Si se agrega una tecla
 ## nueva en main.gd, se agrega aquí también para que el jugador la vea.
 ## Fase 5: COLONIA (comprar/ir a la reina) y PARTIDA (guardar/reiniciar) se quitaron de esta lista
@@ -76,13 +81,13 @@ var _sidebar: Panel
 ## (`_sidebar.visible`).
 var _m: Node
 
-var _top: Label
-var _weather: Label
 var _tools: Label
 var _legend: RichTextLabel
 var _colony: RichTextLabel
 var _resources: Label
 var _threats: Label
+## Fase 30: tarjeta de amenazas, solo en el modo con reina (en Juego normal no se muestra).
+var _threats_card: PanelContainer
 var _ratio: Label
 var _log: RichTextLabel
 var _defeat: Label
@@ -109,7 +114,6 @@ var _buy_btns: Array[Button] = []
 ## muestran a la vez (uno es del modo incremental, el otro de la colonia con reina).
 var _caste_row: VBoxContainer
 var _caste_sliders: Array[HSlider] = []
-var _threat_header: Label
 ## Fase 9 (antes sin interfaz): mejoras de colonia, solo modo incremental.
 var _upgrade_section: Control
 var _upgrade_btns: Array[Button] = []
@@ -117,15 +121,10 @@ var _upgrade_btns: Array[Button] = []
 ## antes solo se podía ver el % de vida de una hormiga al pasar el mouse por encima (ver
 ## `_process`), no los números base ni cómo los mueven las mejoras compradas.
 var _stats_label: RichTextLabel
-## Fase 9 (antes sin interfaz): estación actual + estado de la colonia rival, solo incremental.
-var _season_section: Control
-var _season_label: Label
-var _rival_label: Label
 ## Fase 14: piezas del panel en columna (ver `_ready`).
 const SIDE_PAD := 3.0 * S
 var _scroll: ScrollContainer
 var _log_card: PanelContainer
-var _last_header: Label
 ## Fase 14: barra de arriba del mapa: símbolos y números de lo más importante, de un vistazo.
 var _topbar: PanelContainer
 var _topbar_row: HBoxContainer
@@ -169,19 +168,15 @@ func _ready() -> void:
 	col.add_theme_constant_override("separation", int(3 * S))
 	pad.add_child(col)
 
-	var top_card := _card(col)
-	_top = _line(top_card)
-
+	# Fase 30 (pedido del jugador): sin tarjetas de día, clima ni estación — eso ya está en la barra
+	# de arriba — y la cría en camino va dentro de Colonia, no en una tarjeta aparte.
 	var colony := _section(col, "COLONIA")
 	_colony = _rich(colony)
 	_resources = _line(colony)
 
-	var weather := _section(col, "CLIMA")
-	_weather = _line(weather)
-
-	var threats := _section(col, "AMENAZAS")
-	_threat_header = _last_header
-	_threats = _line(threats)
+	# Amenazas: solo en el modo con reina (Modo infinito, Test); en Juego normal se oculta.
+	_threats_card = _section_card(col, "AMENAZAS")
+	_threats = _line(_threats_card.get_child(0) as VBoxContainer)
 
 	var tools := _section(col, "HERRAMIENTA")
 	_tools = _line(tools)
@@ -243,12 +238,6 @@ func _ready() -> void:
 		ub.pressed.connect(func() -> void: _m.sim.cmd_buy_upgrade(stat))
 	var stats := _section(up_box, "ESTADÍSTICAS")
 	_stats_label = _rich(stats)
-
-	# Fase 9: estación actual + estado de la colonia rival, solo incremental (mismo motivo).
-	_season_section = _section_card(col, "ESTACIÓN")
-	var season := _season_section.get_child(0) as VBoxContainer
-	_season_label = _line(season)
-	_rival_label = _line(season)
 
 	_log_card = _section_card(col, "AVISOS")
 	_log = _rich(_log_card.get_child(0) as VBoxContainer)
@@ -313,7 +302,7 @@ func _build_top_bar(root: Control) -> void:
 	root.add_child(_topbar)
 	_topbar_row = HBoxContainer.new()
 	_topbar_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_topbar_row.add_theme_constant_override("separation", 22)
+	_topbar_row.add_theme_constant_override("separation", 30)
 	_topbar.add_child(_topbar_row)
 
 
@@ -325,11 +314,13 @@ func _set_top_items(items: Array) -> void:
 		item.add_theme_constant_override("separation", 6)
 		item.mouse_filter = Control.MOUSE_FILTER_PASS
 		var icon := TextureRect.new()
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size = Vector2(TOP_ICON_PX, TOP_ICON_PX)
 		icon.mouse_filter = Control.MOUSE_FILTER_PASS
 		item.add_child(icon)
 		var l := Label.new()
-		l.add_theme_font_size_override("font_size", 24)
+		l.add_theme_font_size_override("font_size", 30)
 		l.mouse_filter = Control.MOUSE_FILTER_PASS
 		item.add_child(l)
 		_topbar_row.add_child(item)
@@ -337,7 +328,7 @@ func _set_top_items(items: Array) -> void:
 		var item := _topbar_row.get_child(i) as HBoxContainer
 		item.visible = i < items.size()
 		if item.visible:
-			(item.get_child(0) as TextureRect).texture = HudIcons.get_icon(items[i][0], 2)
+			(item.get_child(0) as TextureRect).texture = ANT_ICON if items[i][0] == "ant" else HudIcons.get_icon(items[i][0], 3)
 			(item.get_child(1) as Label).text = items[i][1]
 			item.tooltip_text = items[i][2]  # ya viene con tr()
 
@@ -620,7 +611,6 @@ func _section_card(parent: Control, title: String) -> PanelContainer:
 	h.add_theme_color_override("font_color", HEADER_COLOR)
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(h)
-	_last_header = h
 	return box.get_parent() as PanelContainer
 
 
@@ -662,10 +652,6 @@ func _trend_arrow(v: float) -> String:
 	return "→"
 
 
-func _plural(n: int, one: String, many: String) -> String:
-	return "%d %s" % [n, one if n == 1 else many]
-
-
 ## Rectángulo real del mundo en la ventana (posición y tamaño del `SubViewportContainer` de
 ## `main.gd`), para que los overlays que flotan sobre el mapa (insignia de feromona, pausa, panel
 ## de Test, derrota) se centren en el mapa visible y no en el hueco que deja el panel lateral.
@@ -675,72 +661,38 @@ func _world_rect(m: Node) -> Rect2:
 	return Rect2(m.world_container.position, m.world_container.size)
 
 
-## Modo incremental (Fase 3): sin semilla, sin agua, sin araña ni eras. Muestra el día, la comida
-## como único recurso, la cría que viene en camino y el precio de cada compra.
-func _update_incremental(m: Node, sim: Simulation) -> void:
+## Modo incremental (Fase 3). Fase 30: el panel solo muestra lo que no está en la barra de arriba —
+## la colonia (cuántas de cada casta y cuántas vienen en camino), la comida con su ritmo, y si hay
+## araña — más compras, mejoras y estadísticas. Día, clima y estación están en la barra.
+func _update_incremental(sim: Simulation) -> void:
 	var cfg := sim.cfg
-	var t := sim.time_s()
-	var night := sim.is_night()
-	_top.text = tr("Día %d · %s\nHormigas: %d   ·   %s   ·   %d FPS") % [
-		sim.day_number(), tr("de noche") if night else tr("de día"), sim.ants.alive_count,
-		tr("En pausa") if m.paused else tr("Velocidad x%d") % m.speed, Engine.get_frames_per_second()]
-
-	var c := sim.ants.count_by_caste([CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE])
-	var queen_alive := sim.ants.alive[sim.queen_id] == 1
-	var queen_hp := sim.ants.hp[sim.queen_id] if queen_alive else 0.0
-	var queen_hp_max := sim.ants.max_hp(sim.queen_id)
-	# Fase 14: zánganos también en Juego normal.
-	_colony.text = tr("[color=#%s]●[/color] %s   [color=#%s]●[/color] %s   [color=#%s]●[/color] %s\n[color=#%s]●[/color] Reina %d%%") % [
-		CasteDefs.COLORS[CasteDefs.Caste.WORKER].to_html(false), _plural(c[CasteDefs.Caste.WORKER], tr("obrera"), tr("obreras")),
-		CasteDefs.COLORS[CasteDefs.Caste.SOLDIER].to_html(false), _plural(c[CasteDefs.Caste.SOLDIER], tr("soldado"), tr("soldados")),
-		CasteDefs.COLORS[CasteDefs.Caste.DRONE].to_html(false), _plural(c[CasteDefs.Caste.DRONE], tr("zángano"), tr("zánganos")),
-		CasteDefs.COLORS[CasteDefs.Caste.QUEEN].to_html(false), int(100.0 * queen_hp / maxf(queen_hp_max, 0.01))]
-	_resources.text = tr("Comida: %.0f / %.0f\n+%.0f/min por hojas · −%.0f/min de consumo%s") % [
-		sim.colony.food, sim.colony.food_cap, sim.econ.income_per_min, sim.econ.upkeep_per_min,
-		tr("\n¡HAMBRE!") if sim.colony.starving else ""]
-
-	var change := ceili(DayNight.seconds_to_change(t, cfg))
-	var weather := (tr("De noche: amanece en %d s") if night else tr("De día: anochece en %d s")) % change
-	match sim.weather:
-		Simulation.Weather.WARNING:
-			weather += tr("\n¡Lluvia en %d s!") % ceili(sim.rain_eta_s())
-		Simulation.Weather.RAINING:
-			weather += "\n" + _rain_word(sim)
-	_weather.text = weather
-
-	# Cría en camino, por casta (lo que el jugador compró y aún no nació). La casta de cada huevo
-	# ya se sorteó al comprarlo (`IncrementalEconomy.buy_egg`), así que esto no es una previsión:
-	# es lo que de verdad va a nacer. Un punto de color por huevo (no por larva/pupa, para no
-	# amontonar la línea) adelanta el resultado antes de que se vea la hormiga.
+	# Cría en camino por casta: la casta de cada huevo ya se sorteó al comprarlo
+	# (`IncrementalEconomy.buy_egg`), así que no es una previsión, es lo que va a nacer.
 	var coming := {CasteDefs.Caste.WORKER: 0, CasteDefs.Caste.SOLDIER: 0, CasteDefs.Caste.DRONE: 0}
-	var egg_dots := ""
 	for i in sim.brood.stage.size():
-		if not sim.brood.alive[i] or not coming.has(sim.brood.caste[i]):
-			continue
-		coming[sim.brood.caste[i]] += 1
-		if sim.brood.stage[i] == BroodSystem.Stage.EGG:
-			egg_dots += "[color=#%s]●[/color]" % CasteDefs.COLORS[sim.brood.caste[i]].to_html(false)
-	var st := sim.brood.counts_by_stage
-	if coming[CasteDefs.Caste.WORKER] + coming[CasteDefs.Caste.SOLDIER] + coming[CasteDefs.Caste.DRONE] == 0:
-		_threats.text = tr("Nada en camino: compra un huevo abajo")
-	else:
-		_threats.text = tr("En camino: %s, %s, %s\nLarvas: %d   ·   Pupas: %d") % [
-			_plural(coming[CasteDefs.Caste.WORKER], tr("obrera"), tr("obreras")),
-			_plural(coming[CasteDefs.Caste.SOLDIER], tr("soldado"), tr("soldados")),
-			_plural(coming[CasteDefs.Caste.DRONE], tr("zángano"), tr("zánganos")),
-			st[BroodSystem.Stage.LARVA], st[BroodSystem.Stage.PUPA]]
-	if egg_dots != "":
-		_colony.text += tr("   Huevos: ") + egg_dots
-	# La araña también aparece en este modo (por población, sin eras: ver
-	# cfg.inc_spider_first_population). Reusa la línea de "en camino" en vez de sumar una línea
-	# nueva: el panel tiene la altura de siempre calculada para una sola línea acá, y agregar una
-	# de más (como se probó primero) tapaba la línea de comida de abajo.
+		if sim.brood.alive[i] and coming.has(sim.brood.caste[i]):
+			coming[sim.brood.caste[i]] += 1
+	var c := sim.ants.count_by_caste([CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE])
+	var rows := ""
+	for caste in [CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE]:
+		var more := "[color=#a8d672]+%d[/color]" % coming[caste] if coming[caste] > 0 else ""
+		rows += "[cell][color=#%s]%s[/color]  [/cell][cell]%d  [/cell][cell]%s[/cell]" % [
+			CasteDefs.COLORS[caste].to_html(false), tr(CASTE_PLURALS[caste]), c[caste], more]
+	var queen_hp := sim.ants.hp[sim.queen_id] if sim.ants.alive[sim.queen_id] == 1 else 0.0
+	rows += "[cell][color=#%s]%s[/color]  [/cell][cell]%d%%[/cell][cell][/cell]" % [
+		CasteDefs.COLORS[CasteDefs.Caste.QUEEN].to_html(false), tr("Reina"),
+		int(100.0 * queen_hp / maxf(sim.ants.max_hp(sim.queen_id), 0.01))]
+	_colony.text = "[table=3]%s[/table]" % rows
+	var food := tr("Comida: %.0f / %.0f") % [sim.colony.food, sim.colony.food_cap]
+	food += "\n" + tr("+%.0f/min · −%.0f/min") % [sim.econ.income_per_min, sim.econ.upkeep_per_min]
+	if sim.colony.starving:
+		food += tr("\n¡HAMBRE!")
 	if sim.spider.alive:
 		var state_names := {Spider.State.SEARCH: tr("buscando presas"), Spider.State.ATTACK: tr("atacando"),
 			Spider.State.SIEGE: tr("en la entrada"), Spider.State.RETREAT: tr("huyendo")}
-		_threats.text = tr("¡Araña %s! (%d%%)") % [
+		food += "\n" + tr("¡Araña %s! (%d%%)") % [
 			state_names.get(sim.spider.state, tr("cerca")), int(100.0 * sim.spider.hp / maxf(sim.spider.max_hp, 0.01))]
-
+	_resources.text = food
 	var econ := sim.econ
 	_buy_btns[0].text = tr("[7] Huevo: %.0f") % econ.egg_cost()
 	_buy_btns[0].disabled = not econ.can_buy_egg()
@@ -767,20 +719,10 @@ func _update_incremental(m: Node, sim: Simulation) -> void:
 		var hp_val := base_hp * CasteDefs.HP_MULT[stat_caste] * up.hp_mult
 		var speed_val := cfg.ant_speed * CasteDefs.SPEED_MULT[stat_caste] * up.speed_mult
 		var dmg_val := CasteDefs.DAMAGE_PER_S[stat_caste] * up.damage_mult
-		stats_text += "[cell][color=#%s]●[/color] %s  [/cell][cell]%.0f[/cell][cell]%.1f[/cell][cell]%.1f[/cell]" % [
+		stats_text += "[cell][color=#%s]%s[/color]  [/cell][cell]%.0f[/cell][cell]%.1f[/cell][cell]%.1f[/cell]" % [
 			CasteDefs.COLORS[stat_caste].to_html(false), tr(CasteDefs.NAMES[stat_caste]), hp_val, speed_val, dmg_val]
 	stats_text += "[/table]\n" + dim % (tr("Cavar una celda: %.1f s") % (cfg.dig_seconds / up.work_mult))
 	_stats_label.text = stats_text
-
-	# Fase 9 (antes sin interfaz): estación actual + colonia rival.
-	_season_label.text = tr("%s (día %d/%d)") % [
-		tr(SeasonSystem.SEASON_NAMES[sim.season_index]), maxi(1, SeasonSystem.day_in_season(sim) + 1),
-		SeasonSystem.season_length(sim)] if sim.season_index < SeasonSystem.SEASON_COUNT else tr("¡Las 4 estaciones superadas!")
-	var rival := sim.rival_colony
-	if rival.battle_active:
-		_rival_label.text = tr("¡Batalla! Reina rival %d%%") % int(100.0 * rival.queen.hp / maxf(rival.queen.max_hp, 0.01))
-	else:
-		_rival_label.text = tr("Sin ataque en curso")
 
 
 ## Fase 5: tooltip al pasar el mouse. Se recalcula cada frame (barato: una hormiga cercana y una
@@ -825,23 +767,8 @@ func _process(_delta: float) -> void:
 
 
 ## Modo con reina ("Modo infinito", Test y partidas clásicas): castas, cría, comida y agua, reparto.
-func _update_classic(m: Node, sim: Simulation) -> void:
-	_top.text = tr("Hormigas: %d   ·   %s   ·   %d FPS\nSemilla: %d") % [
-		sim.ants.alive_count, tr("En pausa") if m.paused else tr("Velocidad x%d") % m.speed, Engine.get_frames_per_second(), sim.rng.seed]
-
-	# --- Clima: despejado, aviso de lluvia o lluvia. (La sequía llega en una fase futura.)
-	var weather := tr("Sin novedades")
-	match sim.weather:
-		Simulation.Weather.WARNING:
-			weather = tr("¡Lluvia en %d s!") % ceili(sim.rain_eta_s())
-		Simulation.Weather.RAINING:
-			weather = _rain_word(sim)
-		_:
-			var eta := sim.rain_eta_s()
-			if eta >= 0.0:
-				weather = tr("Sin novedades (lluvia en %d s)") % int(eta)
-	_weather.text = weather
-
+## Fase 30: sin tarjetas de día ni clima (están en la barra de arriba).
+func _update_classic(sim: Simulation) -> void:
 	# --- Amenazas: quién anda rondando la colonia. Fase 5: ya puede haber dos a la vez (araña y
 	# ciempiés), se listan juntas en la misma línea en vez de sumar una línea por amenaza (mismo
 	# espíritu que la nota de arriba sobre no concatenar secciones nuevas sin pensar el layout).
@@ -870,7 +797,7 @@ func _update_classic(m: Node, sim: Simulation) -> void:
 		var queen_hp := sim.ants.hp[sim.queen_id] if queen_alive else 0.0
 		var queen_hp_max := sim.ants.max_hp(sim.queen_id)
 		# El bullet de cada casta usa el mismo color con el que se ve en el mundo.
-		_colony.text = "[color=#%s]●[/color]%d [color=#%s]●[/color]%d [color=#%s]●[/color]%d [color=#%s]●[/color]%d [color=#%s]●[/color]%d%%   %s" % [
+		_colony.text = "[color=#%s]•[/color]%d [color=#%s]•[/color]%d [color=#%s]•[/color]%d [color=#%s]•[/color]%d [color=#%s]•[/color]%d%%   %s" % [
 			CasteDefs.COLORS[CasteDefs.Caste.WORKER].to_html(false), c[CasteDefs.Caste.WORKER],
 			CasteDefs.COLORS[CasteDefs.Caste.NURSE].to_html(false), c[CasteDefs.Caste.NURSE],
 			CasteDefs.COLORS[CasteDefs.Caste.SOLDIER].to_html(false), c[CasteDefs.Caste.SOLDIER],
@@ -910,19 +837,19 @@ func update_info(m: Node) -> void:
 	# El mismo panel cuenta cosas distintas según el modo. Antes se armaban siempre los textos del
 	# modo con reina y, en Juego normal, `_update_incremental` los pisaba en el mismo cuadro.
 	if sim.incremental:
-		_update_incremental(m, sim)
+		_update_incremental(sim)
 	else:
-		_update_classic(m, sim)
+		_update_classic(sim)
 	_update_log(sim)
 
 	# Fase 3: qué secciones existen depende del modo.
 	_buy_row.visible = sim.incremental
 	_ratio.visible = not sim.incremental
 	_caste_row.visible = not sim.incremental
-	# Fase 9: Mejoras y Estación solo existen de verdad en el modo incremental (`Upgrades`/
-	# `SeasonSystem` atados a `sim.incremental`, ver sim/colony/upgrades.gd y season_system.gd).
+	# Fase 9: Mejoras solo existen de verdad en el modo incremental (`Upgrades` atado a
+	# `sim.incremental`, ver sim/colony/upgrades.gd). Fase 30: amenazas, solo en el modo con reina.
 	_upgrade_section.visible = sim.incremental
-	_season_section.visible = sim.incremental
+	_threats_card.visible = not sim.incremental
 
 	var world_rect := _world_rect(m)
 	_pause_panel.visible = m.paused and not sim.game_over
@@ -931,7 +858,6 @@ func update_info(m: Node) -> void:
 	_test_panel.visible = sim.test_mode
 	if _test_panel.visible:
 		_test_panel.position = world_rect.position + Vector2(world_rect.size.x - _test_panel.size.x - 10.0 * S, 10.0 * S)
-	_threat_header.text = tr("CRÍA") if sim.incremental else tr("AMENAZAS")
 
 	var tool_names := ["", tr("Cavar [1]"), tr("Feromona [2]"), tr("Cámara [3]"), tr("Borrar [4]"), tr("Mover reina [5]")]
 	var sub := ""
@@ -953,13 +879,13 @@ func update_info(m: Node) -> void:
 		var parts := ""
 		for k in AntSystem.State.size():
 			var col: Color = AntSystem.STATE_COLORS[k]
-			parts += "[color=#%s]■ %s[/color]  " % [col.to_html(false), tr(AntSystem.STATE_NAMES[k])]
+			parts += "[color=#%s]• %s[/color]  " % [col.to_html(false), tr(AntSystem.STATE_NAMES[k])]
 		_legend.text = parts
 	elif m.overlay.layer == OverlayView.Layer.CASTES:
 		var parts2 := ""
 		for k in CasteDefs.NAMES.size():
 			var col2: Color = CasteDefs.COLORS[k]
-			parts2 += "[color=#%s]■ %s[/color]  " % [col2.to_html(false), tr(CasteDefs.NAMES[k])]
+			parts2 += "[color=#%s]• %s[/color]  " % [col2.to_html(false), tr(CasteDefs.NAMES[k])]
 		_legend.text = parts2
 	else:
 		_legend.text = ""

@@ -9,7 +9,6 @@ const SIZE := 12
 
 const COLORS := {
 	"k": Color("1a0f08"),  # contorno
-	"a": Color("b5542c"), "A": Color("de7a45"),  # hormiga
 	"g": Color("3f7d2c"), "G": Color("78b84a"),  # hoja / brote
 	"y": Color("e0a020"), "Y": Color("ffd43c"),  # oro / sol
 	"o": Color("a8661c"),
@@ -23,19 +22,6 @@ const COLORS := {
 }
 
 const MAPS := {
-	"ant": [
-		"............",
-		"...k....k...",
-		"....k..k....",
-		"...kAk.kkk..",
-		"..kAAakAAAk.",
-		".kaaakkaAAak",
-		".kaaakkaaaak",
-		"..kkk.kkkkk.",
-		"..k.k.k.k...",
-		".k..k.k..k..",
-		"............",
-		"............"],
 	"leaf": [
 		"..........k.",
 		"........kkGk",

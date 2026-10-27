@@ -111,9 +111,14 @@ func _run() -> void:
 	# main.gd.start()): reina + obreras + soldados iniciales, ya no las 100 obreras de la Fase 1.
 	var expected_total := 1 + cfg.inc_start_workers + cfg.inc_start_soldiers
 	_check("la escena principal arranca con la colonia inicial y todas las vistas", sim.incremental and sim.ants.alive_count == expected_total and _main.terrain_view != null and _main.ant_renderer != null and _main.overlay != null and _main.hud != null and _main.day_night_view != null, "esperado=%d real=%d" % [expected_total, sim.ants.alive_count])
-	# Fase 3: la semilla ya no se muestra; en su lugar va el día (y si es de día o de noche).
-	# Fase 14: panel en tarjetas, "Vel: x1" pasó a "Velocidad x1" y "FPS: 46" a "46 FPS".
-	_check("el HUD muestra los datos en español", _main.hud._top.text.contains("Hormigas: %d" % expected_total) and _main.hud._top.text.contains("Día 1") and not _main.hud._top.text.contains("Semilla") and _main.hud._top.text.contains("FPS") and _main.hud._top.text.contains("Velocidad") and _main.hud._weather.text.length() > 0, _main.hud._top.text + " | " + _main.hud._weather.text)
+	# Fase 30: el día y la cantidad de hormigas están en la barra de arriba (la tarjeta de día y la
+	# de clima del panel se quitaron); el panel muestra la colonia por casta y la comida.
+	var bar := ""
+	for item in _main.hud._topbar_row.get_children():
+		if (item as Control).visible:
+			bar += (item.get_child(1) as Label).text + " | "
+	_check("el HUD muestra los datos en español", bar.begins_with("%d | " % expected_total) and bar.contains("Día 1")
+		and _main.hud._colony.get_parsed_text().contains("Obreras") and _main.hud._resources.text.contains("Comida"), bar)
 
 	# Fase 3: 7 compra un huevo (la casta nace al azar, 8 ya no hace nada en este modo), 9 cambia
 	# la auto-compra (y el botón del panel también compra).
@@ -138,7 +143,7 @@ func _run() -> void:
 	await _key(KEY_I)
 	_check("I pliega el panel entero", not hud.sidebar_open and not hud._sidebar.visible)
 	await _key(KEY_I)
-	_check("I lo vuelve a desplegar", hud.sidebar_open and hud._sidebar.visible and hud._weather.visible)
+	_check("I lo vuelve a desplegar", hud.sidebar_open and hud._sidebar.visible and hud._colony.visible)
 
 	# Pausa y velocidades.
 	await _key(KEY_SPACE)
