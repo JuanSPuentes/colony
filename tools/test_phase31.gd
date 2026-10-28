@@ -12,6 +12,7 @@ var _fail := 0
 func _initialize() -> void:
 	_t_layout()
 	_t_growth_and_raids()
+	_t_start_food()
 	_t_guards_and_raiders()
 	_t_patrols_stay_home()
 	_t_attack_and_win()
@@ -78,24 +79,51 @@ func _t_growth_and_raids() -> void:
 	var sim := _fresh(5)
 	var cfg := sim.cfg
 	var rival := sim.rival_colony
-	rival.update_home(cfg.rival_grow_s[0] * 3.0 + 0.01)
-	_check("crece una hormiga por intervalo", _rivals(sim).size() == cfg.rival_start_ants + 3, "%d" % _rivals(sim).size())
-	_check("la próxima incursión se cuenta hacia atrás", rival.raid_eta_s() < cfg.rival_raid_s)
-	rival.update_home(cfg.rival_raid_s)  # en esos segundos también crece: la mitad se cuenta al salir
-	var raiders := _rivals(sim, 1).size()
-	_check("cada incursión manda a la mitad", raiders == maxi(1, int(round(_rivals(sim).size() * cfg.rival_raid_fraction))),
-		"incursión=%d de %d" % [raiders, _rivals(sim).size()])
+	var grow_s := cfg.rival_grow_days * cfg.day_length_s
+	_check("arranca con la reina y 2 soldados", rival.queen.alive and _rivals(sim).size() == 2)
+	rival.update_home(grow_s - 1.0)
+	_check("antes de 1,5 días no crece", _rivals(sim).size() == 2)
+	rival.update_home(grow_s * 2.0 + 1.01)
+	_check("suma una hormiga cada 1,5 días", _rivals(sim).size() == cfg.rival_start_ants + 3, "%d" % _rivals(sim).size())
+	# La incursión, en un mapa nuevo: con varios días de golpe ya habría salido una en el medio.
+	var raid := _fresh(5)
+	raid.rival_colony.update_home(cfg.rival_raid_s - 1.0)
+	_check("la próxima incursión se cuenta hacia atrás", raid.rival_colony.raid_eta_s() < cfg.rival_raid_s
+		and _rivals(raid, 1).is_empty())
+	raid.rival_colony.update_home(1.01)
+	var raiders := _rivals(raid, 1).size()
+	_check("cada incursión manda a la mitad", raiders == maxi(1, int(round(_rivals(raid).size() * cfg.rival_raid_fraction))),
+		"incursión=%d de %d" % [raiders, _rivals(raid).size()])
 	var noted := false
-	for n in sim.notifications:
+	for n in raid.notifications:
 		noted = noted or n.begins_with("¡Incursión rival")
 	_check("la incursión avisa", noted)
 	var capped := _fresh(5)
-	capped.rival_colony.update_home(cfg.rival_grow_s[0] * (cfg.rival_max_ants + 20))
+	capped.rival_colony.update_home(grow_s * (cfg.rival_max_ants + 20))
 	_check("no pasa del máximo de hormigas", _rivals(capped).size() <= cfg.rival_max_ants, "%d" % _rivals(capped).size())
-	var later := _fresh(5)
-	later.season_index = 3
-	later.rival_colony.update_home(cfg.rival_grow_s[3] * 2.0 + 0.01)
-	_check("en invierno crece más rápido", _rivals(later).size() == cfg.rival_start_ants + 2)
+
+
+## Pedido del jugador: comida al inicio junto a cada nido, que tarda más en pudrirse.
+func _t_start_food() -> void:
+	var sim := _fresh(12)
+	var cfg := sim.cfg
+	var near_mine := 0
+	var near_rival := 0
+	for c in sim.corpses:
+		var x := c.pos.x / cfg.cell_px
+		if absf(x - (cfg.nest_x + 0.5)) <= cfg.start_food_radius + 1:
+			near_mine += 1
+		elif absf(x - (sim.rival_colony.home_x + 0.5)) <= cfg.start_food_radius + 1:
+			near_rival += 1
+	_check("hay comida al inicio junto a tu nido y junto al de la rival",
+		near_mine == cfg.start_food_piles and near_rival == cfg.start_food_piles, "tuyo=%d rival=%d" % [near_mine, near_rival])
+	sim._update_corpses(cfg.drop_decay_s + 1.0)
+	_check("tarda más en pudrirse que lo que cae del árbol", sim.corpses.size() == cfg.start_food_piles * 2)
+	sim._update_corpses(cfg.start_food_keep_s)
+	_check("pero al final se pudre", sim.corpses.is_empty())
+	var classic := Simulation.new(_cfg(), 1)
+	classic.spawn_incremental_start()
+	_check("el mapa fijo (pruebas, Nivel 0) no la tiene", classic.corpses.is_empty())
 
 
 func _t_guards_and_raiders() -> void:

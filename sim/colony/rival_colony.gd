@@ -91,7 +91,7 @@ func update_home(dt: float) -> void:
 	if not home or not queen.alive:
 		return
 	var cfg := sim.cfg
-	var grow_s: float = cfg.rival_grow_s[clampi(sim.season_index, 0, cfg.rival_grow_s.size() - 1)]
+	var grow_s: float = cfg.rival_grow_days * cfg.day_length_s
 	grow_acc += dt
 	while grow_acc >= grow_s:
 		grow_acc -= grow_s

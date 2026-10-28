@@ -272,6 +272,12 @@ extends Resource
 @export var drop_decay_s := 120.0
 ## Los demás árboles quedan lejos del madre (celdas desde su tronco) y son menos. Con 0 no hay otros:
 ## pedido del jugador, que el árbol madre sea el único (la escala hormiga/árbol se ve de verdad).
+## Pedido del jugador (2026-10-28): comida al inicio junto a cada nido (el tuyo y el de la rival):
+## `start_food_piles` cosas a `start_food_radius` celdas o menos de la entrada, mitad semillas y
+## mitad hojas. Duran `start_food_keep_s` segundos más que lo que cae del árbol antes de pudrirse.
+@export var start_food_piles := 6
+@export var start_food_radius := 4
+@export var start_food_keep_s := 300.0
 @export var home_tree_clear_cells := 16
 @export var home_tree_other_trees := 0
 ## Fase 19: bolsones de hongos en la primera capa de tierra (solo "Juego normal" con mapa al azar).
@@ -302,13 +308,14 @@ extends Resource
 
 ## Fase 31 (etapa A del núcleo, ver NUCLEO.md): en "Juego normal" la colonia rival está en el mapa
 ## desde el principio, en un montículo a `rival_spawn_dist` celdas del nido; el árbol madre queda
-## en el medio. Crece sola (una hormiga cada `rival_grow_s[estación]` segundos, hasta
+## en el medio. Crece sola (una hormiga cada `rival_grow_days` días de juego, hasta
 ## `rival_max_ants`) y cada `rival_raid_s` manda a la mitad (`rival_raid_fraction`) contra tu
 ## nido. Se gana la estación matando a su reina cuando el jugador quiera ("¡Atacar!").
 ## Apagarla deja la rival como antes (solo la oleada final); lo usan pruebas de otras cosas.
 @export var rival_home := true
-@export var rival_start_ants := 3
-@export var rival_grow_s: Array[float] = [45.0, 38.0, 32.0, 26.0]
+## Pedido del jugador (2026-10-28): arranca con la reina y 2 soldados, y suma 1 cada 1,5 días.
+@export var rival_start_ants := 2
+@export var rival_grow_days := 1.5
 @export var rival_max_ants := 40
 @export var rival_raid_s := 150.0
 @export var rival_raid_fraction := 0.5

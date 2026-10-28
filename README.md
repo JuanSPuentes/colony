@@ -1130,8 +1130,8 @@ Separado en tres piezas, cada una con una sola responsabilidad:
 
 - **Mapa:** en "Juego normal" la rival vive en un montículo a `rival_spawn_dist` celdas del nido
   (a un lado al azar) y el árbol madre queda en el medio (`RivalColony.choose_home`/`midpoint_x`).
-- **Crece sola:** una hormiga cada `rival_grow_s[estación]` segundos (más rápido en cada
-  estación), hasta `rival_max_ants`. Sus guardias deambulan cerca del montículo
+- **Crece sola:** arranca con la reina y 2 soldados y suma una hormiga cada `rival_grow_days`
+  (1,5) días de juego, hasta `rival_max_ants`. Sus guardias deambulan cerca del montículo
   (`AntSystem._guard_rival_home`); cada `rival_raid_s` la mitad sale contra tu nido
   (`AntSystem.raiding`).
 - **Ganar y perder:** la estación se gana en cuanto muere su reina, por la vía que sea; tecla 8 o
@@ -1142,6 +1142,8 @@ Separado en tres piezas, cada una con una sola responsabilidad:
   decidirlo el jugador.
 - **Se ve:** montículo bajo la reina rival (`RivalQueenView`), sus hormigas en la barra de arriba
   (sprite de hormiga en rojo; tooltip con la próxima incursión) y una lección nueva.
+- **Comida al inicio:** `start_food_piles` semillas y hojas junto a cada nido (el tuyo y el de la
+  rival), que tardan `start_food_keep_s` más en pudrirse (`Simulation._place_start_food`).
 - **Fuera de esta etapa:** que la rival recoja comida del árbol (etapa B) y el balance medido.
   `rival_home = false` deja la rival como antes (lo usan pruebas de otras cosas).
 - Pruebas: `tools/test_phase31.gd`.

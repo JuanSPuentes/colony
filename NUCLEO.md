@@ -47,6 +47,9 @@ Todo lo que se agregue tiene que reforzar al menos uno.
 - Comida valiosa lejos del nido o arriba, que obligue a usar rastros.
 - Matar enemigos da comida.
 - Logros de estilo de juego (sin soldados, rápido, sin perder obreras...).
+- Tutorial obligatorio solo la primera vez, con una colonia ya armada: cómo se forma una colonia,
+  las castas y sus funciones, y el bioma (árbol, superficie, bajo tierra, clima, rival). Tarjetas
+  con «Omitir» y «Omitir todo». El Juego normal ya no repite explicaciones.
 - Lo ya hecho que sirve al núcleo: feromonas, excavación, castas, mejoras, estaciones,
   mudanza, niebla, lluvia, hongos bajo tierra, traducción, HUD pixel.
 - Sonido, arte final, página de Steam, demo.

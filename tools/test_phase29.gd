@@ -34,6 +34,7 @@ func _cfg() -> SimConfig:
 func _fresh(seed_value: int) -> Simulation:
 	var sim := Simulation.new(_cfg(), seed_value)
 	sim.spawn_incremental_start(true)
+	sim.corpses.clear()  # sin la comida inicial junto a los nidos: estas pruebas cuentan lo que cae del árbol
 	return sim
 
 

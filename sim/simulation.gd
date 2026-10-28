@@ -228,7 +228,27 @@ func spawn_incremental_start(fresh_layout := false) -> void:
 		rain_start_tick = int(cfg.inc_rain_first_s * cfg.tick_rate)
 	if rival_colony.home:
 		rival_colony.spawn_home()
+	if fresh_layout:
+		_place_start_food()
 	ants._recount()
+
+
+## Pedido del jugador (2026-10-28): un montoncito de comida junto a cada nido para arrancar (ver
+## `cfg.start_food_piles`). Es comida en el suelo como la que cae del árbol (`Corpse` con tipo), pero
+## arranca con edad negativa: tarda `start_food_keep_s` más en pudrirse, así da tiempo a abrir el nido.
+func _place_start_food() -> void:
+	var xs: Array[int] = [cfg.nest_x]
+	if rival_colony.home:
+		xs.append(rival_colony.home_x)
+	for nx in xs:
+		for k in cfg.start_food_piles:
+			var kind := Corpse.Kind.SEED if k % 2 == 0 else Corpse.Kind.LEAF
+			var value := cfg.drop_food_seed if kind == Corpse.Kind.SEED else cfg.drop_food_leaf
+			var cx := clampi(nx + rng.randi_range(-cfg.start_food_radius, cfg.start_food_radius), 1, world.w - 2)
+			var p := Vector2((cx + rng.randf_range(0.2, 0.8)) * cfg.cell_px, cfg.surface_y * cfg.cell_px - 1.0)
+			var food_drop := Corpse.new(p, value, kind)
+			food_drop.age = -cfg.start_food_keep_s
+			corpses.append(food_drop)
 
 
 ## Fase 14: Nivel 0. La misma colonia mínima que "Juego normal", sin lluvia automática ni araña
