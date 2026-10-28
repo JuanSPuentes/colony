@@ -148,6 +148,7 @@ static func to_dict(sim: Simulation) -> Dictionary:
 		"home": sim.rival_colony.home, "home_x": sim.rival_colony.home_x,
 		"grow_acc": sim.rival_colony.grow_acc, "raid_acc": sim.rival_colony.raid_acc,
 		"player_attack": sim.rival_colony.player_attack,
+		"food_stored": sim.rival_colony.food_stored,  # Fase 32
 	}
 
 	var ants := sim.ants
@@ -360,6 +361,7 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 		sim.rival_colony.grow_acc = float(rcd.get("grow_acc", 0.0))
 		sim.rival_colony.raid_acc = float(rcd.get("raid_acc", 0.0))
 		sim.rival_colony.player_attack = bool(rcd.get("player_attack", false))
+		sim.rival_colony.food_stored = float(rcd.get("food_stored", 0.0))
 
 	var ad: Dictionary = d["ants"]
 	var ants := sim.ants

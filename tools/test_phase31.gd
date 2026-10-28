@@ -133,10 +133,14 @@ func _t_guards_and_raiders() -> void:
 	for t in int(20.0 / sim.dt):
 		sim.tick()
 	var far := 0
+	var guards := 0
 	for i in _rivals(sim, 0):
+		if sim.ants._is_rival_forager(i):
+			continue  # Fase 32: las recolectoras recorren su mitad del mapa
+		guards += 1
 		if absf(sim.ants.pos[i].x / cfg.cell_px - rival.home_x) > cfg.rival_guard_radius + 3:
 			far += 1
-	_check("las guardias se quedan cerca de su montículo", far == 0, "lejos=%d" % far)
+	_check("las guardias se quedan cerca de su montículo", guards > 0 and far == 0, "guardias=%d lejos=%d" % [guards, far])
 	rival.update_home(cfg.rival_raid_s)
 	var raiders := _rivals(sim, 1)
 	var d0 := 0.0

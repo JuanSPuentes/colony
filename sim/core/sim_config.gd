@@ -264,6 +264,9 @@ extends Resource
 ## Más que esto en el suelo a la vez y deja de soltar (una colonia chica no aprovecha todo).
 @export var home_tree_max_drops := 18
 ## Probabilidad de cada cosa al caer (el resto, hoja) y cuánta comida vale al llegar al nido.
+## Fase 32 (etapa B): semillas y frutas caen solo en la parte del medio de la copa, cerca del tronco
+## (esta fracción del radio): lo valioso queda lejos de los dos nidos, en la zona disputada.
+@export var home_tree_rich_spread := 0.35
 @export var home_tree_seed_chance := 0.28
 @export var home_tree_fruit_chance := 0.07
 @export var drop_food_leaf := 4.0
@@ -319,6 +322,10 @@ extends Resource
 @export var rival_max_ants := 40
 @export var rival_raid_s := 150.0
 @export var rival_raid_fraction := 0.5
+## Fase 32 (etapa B): la rival recoge lo que cae del árbol en su mitad del mapa, sin crecer por
+## eso. Una recolectora cada tantas hormigas (siempre queda una guardia) y lo que ve a esta distancia.
+@export var rival_forager_per_ants := 3
+@export var rival_forage_sight_cells := 4.0
 ## Qué tan lejos de su montículo deambulan las guardias rivales (celdas).
 @export var rival_guard_radius := 6
 

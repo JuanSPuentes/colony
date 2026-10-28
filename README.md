@@ -1144,6 +1144,22 @@ Separado en tres piezas, cada una con una sola responsabilidad:
   (sprite de hormiga en rojo; tooltip con la próxima incursión) y una lección nueva.
 - **Comida al inicio:** `start_food_piles` semillas y hojas junto a cada nido (el tuyo y el de la
   rival), que tardan `start_food_keep_s` más en pudrirse (`Simulation._place_start_food`).
-- **Fuera de esta etapa:** que la rival recoja comida del árbol (etapa B) y el balance medido.
+- **Fuera de esta etapa:** que la rival recoja comida del árbol (etapa B, Fase 32) y el balance medido.
   `rival_home = false` deja la rival como antes (lo usan pruebas de otras cosas).
 - Pruebas: `tools/test_phase31.gd`.
+
+## Fase 32: el árbol en disputa (etapa B del núcleo)
+
+- **Lo valioso cae en el medio:** semillas y frutas caen a menos de `home_tree_rich_spread` del
+  radio de la copa, junto al tronco; las hojas siguen cayendo por toda la copa (`HomeTree.drop`).
+- **La rival recoge, pero no crece por eso:** su crecimiento sigue siendo 1 hormiga cada
+  `rival_grow_days`. Lo que lleva al montículo (`RivalColony.store_food`, `food_stored`) es comida
+  que el jugador ya no tiene: la competencia es por el árbol, no un atajo para crecer.
+- **Recolectoras limitadas:** 1 cada `rival_forager_per_ants` hormigas (al menos 1), y siempre
+  queda al menos una guardia junto a la reina (`RivalColony.forager_limit`). Las recolectoras
+  recorren solo la mitad del mapa de la rival (`rival_range`) y ven lo caído a
+  `rival_forage_sight_cells`, como las obreras del jugador; antes conocían todo su territorio y
+  juntaban el doble.
+- **Simplificación deliberada:** la rival no usa feromonas ni gasta lo que junta. Un árbol de
+  mejoras para el jugador queda planeado para la semana de balance.
+- Pruebas: `tools/test_phase32.gd`.

@@ -166,6 +166,10 @@ func _t_save_load_keeps_kinds() -> void:
 ## hongos (el camino esquiva el agua: el bolsón queda inalcanzable); cuando baja, vuelven a cosechar.
 func _t_flooded_pocket_is_skipped() -> void:
 	var sim := _fresh(7)
+	# Sin árbol ni comida en el suelo: esta prueba cuenta obreras que van a comer, y lo que cae del
+	# árbol madre es un destino legítimo (Fase 32) que no tiene que ver con la cueva inundada.
+	sim.home_tree = null
+	sim.corpses.clear()
 	var m := _nearest_pocket(sim)
 	_connect(sim, m)
 	var w := sim.world

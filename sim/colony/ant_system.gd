@@ -936,13 +936,71 @@ func _tick_rival(i: int, cx: int, cy: int, ci: int, dt: float) -> void:
 
 ## Fase 31: guardia rival. Deambula cerca del montículo de su reina (`rival_guard_radius`), sin
 ## alejarse; pelea con lo que se acerque (lo decide `_tick_rival` antes de llegar acá).
+## Fase 32 (etapa B): algunas son recolectoras (`RivalColony.forager_limit`): recorren la mitad del
+## mapa de la rival y llevan al montículo lo que ven caído del árbol (`RivalColony.store_food`). No
+## la hace crecer: compite con el jugador por la misma comida. Las demás siguen junto a la reina.
 func _guard_rival_home(i: int, cx: int, cy: int, ci: int) -> void:
 	var rival := sim.rival_colony
 	var cfg := sim.cfg
-	state[i] = State.GUARD
-	if patrol_x[i] < 0 or absi(cx - patrol_x[i]) <= 1:
-		patrol_x[i] = clampi(rival.home_x + sim.rng.randi_range(-cfg.rival_guard_radius, cfg.rival_guard_radius), 1, sim.world.w - 2)
+	var reach := cfg.pickup_cells * cfg.cell_px
+	if carry[i] == 1:
+		state[i] = State.CARRY_HOME
+		var home := rival.home_pos()
+		if pos[i].distance_to(home) <= reach:
+			rival.store_food(carry_value[i])
+			carry[i] = 0
+			carry_kind[i] = 0
+		else:
+			_step(i, cx, cy, ci, Mode.PLANT, home)
+		return
+	if not _is_rival_forager(i) and rival.forager_count() >= rival.forager_limit():
+		state[i] = State.GUARD
+		if patrol_x[i] < 0 or absi(cx - patrol_x[i]) <= 1:
+			patrol_x[i] = clampi(rival.home_x + sim.rng.randi_range(-cfg.rival_guard_radius, cfg.rival_guard_radius), 1, sim.world.w - 2)
+		_step(i, cx, cy, ci, Mode.PLANT, _center(patrol_x[i], cfg.surface_y - 1))
+		return
+	var food := _rival_drop_target(i)
+	if food != null:
+		state[i] = State.GO_TO_FOOD
+		if pos[i].distance_to(food.pos) <= reach:
+			carry[i] = 1
+			carry_value[i] = food.food_value
+			carry_kind[i] = CARRY_DROP + food.kind - 1
+			food.food_value = 0.0
+		else:
+			_step(i, cx, cy, ci, Mode.PLANT, food.pos)
+		return
+	# Sin nada a la vista: recorre su mitad del mapa buscando.
+	state[i] = State.EXPLORE
+	var span: Vector2i = rival.rival_range()
+	if patrol_x[i] < span.x or patrol_x[i] > span.y or absi(cx - patrol_x[i]) <= 1:
+		patrol_x[i] = sim.rng.randi_range(span.x, span.y)
 	_step(i, cx, cy, ci, Mode.PLANT, _center(patrol_x[i], cfg.surface_y - 1))
+
+
+## Fase 32: ¿esta hormiga rival (sin incursión) está recolectando? Se reconoce por su estado.
+func _is_rival_forager(i: int) -> bool:
+	return state[i] == State.EXPLORE or state[i] == State.GO_TO_FOOD or state[i] == State.CARRY_HOME
+
+
+## Fase 32: lo caído del árbol más cercano que esta recolectora VE (`rival_forage_sight_cells`),
+## dentro de la mitad del mapa de la rival, o null. Antes conocía todo su territorio sin buscar y
+## juntaba el doble que el jugador.
+func _rival_drop_target(i: int) -> Corpse:
+	var span: Vector2i = sim.rival_colony.rival_range()
+	var best: Corpse = null
+	var best_d := sim.cfg.rival_forage_sight_cells * sim.cfg.cell_px
+	for c in sim.corpses:
+		if not c.is_tree_drop() or c.food_value <= 0.0:
+			continue
+		var x := int(c.pos.x / sim.cfg.cell_px)
+		if x < span.x or x > span.y:
+			continue
+		var d := pos[i].distance_to(c.pos)
+		if d < best_d:
+			best_d = d
+			best = c
+	return best
 
 
 ## Obrera y Zángano (en combate activo; el Zángano además pelea pasivo si lo alcanzan, ver

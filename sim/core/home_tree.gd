@@ -51,7 +51,11 @@ func drop(sim: Simulation) -> void:
 	elif r < cfg.home_tree_fruit_chance + cfg.home_tree_seed_chance:
 		kind = Corpse.Kind.SEED
 		value = cfg.drop_food_seed
-	var cx := clampi(x + rng.randi_range(-cfg.home_tree_drop_radius, cfg.home_tree_drop_radius), 1, sim.world.w - 2)
+	# Fase 32: semillas y frutas, solo cerca del tronco (lejos de los dos nidos); hojas, en toda la copa.
+	var radius := cfg.home_tree_drop_radius
+	if kind != Corpse.Kind.LEAF:
+		radius = int(round(radius * cfg.home_tree_rich_spread))
+	var cx := clampi(x + rng.randi_range(-radius, radius), 1, sim.world.w - 2)
 	var p := Vector2((cx + rng.randf_range(0.2, 0.8)) * cfg.cell_px, cfg.surface_y * cfg.cell_px - 1.0)
 	sim.corpses.append(Corpse.new(p, value, kind))
 

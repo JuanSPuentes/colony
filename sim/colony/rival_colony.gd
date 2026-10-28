@@ -33,6 +33,8 @@ var grow_acc := 0.0
 var raid_acc := 0.0
 ## El jugador pidió atacar ("¡Atacar!"): sus soldados se reúnen y marchan como en una batalla.
 var player_attack := false
+## Fase 32: comida total que la rival llevó a su montículo (para el HUD y las pruebas).
+var food_stored := 0.0
 
 
 func _init(s: Simulation) -> void:
@@ -71,6 +73,40 @@ func player_patrol_range() -> Vector2i:
 		return Vector2i(3, w - 4)
 	var mid := midpoint_x()
 	return Vector2i(mid + 2, w - 4) if home_x < sim.cfg.nest_x else Vector2i(3, mid - 2)
+
+
+## Fase 32: la mitad del mapa de la rival (columnas, x = mínimo, y = máximo), hasta el árbol: ahí sus
+## guardias recogen lo que cae. La de enfrente de `player_patrol_range`.
+func rival_range() -> Vector2i:
+	var w := sim.world.w
+	var mid := midpoint_x()
+	return Vector2i(1, mid + 2) if home_x < sim.cfg.nest_x else Vector2i(mid - 2, w - 2)
+
+
+## Fase 32: comida que una recolectora llevó al montículo. No la hace crecer (eso sigue siendo
+## 1 hormiga cada `rival_grow_days`): lo que importa es que el jugador ya no la tiene.
+func store_food(value: float) -> void:
+	food_stored += value
+
+
+## Fase 32: cuántas pueden recolectar a la vez: 1 cada `rival_forager_per_ants` (al menos 1), y
+## siempre queda al menos una guardia junto a la reina.
+func forager_limit() -> int:
+	var n := 0
+	var ants := sim.ants
+	for i in ants.count:
+		if ants.alive[i] == 1 and ants.faction[i] == 1 and ants.raiding[i] == 0:
+			n += 1
+	return mini(maxi(1, n / sim.cfg.rival_forager_per_ants), n - 1)
+
+
+func forager_count() -> int:
+	var n := 0
+	var ants := sim.ants
+	for i in ants.count:
+		if ants.alive[i] == 1 and ants.faction[i] == 1 and ants.raiding[i] == 0 and ants._is_rival_forager(i):
+			n += 1
+	return n
 
 
 ## La reina en su montículo y las primeras guardias. La reina es más fuerte en cada estación.
