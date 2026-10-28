@@ -171,7 +171,7 @@ func _t_notes() -> void:
 	hud.free()
 
 
-## La guía en partida (`CoachView`) y las pistas del Nivel 0 (`TutorialView`) guardan sus textos en
+## La guía en partida (`CoachView`) y las pistas de Modo infinito (`TutorialView`) guardan sus textos en
 ## diccionarios y listas: los busca en el código (título, texto, objetivo, botón y cada pista).
 func _t_lessons_have_rows() -> void:
 	var missing: Array[String] = []

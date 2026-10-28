@@ -18,6 +18,10 @@ var volume := 0.8
 var brightness := 1.0
 ## Sin preferencia guardada: el idioma del sistema si es español, si no inglés.
 var language := "es" if OS.get_locale_language() == "es" else "en"
+## Fase 35: el tutorial es obligatorio solo la primera vez ("Nueva partida" lo arranca solo).
+var tutorial_done := false
+## Fase 35: consejos cortos durante Juego normal (`CoachView`). Apagados: el tutorial ya explicó.
+var show_tips := false
 
 
 static func load_settings() -> AppSettings:
@@ -35,6 +39,8 @@ static func load_settings() -> AppSettings:
 		var lang := str(parsed.get("language", s.language))
 		if lang in LANGUAGES:
 			s.language = lang
+		s.tutorial_done = bool(parsed.get("tutorial_done", false))
+		s.show_tips = bool(parsed.get("show_tips", false))
 	return s
 
 
@@ -42,7 +48,8 @@ func save() -> void:
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
 	if f == null:
 		return
-	f.store_string(JSON.stringify({"volume": volume, "brightness": brightness, "language": language}))
+	f.store_string(JSON.stringify({"volume": volume, "brightness": brightness, "language": language,
+		"tutorial_done": tutorial_done, "show_tips": show_tips}))
 	f.close()
 
 

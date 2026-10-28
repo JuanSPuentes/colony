@@ -22,8 +22,6 @@ enum Era { FOUNDATION, YOUNG, MATURE }
 const EraSystem = preload("res://sim/colony/era_system.gd")
 ## Mismo motivo que `EraSystem`: evitar el ciclo de resolución.
 const SeasonSystem = preload("res://sim/colony/season_system.gd")
-## Fase 14: mismo motivo.
-const TutorialLevel = preload("res://sim/colony/tutorial_level.gd")
 
 var cfg: SimConfig
 var rng := RandomNumberGenerator.new()
@@ -37,8 +35,8 @@ var attack: PheromoneField
 var evacuate: PheromoneField
 var water: WaterSim
 var fields: NestDistanceField
-## Fase 24: niebla bajo tierra. null salvo en "Juego normal" con mapa al azar (las pruebas, el
-## Nivel 0 y los otros modos ven todo, como siempre).
+## Fase 24: niebla bajo tierra. null salvo con mapa al azar (Juego normal y el tutorial); las
+## pruebas y los otros modos ven todo, como siempre.
 var fog: Fog
 var ants: AntSystem
 var plants: Array[Plant] = []
@@ -63,9 +61,9 @@ var incremental := false
 ## Fase 6: false salvo que se llame a `spawn_test_start()`. Sandbox sin victoria/derrota (ver
 ## `tick()`), para probar amenazas y castas a voluntad sin que una partida real se corte.
 var test_mode := false
-## Fase 14: Nivel 0 (tutorial jugable). false salvo `spawn_tutorial_start()`; implica `incremental`.
+## Fase 35: el tutorial (una colonia ya armada que se recorre con tarjetas, `CoachView`). false
+## salvo `spawn_tutorial_start()`; implica `incremental`. Sin estaciones, rival quieta, sin araña.
 var tutorial_level := false
-var tutorial_battle_started := false
 var econ: IncrementalEconomy
 ## Fase 9: mejoras de colonia del modo incremental (siempre existe, como el resto de los sistemas
 ## "siempre creados"; solo se puede comprar algo en `sim.incremental`, ver `Upgrades.can_buy`).
@@ -193,13 +191,12 @@ func spawn_colony_court() -> void:
 ##
 ## Fase 15 (`fresh_layout`, solo lo activa `main.gd` para "Juego normal" de verdad): el nido
 ## arranca cerrado, sin el pozo hacia la superficie — el jugador decide por dónde abrirlo — y los
-## árboles se reparten al azar (cantidad y distancias). Opcional a propósito: las pruebas y el
-## Nivel 0 siguen con el mapa de siempre (pozo abierto, árboles a distancias fijas), del que
-## dependen sus resultados y el orden de las lecciones.
+## árboles se reparten al azar (cantidad y distancias). Opcional a propósito: las pruebas siguen
+## con el mapa de siempre (pozo abierto, árboles a distancias fijas), del que dependen sus resultados.
 func spawn_incremental_start(fresh_layout := false) -> void:
 	incremental = true
 	if fresh_layout:
-		_seal_shaft()
+		_set_shaft(WorldGrid.Cell.DIRT)
 		_carve_side_chambers()
 		# Fase 31: la rival vive del otro lado; el árbol madre va en el medio de los dos nidos.
 		if cfg.rival_home:
@@ -251,13 +248,25 @@ func _place_start_food() -> void:
 			corpses.append(food_drop)
 
 
-## Fase 14: Nivel 0. La misma colonia mínima que "Juego normal", sin lluvia automática ni araña
-## (ver `tick()`) y con más comida al empezar; el final lo decide `TutorialLevel`, no las estaciones.
+## Fase 35: el tutorial. El mapa de Juego normal (árbol madre, rival, niebla, cámaras) pero con la
+## colonia ya armada: el nido abierto a la superficie, todas las castas y cría en camino, para que
+## las tarjetas muestren cada cosa de verdad. Sin lluvia, ni araña, ni estaciones (ver `tick()`):
+## la rival no crece ni manda incursiones, solo está ahí para verla.
 func spawn_tutorial_start() -> void:
-	spawn_incremental_start()
+	spawn_incremental_start(true)
 	tutorial_level = true
+	_set_shaft(WorldGrid.Cell.TUNNEL)
+	for k in cfg.tut_extra_workers:
+		ants.add_ant_at(_random_nest_cell(), CasteDefs.Caste.WORKER)
+	for k in cfg.tut_extra_soldiers:
+		ants.add_ant_at(_random_nest_cell(), CasteDefs.Caste.SOLDIER)
+	for k in cfg.tut_drones:
+		ants.add_ant_at(_random_nest_cell(), CasteDefs.Caste.DRONE)
+	for k in cfg.tut_eggs:
+		brood.lay_egg(CasteDefs.Caste.WORKER, egg_spot())
 	colony.food = cfg.tut_start_food
 	rain_start_tick = -1
+	ants._recount()
 
 
 ## Fase 14: dónde deja la reina un huevo nuevo: en una celda libre al lado suyo (no debajo). Antes
@@ -279,11 +288,6 @@ func egg_spot() -> Vector2:
 	# Un poco de desorden dentro de la celda: varios huevos en la misma no se tapan entre sí.
 	var jitter := Vector2(rng.randf_range(-0.3, 0.3), rng.randf_range(-0.25, 0.25)) * cfg.cell_px
 	return (Vector2(c) + Vector2(0.5, 0.5)) * cfg.cell_px + jitter
-
-
-## Fase 14: la guía pide la batalla final del Nivel 0 (ver `sim/colony/tutorial_level.gd`).
-func cmd_start_tutorial_battle() -> bool:
-	return TutorialLevel.start_battle(self)
 
 
 ## Fase 6: arranque del modo Test (sandbox, sin victoria/derrota — ver `test_mode` en `tick()`).
@@ -322,10 +326,11 @@ func _place_plants() -> void:
 
 ## Fase 15: rellena con tierra el pozo inicial (de la superficie a la cámara), dejando la cámara
 ## del nido cerrada. Las obreras no pueden salir hasta que el jugador marque por dónde cavar.
-func _seal_shaft() -> void:
+## El pozo de entrada del nido: tierra (Juego normal arranca cerrado) o túnel (abierto, el tutorial).
+func _set_shaft(cell: int) -> void:
 	for y in range(cfg.surface_y, cfg.surface_y + cfg.shaft_depth):
 		var i := y * world.w + cfg.nest_x
-		world.cells[i] = WorldGrid.Cell.DIRT
+		world.cells[i] = cell
 		world.changed.append(i)
 	world.passable_version += 1
 	world.jobs_version += 1
@@ -557,10 +562,8 @@ func tick() -> void:
 			_update_spider(dt * 3.0, cfg.inc_spider_first_population)
 		_check_game_over()
 		# Fase 9: estaciones + colonia rival — decide game_over/victory de este modo (reemplaza la
-		# condición de la Fase 8, retirada). Fase 14: el Nivel 0 tiene su propio final.
-		if tutorial_level:
-			TutorialLevel.update(self)
-		else:
+		# condición de la Fase 8, retirada). Fase 35: el tutorial no tiene estaciones ni final.
+		if not tutorial_level:
 			SeasonSystem.update(self)
 	elif queen_id >= 0:
 		colony.tick(self, dt)

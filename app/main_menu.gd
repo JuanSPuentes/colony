@@ -10,19 +10,15 @@ extends CanvasLayer
 ## porque son la posición en el menú, no el modo; `app.gd._ready()` decide a qué modo de
 ## `_start_game()` apunta cada una.
 
-## Fase 14: Nivel 0, el tutorial jugable (ver `sim/colony/tutorial_level.gd`).
 ## Fase 17: retoma la partida guardada (`main.SAVE_PATH`). Solo se ve si hay una guardada.
 signal play_continue
-signal play_tutorial
 signal play_normal
 signal play_infinite
 ## Fase 6: sandbox para probar amenazas y castas sin que una partida real se corte.
 signal play_test
 signal open_options
-## Fase 14: la guía de una pantalla (`GuideScreen`) ya no sale sola al empezar; queda aquí.
-signal open_guide
 signal quit_requested
-## Fase 18: "Nueva partida" — `app.gd` pregunta si se quiere hacer el tutorial antes.
+## "Nueva partida" — Fase 35: la primera vez `app.gd` arranca el tutorial antes.
 signal play_new
 
 const GOLD := Color("ffd43c")

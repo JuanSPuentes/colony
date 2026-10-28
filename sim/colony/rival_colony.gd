@@ -7,8 +7,8 @@ extends RefCounted
 ## necesita pathing, solo ser el objetivo a matar.
 ##
 ## Dos formas de aparecer:
-## - Fase 9: una oleada al final de la estación (`start_battle`), lejos del nido. Es lo que usan el
-##   Nivel 0 y el mapa fijo de las pruebas.
+## - Fase 9: una oleada al final de la estación (`start_battle`), lejos del nido. Es lo que usa el
+##   mapa fijo de las pruebas.
 ## - Fase 31 (etapa A del núcleo, NUCLEO.md): en "Juego normal" la rival vive en el mapa desde el
 ##   principio (`home`), en un montículo del otro lado del árbol madre. Crece con el tiempo, manda
 ##   incursiones y se gana la estación cuando muere su reina — cuando el jugador decide atacar
@@ -190,7 +190,7 @@ func cmd_attack() -> bool:
 
 # --- Fase 9: la oleada final ---------------------------------------------------------------------
 
-## Oleada de `ant_count` soldados rivales alrededor de la reina. Sin montículo (Nivel 0, pruebas)
+## Oleada de `ant_count` soldados rivales alrededor de la reina. Sin montículo (pruebas)
 ## aparece lejos del nido, a izquierda o derecha al azar (`cfg.rival_spawn_dist`), en la
 ## superficie. Con montículo (Fase 31) sale de él, con la reina que ya está ahí, y TODAS las
 ## rivales van contra el nido del jugador.

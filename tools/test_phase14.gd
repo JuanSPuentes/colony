@@ -1,9 +1,9 @@
 extends SceneTree
 ## Pruebas de la Fase 14: controles nuevos de cámara (clic izquierdo arrastra el mapa, clic derecho
-## usa la herramienta, WASD/flechas con Shift), la guía contextual (`CoachView`) y el Nivel 0
-## (`sim/colony/tutorial_level.gd`): orden de las lecciones, sin araña ni lluvia ni estaciones
-## automáticas, batalla final pedida por la guía, las hormigas de verdad dañan a la reina rival,
-## victoria al matarla, guardar/cargar conserva el modo.
+## usa la herramienta, WASD/flechas con Shift) y la guía contextual (`CoachView`). Fase 35: el
+## tutorial (colonia ya armada, sin araña ni lluvia ni estaciones, tarjetas por capítulo con
+## Siguiente/Omitir/Omitir todo), las hormigas de verdad dañan a la reina rival, guardar/cargar
+## conserva el modo.
 ## Uso: godot --headless --path . --script tools/test_phase14.gd      (código de salida 1 si algo falla)
 
 var _pass := 0
@@ -127,32 +127,39 @@ func _sim_tests() -> void:
 	var cfg := _cfg()
 	var sim := Simulation.new(cfg, 3)
 	sim.spawn_tutorial_start()
-	_check("el Nivel 0 es modo incremental con su bandera propia", sim.incremental and sim.tutorial_level and not sim.test_mode)
-	_check("arranca con la comida del Nivel 0", is_equal_approx(sim.colony.food, cfg.tut_start_food))
+	_check("el tutorial es modo incremental con su bandera propia", sim.incremental and sim.tutorial_level and not sim.test_mode)
+	_check("arranca con la comida del tutorial", is_equal_approx(sim.colony.food, cfg.tut_start_food))
 	_check("sin lluvia automática", sim.rain_start_tick == -1)
+	# Fase 35: la colonia ya armada — nido abierto, las tres cámaras, todas las castas y cría.
+	var top := (cfg.surface_y - 1) * sim.world.w + cfg.nest_x
+	_check("el nido ya está abierto a la superficie", sim.fields.nest_dist[top] < NestDistanceField.FAR)
+	var rooms := {}
+	for r in sim.world.room:
+		rooms[r] = true
+	_check("tiene Real, Guardería y Almacén", rooms.has(WorldGrid.Room.ROYAL) and rooms.has(WorldGrid.Room.NURSERY) and rooms.has(WorldGrid.Room.STORAGE))
+	var castes := sim.ants.count_by_caste([CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE])
+	_check("con obreras, soldados y zánganos", castes[CasteDefs.Caste.WORKER] >= cfg.tut_extra_workers
+		and castes[CasteDefs.Caste.SOLDIER] >= cfg.tut_extra_soldiers and castes[CasteDefs.Caste.DRONE] == cfg.tut_drones, str(castes))
+	_check("y cría en camino", sim.brood.stage.size() >= cfg.tut_eggs)
+	_check("con el árbol gigante y la rival en el mapa", sim.home_tree != null and sim.rival_colony.home and sim.rival_colony.queen.alive)
+	var rivals := sim.rival_colony.alive_count()
 	sim.cmd_add_ants(cfg.inc_spider_first_population + 10)
 	# Saltar al último día de la primera estación: en Juego normal aquí empezaría la batalla.
 	sim.tick_count = int(cfg.day_length_s * (cfg.season_days[0] - 1) / sim.dt) + 10
 	for i in 120:
 		sim.tick()
 	_check("sin araña aunque la población pase el umbral", sim.spiders_spawned == 0)
-	_check("sin batalla de estación automática", not sim.rival_colony.battle_active)
+	_check("sin estaciones: la rival no crece ni ataca", not sim.rival_colony.battle_active
+		and sim.rival_colony.alive_count() == rivals and not sim.ants.raiding.has(1))
 
 	var normal := Simulation.new(cfg, 3)
 	normal.spawn_incremental_start()
 	normal.tick_count = sim.tick_count
 	normal.tick()
 	_check("Juego normal sigue con su batalla de fin de estación", normal.rival_colony.battle_active and not normal.tutorial_level)
-	_check("cmd_start_tutorial_battle no hace nada fuera del Nivel 0", not normal.cmd_start_tutorial_battle())
-
-	var before := sim.ants.alive_count
-	_check("la guía puede pedir la batalla final", sim.cmd_start_tutorial_battle() and sim.rival_colony.battle_active)
-	_check("llegan los refuerzos y el ejército rival chico", sim.ants.alive_count == before + cfg.tut_bonus_soldiers + cfg.tut_rival_ants,
-		"%d -> %d" % [before, sim.ants.alive_count])
-	_check("la batalla final no se puede pedir dos veces", not sim.cmd_start_tutorial_battle())
 
 	var copy := SaveSystem.from_dict(SaveSystem.to_dict(sim), cfg)
-	_check("guardar/cargar conserva el Nivel 0 y su batalla", copy.tutorial_level and copy.tutorial_battle_started and copy.rival_colony.battle_active)
+	_check("guardar/cargar conserva el tutorial", copy.tutorial_level)
 
 	# Las hormigas del jugador dañan a la reina rival (antes nadie podía: solo moría a mano).
 	var q := sim.rival_colony.queen
@@ -163,14 +170,6 @@ func _sim_tests() -> void:
 	for i in 40:
 		sim.tick()
 	_check("los soldados del jugador dañan a la reina rival", q.hp < hp0, "vida %.1f -> %.1f" % [hp0, q.hp])
-	var guard := 0
-	while not sim.game_over and guard < 3000:
-		for i in sim.ants.count:
-			if sim.ants.alive[i] == 1 and sim.ants.faction[i] == 0 and sim.ants.caste[i] == CasteDefs.Caste.SOLDIER:
-				sim.ants.pos[i] = q.pos
-		sim.tick()
-		guard += 1
-	_check("matar a la reina rival gana el Nivel 0", sim.game_over and sim.victory and not q.alive, sim.game_over_reason)
 
 
 func _input_tests() -> void:
@@ -243,55 +242,41 @@ func _coach_tests() -> void:
 	await _frames(3)
 	_check("sin coach_enabled (main.tscn directo) no aparece ninguna tarjeta", not _main.coach.is_showing())
 
+	# Fase 35: el tutorial — tarjetas por capítulo con Siguiente / Omitir / Omitir todo.
 	_main.coach_enabled = true
 	_main.start(_main.cfg.world_seed, null, "tutorial")
 	await _frames(3)
 	var coach: CoachView = _main.coach
-	_check("el Nivel 0 arranca con la primera tarjeta, sin pausar el juego", coach.is_showing() and not _main.paused and coach._title.text == "Nivel 0")
+	_check("el tutorial arranca con la primera tarjeta, sin pausar el juego", coach.is_showing() and not _main.paused and coach._title.text == "Bienvenida")
 	var wr := Rect2(_main.world_container.position, _main.world_container.size)
 	_check("la tarjeta va pegada al costado derecho del mapa", coach._card.position.x + coach._card.size.x > wr.end.x - 30.0 and coach._card.position.x > wr.position.x + wr.size.x * 0.4,
 		"tarjeta x=%.0f ancho=%.0f mapa=%s" % [coach._card.position.x, coach._card.size.x, wr])
+	_check("con Siguiente, Omitir y Omitir todo", coach._ok.visible and coach._skip.visible and coach._skip_all.visible)
 	_main._zoom_t = 0.999999
 	await _frames(2)
 	_check("la tarjeta acerca la cámara a lo que explica", _main.zoom_index == CoachView.Z_WIDE)
-	var order := []
-	for i in 4:
+	coach.close_card()
+	await _frames(2)
+	_check("Siguiente pasa al capítulo de la colonia", coach._title.text == "La cámara Real" and coach._count.text.begins_with("La colonia"), coach._count.text)
+	coach.skip_chapter()
+	await _frames(2)
+	_check("Omitir salta el resto del capítulo", coach._title.text == "La reina", coach._title.text)
+	var finished := [false]
+	_main.tutorial_finished.connect(func() -> void: finished[0] = true)
+	while coach.step < coach.lessons.size():
 		coach.close_card()
 		await _frames(2)
-		order.append(coach.lessons[coach.step - 1]["id"])
-	_check("las lecciones siguen el orden de importancia", order == ["queen", "food", "castes", "camera"], str(order))
-	_check("la lección de cámara muestra su objetivo y no tiene botón", coach.is_showing() and coach._goal_label.visible and not coach._ok.visible)
-	# Desde el lado izquierdo del mapa: en esta ventana de prueba (480x270) la tarjeta tapa la mitad
-	# derecha, y un clic sobre ella es de la tarjeta, no del mapa.
-	await _pixel_drag(Vector2(60, 200), Vector2(20, 200))
-	await _until(func() -> bool: return coach.lessons[coach.step - 1]["id"] == "phero")
-	_check("cumplir el objetivo pasa sola a la siguiente lección", coach.is_showing() and coach.lessons[coach.step - 1]["id"] == "phero")
-	_main.sim.cmd_paint_food(_main.cfg.nest_x, _main.cfg.surface_y - 1, 0.5)
-	await _until(func() -> bool: return not coach.is_showing())
+	_check("la última tarjeta no se puede omitir", coach.is_showing() and not coach._skip.visible and not coach._skip_all.visible)
+	coach.close_card()
+	_check("cerrarla termina el tutorial", finished[0])
+	_main.start(_main.cfg.world_seed, null, "tutorial")
 	await _frames(3)
-	_check("una lección con condición espera a que se cumpla (cosecha)", not coach.is_showing() and coach.lessons[coach.step]["id"] == "harvest")
-	_main.sim.delivered = 1
-	await _until(func() -> bool: return coach.is_showing())
-	_check("la cosecha se explica en cuanto llega la primera hoja", coach.is_showing() and coach._title.text == "Cosecha")
-	# Recorrer el resto hasta la batalla, cumpliendo cada objetivo a mano.
-	var guard := 0
-	while not _main.sim.rival_colony.battle_active and guard < 400:
-		guard += 1
-		if coach.is_showing() and coach._ok.visible:
-			coach.close_card()
-		_main.sim.dug = 1
-		_main.sim.eggs_bought = 1
-		_main.sim.colony.food = 500.0
-		await _frames(2)
-	_check("la última lección pide la batalla final", _main.sim.tutorial_battle_started and _main.sim.rival_colony.battle_active)
-	await _until(func() -> bool: return coach.is_showing())
-	_check("la cámara va a la reina rival", coach.is_showing() and coach._title.text == "La reina rival")
-	_main.sim.rival_colony.queen.take_damage(9999.0)
-	await _until(func() -> bool: return _main.sim.game_over)
-	_check("matarla termina el Nivel 0 con victoria", _main.sim.game_over and _main.sim.victory)
+	finished[0] = false
+	coach.skip_all()
+	_check("Omitir todo lo termina en cualquier momento", finished[0])
 	var loaded := SaveSystem.from_dict(SaveSystem.to_dict(_main.sim), _main.cfg)
 	_main.start(1, loaded)
-	_check("cargar una partida del Nivel 0 vuelve al modo tutorial", _main.game_mode == "tutorial")
+	_check("cargar una partida del tutorial vuelve al modo tutorial", _main.game_mode == "tutorial")
 
 	# Barra de arriba: símbolos y números de la colonia.
 	_main.start(12345, null, "incremental")
@@ -359,7 +344,8 @@ func _end_banner_tests() -> void:
 	await _frames(2)
 	_main.sim.game_over = true
 	_main.sim.victory = true
-	_main.sim.game_over_reason = "Derrotaste a la reina rival y superaste el Nivel 0.\nEn Juego normal, así termina cada estación."
+	_main.sim.game_over_reason = "Un motivo largo de fin de partida, para ver que el cartel entra entero.
+Con una segunda línea también larga, como los avisos reales."
 	await _frames(3)
 	var p: PanelContainer = _main.hud._end_panel
 	var wr := Rect2(_main.world_container.position, _main.world_container.size)

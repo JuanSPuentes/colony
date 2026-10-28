@@ -59,6 +59,7 @@ func _run() -> void:
 
 	# Papeles invertidos a propósito (ver main_menu.gd): "Juego normal" es la economía de
 	# comida/compra (incremental) y "Modo infinito" es la colonia con reina/castas/araña (Historia).
+	_app.settings.show_tips = true  # Fase 35: los consejos de Juego normal, solo si se piden
 	_app.menu.play_normal.emit()
 	await _frames(3)
 	_check("Juego normal arranca en modo incremental (comida/compra)", _app.game != null and _app.game.sim.incremental, "" if _app.game == null else "incremental=%s" % _app.game.sim.incremental)
@@ -232,8 +233,8 @@ func _t_game_actions() -> void:
 		DirAccess.remove_absolute(save_path)
 
 
-## Fase 18: menú final (Continuar / Nueva partida / Opciones / Salir), tutorial opcional al pulsar
-## Nueva partida que pasa solo a la partida normal al ganarlo, y "Cómo jugar" desde Opciones.
+## Fase 18: menú final (Continuar / Nueva partida / Opciones / Salir) y "Cómo jugar" desde
+## Opciones. Fase 35: el tutorial obligatorio solo la primera vez y "Mostrar consejos".
 func _t_new_game_flow() -> void:
 	if _app.game != null:
 		_app.game.queue_free()
@@ -251,29 +252,25 @@ func _t_new_game_flow() -> void:
 	_check("Modo infinito y Test solo se ven corriendo desde el editor",
 		labels.has("Modo infinito") == OS.has_feature("editor") and labels.has("Test") == OS.has_feature("editor"))
 
+	# Fase 35: la primera vez, Nueva partida arranca el tutorial (obligatorio); al terminarlo (o
+	# "Omitir todo") empieza sola la partida normal, y las siguientes veces se juega directo.
+	_app.settings.tutorial_done = false
 	_app.menu.play_new.emit()
-	await _frames(1)
-	_check("Nueva partida pregunta si se quiere el tutorial", _app.tutorial_dialog.visible)
-	_app.tutorial_dialog.custom_action.emit(&"direct")
 	await _frames(3)
-	_check("\"Jugar directo\" arranca la partida normal", _app.game != null and _app.game.sim.incremental and not _app.game.sim.tutorial_level)
-
+	_check("la primera vez, Nueva partida arranca el tutorial", _app.game != null and _app.game.sim.tutorial_level)
+	_app.game.coach.skip_all()
+	await _frames(3)
+	_check("al terminarlo empieza sola la partida normal", _app.game != null and _app.game.sim != null
+		and _app.game.sim.incremental and not _app.game.sim.tutorial_level)
+	_check("y queda marcado como hecho", _app.settings.tutorial_done and AppSettings.load_settings().tutorial_done)
+	_check("sin consejos pedidos, Juego normal no muestra tarjetas", not _app.game.coach_enabled)
 	_app._close_game()
 	await _frames(1)
 	_app.menu.play_new.emit()
-	await _frames(1)
-	_app.tutorial_dialog.confirmed.emit()
-	_app.tutorial_dialog.hide()
 	await _frames(3)
-	_check("\"Hacer el tutorial\" arranca el Nivel 0", _app.game != null and _app.game.sim.tutorial_level)
-	_app.game.sim.game_over = true
-	_app.game.sim.victory = true
-	var t0 := Time.get_ticks_msec()
-	while (Time.get_ticks_msec() - t0) < (_app.CHAIN_DELAY_S + 2.0) * 1000.0 and _app.game != null and _app.game.sim != null and _app.game.sim.tutorial_level:
-		await process_frame
-	await _frames(3)
-	_check("al ganar el tutorial empieza sola la partida normal", _app.game != null and _app.game.sim != null
-		and _app.game.sim.incremental and not _app.game.sim.tutorial_level)
+	_check("las siguientes veces, Nueva partida va directo a jugar", _app.game != null and not _app.game.sim.tutorial_level)
+	_app.options.tips_changed.emit(true)
+	_check("prender «Mostrar consejos» los activa en la partida", _app.game.coach_enabled and _app.settings.show_tips)
 
 	_app.game.menu_requested.emit()
 	await _frames(1)

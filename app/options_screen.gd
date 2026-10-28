@@ -20,6 +20,9 @@ signal new_game_requested
 signal main_menu_requested
 ## Fase 18: "Cómo jugar" salió del menú principal y vive aquí, dentro de la partida.
 signal how_to_play_requested
+## Fase 35: "Mostrar consejos" en Juego normal, y volver a ver el tutorial.
+signal tips_changed(on: bool)
+signal tutorial_requested
 
 const BG := Color(0.05, 0.04, 0.04, 1.0)
 const GOLD := Color("ffd43c")
@@ -31,6 +34,7 @@ var _volume_value: Label
 var _brightness_slider: HSlider
 var _brightness_value: Label
 var _language: OptionButton
+var _tips: CheckButton
 var _controls_cols: HBoxContainer
 var _game_card: PanelContainer
 var _save_status: Label
@@ -114,6 +118,13 @@ func _ready() -> void:
 	_brightness_slider = _last_slider
 	_brightness_value = _last_value_label
 	_language_row(settings_body)
+	_tips = CheckButton.new()
+	_tips.text = "Mostrar consejos"
+	_tips.add_theme_font_size_override("font_size", 16)
+	_tips.add_theme_color_override("font_color", CREAM)
+	_tips.toggled.connect(func(on: bool) -> void: tips_changed.emit(on))
+	settings_body.add_child(_tips)
+	settings_body.add_child(_action_button("Ver el tutorial", func() -> void: tutorial_requested.emit()))
 
 	var controls_card := _card("Controles")
 	content.add_child(controls_card)
@@ -292,6 +303,10 @@ func _language_row(parent: VBoxContainer) -> void:
 		_language.add_item(name)
 	_language.item_selected.connect(func(i: int) -> void: language_changed.emit(AppSettings.LANGUAGES[i]))
 	row.add_child(_language)
+
+
+func set_tips(on: bool) -> void:
+	_tips.set_pressed_no_signal(on)
 
 
 func set_language(code: String) -> void:

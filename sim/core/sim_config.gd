@@ -336,7 +336,6 @@ extends Resource
 ## "Curación": fracción de la vida máxima que recupera por segundo una hormiga dentro del nido.
 @export var inc_upgrade_heal_per_s := 0.02
 
-## Fase 14: Nivel 0 (tutorial jugable, ver `sim/colony/tutorial_level.gd`).
 ## Fase 14: patrulla del soldado (ver `AntCasteAI.patrol`).
 @export_group("Fase 14: patrulla y zánganos")
 ## Probabilidad de que, al elegir el siguiente punto de patrulla, el soldado vaya a revisar el nido.
@@ -361,14 +360,13 @@ extends Resource
 @export var rally_max_s := 25.0
 @export var rally_radius_cells := 4.0
 
-@export_group("Fase 14: Nivel 0")
-## Comida inicial: más que `inc_start_food` para que el primer huevo se pueda comprar pronto.
-@export var tut_start_food := 60.0
-## Ejército rival del final del nivel: chico a propósito, es una demostración.
-@export var tut_rival_ants := 3
-@export var tut_rival_strength := 0.4
-## Soldados que nacen al empezar esa batalla para que siempre se pueda ganar.
-@export var tut_bonus_soldiers := 3
+@export_group("Fase 35: tutorial")
+## La colonia ya armada del tutorial: además de la de Juego normal, estas hormigas, cría y comida.
+@export var tut_start_food := 150.0
+@export var tut_extra_workers := 5
+@export var tut_extra_soldiers := 2
+@export var tut_drones := 2
+@export var tut_eggs := 3
 
 @export_group("Fase 4: victoria")
 ## Cuánto tiempo de simulación hay que sobrevivir en Colonia madura (con la reina viva) para ganar.

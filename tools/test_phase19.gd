@@ -131,8 +131,12 @@ func _t_connected_pocket_is_harvested() -> void:
 func _t_regrow_rules() -> void:
 	var sim := _fresh(8)
 	var m := _of_kind(sim, Plant.Kind.MUSHROOM)[0]
-	var g := _of_kind(sim, Plant.Kind.GIANT)[0]
-	var t: Plant = _of_kind(sim, Plant.Kind.TREE)[0]
+	# Desde la Fase 29 el mapa al azar no trae otros árboles (`home_tree_other_trees = 0`): se
+	# plantan a mano un árbol normal y un gigante para comparar cómo rebrotan.
+	var t := Plant.new(Vector2i(10, sim.cfg.surface_y - 1), 20)
+	var g := Plant.new(Vector2i(20, sim.cfg.surface_y - 1), 20)
+	g.kind = Plant.Kind.GIANT
+	sim.plants.append_array([t, g])
 	m.leaves = 0
 	t.leaves = 0
 	# De noche: el hongo rebrota, el árbol no.

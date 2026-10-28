@@ -730,8 +730,7 @@ func _update_incremental(sim: Simulation) -> void:
 
 	# Fase 34: el botón del árbol avisa cuántas mejoras alcanzan ya.
 	var ready := sim.upgrades.available_count()
-	_tree_btn.text = tr("[U] Árbol de mejoras") + ("
-" + tr("%d para comprar") % ready if ready > 0 else "")
+	_tree_btn.text = tr("[U] Árbol de mejoras") + ("\n" + tr("%d para comprar") % ready if ready > 0 else "")
 	_tree_btn.self_modulate = UPGRADE_READY_TINT if ready > 0 else Color.WHITE
 
 
@@ -908,7 +907,7 @@ func update_info(m: Node) -> void:
 	_end_panel.visible = sim.game_over
 	if sim.game_over:
 		var won := sim.victory
-		_defeat.text = (tr("¡VICTORIA!") if sim.tutorial_level else tr("¡LA COLONIA PROSPERÓ!")) if won else tr("LA COLONIA CAYÓ")
+		_defeat.text = tr("¡LA COLONIA PROSPERÓ!") if won else tr("LA COLONIA CAYÓ")
 		_defeat.add_theme_color_override("font_color", Color("7fe08a") if won else Color("ff6a6a"))
 		_end_reason.text = sim.game_over_reason
 		_end_reason.custom_minimum_size.x = clampf(world_rect.size.x - 160.0, 280.0, 520.0)

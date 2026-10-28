@@ -1,24 +1,28 @@
 class_name CoachView
 extends CanvasLayer
-## Fase 14: guía contextual. En vez de una sola pantalla de instrucciones al empezar, cada cosa se
-## explica la primera vez que se vuelve relevante: la cámara se acerca a lo que se explica y
-## aparece una tarjeta chica al costado derecho del mapa. La partida NO se pausa (pedido del
-## jugador): se lee mientras se hace. Si la lección pide algo, la tarjeta muestra el objetivo y
-## pasa sola a la siguiente cuando se cumple; si solo informa, tiene un botón "Siguiente" (o Enter).
+## Fase 14: guía contextual. La cámara se acerca a lo que se explica y aparece una tarjeta chica al
+## costado derecho del mapa. La partida NO se pausa (pedido del jugador): se lee mientras se hace.
+## Si la lección pide algo, la tarjeta muestra el objetivo y pasa sola a la siguiente cuando se
+## cumple; si solo informa, tiene un botón "Siguiente" (o Enter).
 ##
 ## Dos listas:
-## - Nivel 0 (`sim.tutorial_level`): lecciones en orden fijo, de lo más importante a lo menos. La
-##   penúltima pide la batalla final (`sim.cmd_start_tutorial_battle`).
-## - Juego normal (`sim.incremental`): cada consejo salta solo, en cualquier orden, la primera vez
-##   que pasa lo que explica (primera noche, primera araña, primera vez que alcanza para un huevo...).
+## - Tutorial (`sim.tutorial_level`, Fase 35): tarjetas en orden fijo sobre una colonia ya armada,
+##   por capítulos (la colonia, las castas, el bioma, cómo se juega). Cada una con "Siguiente",
+##   "Omitir" (salta el resto del capítulo) y "Omitir todo"; al terminar avisa a `main`
+##   (`tutorial_finished`) y `app.gd` arranca la partida normal.
+## - Juego normal (`sim.incremental`): consejos cortos, solo si el jugador los pidió ("Mostrar
+##   consejos" en Opciones). Cada uno salta solo, en cualquier orden, la primera vez que pasa lo que
+##   explica (primera noche, primera araña, primera vez que alcanza para un huevo...).
 ## Modo infinito y Test no la usan. Solo se activa si `main.coach_enabled` (lo pone `app.gd`): así
 ## `main.tscn` abierto directo, como lo usan las pruebas viejas, se comporta como siempre.
 
 const GOLD := Color("ffd43c")
 const CREAM := Color("f4ecd8")
 const GREEN := Color("7fe08a")
-## Ancho de la tarjeta, en píxeles reales de ventana. Chica a propósito: solo lo mínimo.
+## Ancho de la tarjeta, en píxeles reales de ventana. Chica a propósito: solo lo mínimo. Las del
+## tutorial, más anchas: explican más y llevan tres botones.
 const CARD_W := 270.0
+const TUTORIAL_CARD_W := 380.0
 const MARGIN := 12.0
 
 ## Índices de `main.ZOOM_LEVELS` ([0.5, 1, 2, 3, 4]).
@@ -27,14 +31,11 @@ const Z_NEAR := 2
 const Z_CLOSE := 3
 
 var lessons: Array[Dictionary] = []
-## Índice de la próxima lección del Nivel 0 (en Juego normal no se usa: van por `_seen`).
+## Índice de la próxima tarjeta del tutorial (en Juego normal no se usa: van por `_seen`).
 var step := 0
 var _seen := {}
 var _current: Dictionary = {}
 var _mode := ""
-## Lo marca `main.gd` cuando el jugador mueve la cámara (arrastre o teclado): la lección de cámara
-## del Nivel 0 no tiene un contador en `sim` porque la cámara es pura presentación.
-var camera_moved := false
 ## Tick en que arrancó la partida: algunos consejos de Juego normal esperan unos segundos de juego
 ## (`_played_s`) para no encadenarse con la bienvenida.
 var _start_tick := 0
@@ -49,6 +50,9 @@ var _body: Label
 var _count: Label
 var _goal_label: Label
 var _ok: Button
+## Fase 35: "Omitir" (el resto del capítulo) y "Omitir todo" (termina el tutorial).
+var _skip: Button
+var _skip_all: Button
 
 
 func _ready() -> void:
@@ -87,15 +91,25 @@ func _ready() -> void:
 	_goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_goal_label.custom_minimum_size = Vector2(CARD_W - 24.0, 0)
 	box.add_child(_goal_label)
-	_ok = Button.new()
-	_ok.text = "Siguiente  ⏎"
-	_ok.focus_mode = Control.FOCUS_NONE
-	_ok.size_flags_horizontal = Control.SIZE_SHRINK_END
-	_ok.add_theme_font_size_override("font_size", 18)
-	PixelUI.style_button(_ok)
-	_ok.pressed.connect(close_card)
-	box.add_child(_ok)
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_END
+	buttons.add_theme_constant_override("separation", 6)
+	box.add_child(buttons)
+	_skip_all = _card_button(buttons, "Omitir todo", skip_all)
+	_skip = _card_button(buttons, "Omitir", skip_chapter)
+	_ok = _card_button(buttons, "Siguiente  ⏎", close_card)
 	_card.visible = false
+
+
+func _card_button(parent: Control, text: String, cb: Callable) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_size_override("font_size", 18)
+	PixelUI.style_button(b)
+	b.pressed.connect(cb)
+	parent.add_child(b)
+	return b
 
 
 func is_showing() -> bool:
@@ -105,15 +119,14 @@ func is_showing() -> bool:
 ## Llamado por `main.start()` en cada partida nueva (también al reiniciar con F5).
 func reset(sim: Simulation) -> void:
 	step = 0
-	camera_moved = false
 	_start_tick = sim.tick_count
 	_last_close_tick = -1000000
 	_seen.clear()
 	_current = {}
 	_card.visible = false
 	if sim.tutorial_level:
-		_mode = "level0"
-		lessons = _level0_lessons()
+		_mode = "tutorial"
+		lessons = _tutorial_lessons()
 	elif sim.incremental and not sim.test_mode:
 		_mode = "normal"
 		lessons = _normal_lessons()
@@ -137,8 +150,8 @@ func update(main) -> void:
 		if _current.has("done") and (_current["done"] as Callable).call(sim):
 			close_card()
 		return
-	if _mode == "level0":
-		if step < lessons.size() and (lessons[step]["when"] as Callable).call(sim):
+	if _mode == "tutorial":
+		if step < lessons.size():
 			_open(main, lessons[step])
 			step += 1
 	else:
@@ -154,20 +167,29 @@ func update(main) -> void:
 ## Pegada al borde derecho del mapa, justo debajo de la barra de arriba del HUD.
 func _place(main) -> void:
 	var r := Rect2(main.world_container.position, main.world_container.size)
-	_card.size = Vector2(CARD_W, 0)  # que la altura salga del contenido
-	_card.position = Vector2(r.end.x - CARD_W - MARGIN, r.position.y + Hud.TOPBAR_H + MARGIN)
+	# La del tutorial nunca más ancha que medio mapa (ventanas chicas).
+	var w := minf(TUTORIAL_CARD_W, r.size.x * 0.55) if _mode == "tutorial" else CARD_W
+	_card.custom_minimum_size = Vector2(w, 0)
+	_body.custom_minimum_size = Vector2(w - 24.0, 0)
+	_card.size = Vector2(w, 0)  # que la altura salga del contenido
+	_card.position = Vector2(r.end.x - w - MARGIN, r.position.y + Hud.TOPBAR_H + MARGIN)
 
 
 func _open(main, lesson: Dictionary) -> void:
 	_current = lesson
 	_title.text = lesson["title"]
 	_body.text = lesson["text"]
-	_count.text = "%d/%d" % [step + 1, lessons.size()] if _mode == "level0" else ""
+	var tutorial := _mode == "tutorial"
+	# Tutorial: "Capítulo  n/m" dentro del capítulo. Armado: no se traduce solo (Fase 27).
+	_count.text = "%s  %d/%d" % [tr(String(lesson["chapter"])), _chapter_pos(step), _chapter_size(step)] if tutorial else ""
 	var has_goal: bool = lesson.has("goal")
 	_goal_label.visible = has_goal
-	_goal_label.text = "▶ " + tr(String(lesson.get("goal", "")))  # armado: no se traduce solo (Fase 27)
+	_goal_label.text = "▶ " + tr(String(lesson.get("goal", "")))
 	_ok.visible = not has_goal
-	_ok.text = String(lesson.get("button", "Siguiente  ⏎" if _mode == "level0" else "Entendido  ⏎"))
+	_ok.text = String(lesson.get("button", "Siguiente  ⏎" if tutorial else "Entendido  ⏎"))
+	var last := step >= lessons.size() - 1
+	_skip.visible = tutorial and not last
+	_skip_all.visible = tutorial and not last
 	_card.visible = true
 	var focus: Callable = lesson.get("focus", Callable())
 	if focus.is_valid():
@@ -184,10 +206,44 @@ func close_card() -> void:
 	if main == null:
 		return
 	_last_close_tick = main.sim.tick_count
-	var on_close: Callable = _current.get("on_close", Callable())
-	if on_close.is_valid():
-		on_close.call(main.sim)
 	_current = {}
+	if _mode == "tutorial" and step >= lessons.size():
+		main.tutorial_finished.emit()
+
+
+## Fase 35: "Omitir": salta el resto del capítulo de la tarjeta abierta (`step` ya apunta a la
+## siguiente); nunca se salta la última tarjeta, la de despedida.
+func skip_chapter() -> void:
+	if _mode != "tutorial" or not _card.visible:
+		return
+	var chapter: String = lessons[step - 1]["chapter"]
+	while step < lessons.size() - 1 and lessons[step]["chapter"] == chapter:
+		step += 1
+	close_card()
+
+
+## Fase 35: "Omitir todo": termina el tutorial ya.
+func skip_all() -> void:
+	if _mode != "tutorial" or not _card.visible:
+		return
+	step = lessons.size()
+	close_card()
+
+
+## Posición (desde 1) de la tarjeta `i` dentro de su capítulo, y cuántas tiene ese capítulo.
+func _chapter_pos(i: int) -> int:
+	var n := 1
+	while i - n >= 0 and lessons[i - n]["chapter"] == lessons[i]["chapter"]:
+		n += 1
+	return n
+
+
+func _chapter_size(i: int) -> int:
+	var n := 0
+	for l in lessons:
+		if l["chapter"] == lessons[i]["chapter"]:
+			n += 1
+	return n
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -236,9 +292,9 @@ func _played_s(sim: Simulation) -> float:
 
 
 # --- Lecciones ----------------------------------------------------------------------------------
-# Cada lección: id, title, text, when(sim) -> bool, y opcionales focus(sim) -> Vector2, zoom,
-# goal (texto) + done(sim) -> bool, on_close(sim), button. Textos cortos: solo lo mínimo para
-# entender la idea; el detalle sale jugando.
+# Cada lección: title, text y, en Juego normal, id + when(sim) -> bool; en el tutorial, chapter.
+# Opcionales: focus(sim) -> Vector2, zoom, goal (texto) + done(sim) -> bool, button. Textos cortos:
+# solo lo mínimo para entender la idea; el detalle sale jugando.
 
 ## Fase 15: antes cada feromona se mencionaba suelta en lecciones distintas, sin decir nunca quién
 ## sigue cuál — el jugador reportó que era confuso. Una sola tarjeta con las cinco, en el mismo
@@ -253,45 +309,71 @@ static func _nest_open(sim: Simulation) -> bool:
 	return sim.fields.nest_dist[i] < NestDistanceField.FAR
 
 
-func _level0_lessons() -> Array[Dictionary]:
-	var always := func(_s: Simulation) -> bool: return true
+## Fase 35: centro de las celdas de una cámara (`WorldGrid.Room`), o el nido si no hay ninguna.
+static func _room(sim: Simulation, room_type: int) -> Vector2:
+	var sum := Vector2.ZERO
+	var n := 0
+	for i in sim.world.room.size():
+		if sim.world.room[i] == room_type:
+			sum += _px(sim, Vector2i(i % sim.world.w, i / sim.world.w))
+			n += 1
+	return sum / n if n > 0 else _nest(sim)
+
+
+static func _tree(sim: Simulation) -> Vector2:
+	if sim.home_tree == null:
+		return _nest(sim)
+	return _px(sim, Vector2i(sim.home_tree.x, sim.cfg.surface_y - 4))
+
+
+static func _mushroom(sim: Simulation) -> Vector2:
+	for p in sim.plants:
+		if p.is_mushroom():
+			return _px(sim, p.cell)
+	return _nest(sim)
+
+
+## Fase 35: el tutorial. Tarjetas cortas por capítulo, sobre la colonia ya armada
+## (`Simulation.spawn_tutorial_start`). Sin objetivos: solo se lee y se mira.
+func _tutorial_lessons() -> Array[Dictionary]:
+	var surface := func(s: Simulation) -> Vector2: return _px(s, Vector2i(s.cfg.nest_x, s.cfg.surface_y - 3))
 	return [
-		{"id": "welcome", "title": "Nivel 0", "when": always, "focus": _nest, "zoom": Z_WIDE,
-			"text": "No controlas a las hormigas: les das señales (feromonas) y diseñas el nido. Termina con una batalla."},
-		{"id": "queen", "title": "La reina", "when": always, "focus": _queen, "zoom": Z_CLOSE,
-			"text": "La más grande. Pone todos los huevos. Si muere, pierdes."},
-		{"id": "food", "title": "Comida", "when": always, "focus": _nest, "zoom": Z_NEAR,
-			"text": "Todo cuesta comida y todas comen. Si llega a 0, la reina y los soldados se debilitan."},
-		{"id": "castes", "title": "Castas", "when": always, "focus": func(s: Simulation) -> Vector2: return _first_of(s, CasteDefs.Caste.WORKER), "zoom": Z_CLOSE,
-			"text": "Obrera: cava y trae hojas.\nSoldado: patrulla y defiende.\nZángano: lleva huevos a la Guardería y defiende a la reina.\nAnte un enemigo pelean todas."},
-		{"id": "camera", "title": "Cámara", "when": always,
-			"text": "Clic izq. arrastra · WASD/flechas (Shift: rápido) · rueda: zoom · H: la reina.",
-			"goal": "Mueve la cámara", "done": func(s: Simulation) -> bool: return camera_moved},
-		{"id": "phero", "title": "Feromona de Comida", "when": always, "focus": _nearest_plant, "zoom": Z_WIDE,
-			"text": "Las obreras siguen rastros. Empieza en el nido y termina en la planta.",
-			"goal": "Pulsa 2 y arrastra con clic derecho", "done": func(s: Simulation) -> bool: return s.food_painted},
-		{"id": "harvest", "title": "Cosecha", "when": func(s: Simulation) -> bool: return s.delivered > 0, "focus": _nest, "zoom": Z_NEAR,
-			"text": "Cada hoja que llega al nido es comida. Las plantas rebrotan de día."},
-		{"id": "pheromones", "title": "Las 5 feromonas", "when": always, "text": PHEROMONES_TEXT},
-		{"id": "dig", "title": "Cavar", "when": always, "focus": _nest, "zoom": Z_NEAR,
-			"text": "Marca desde un túnel hacia la tierra; las obreras cavan. La roca gris no se cava.",
-			"goal": "Pulsa 1 y arrastra con clic derecho", "done": func(s: Simulation) -> bool: return s.dug > 0},
-		{"id": "egg", "title": "Huevos", "when": func(s: Simulation) -> bool: return s.econ.can_buy_egg(), "focus": _queen, "zoom": Z_CLOSE,
-			"text": "Huevo → larva → pupa → adulta. Sale obrera, soldado o zángano al azar. 9: auto-compra.",
-			"goal": "Compra un huevo (tecla 7)", "done": func(s: Simulation) -> bool: return s.eggs_bought > 0},
-		{"id": "daynight", "title": "Día y noche", "when": always,
-			"text": "De noche no rebrotan las plantas. Arriba ves cuánto falta para que cambie."},
-		{"id": "upgrades", "title": "Mejoras", "when": always,
+		{"chapter": "Inicio", "title": "Bienvenida", "focus": _nest, "zoom": Z_WIDE,
+			"text": "Esta colonia ya está armada para que veas cómo funciona. Después empiezas la tuya desde cero.\nMueve la cámara con clic izq. y arrastrando, o con WASD; la rueda acerca y aleja."},
+		{"chapter": "La colonia", "title": "La cámara Real", "focus": func(s: Simulation) -> Vector2: return _room(s, WorldGrid.Room.ROYAL), "zoom": Z_NEAR,
+			"text": "Aquí vive la reina. Es el corazón del nido: si la reina muere, pierdes."},
+		{"chapter": "La colonia", "title": "La Guardería", "focus": func(s: Simulation) -> Vector2: return _room(s, WorldGrid.Room.NURSERY), "zoom": Z_NEAR,
+			"text": "Aquí se cuida la cría hasta que nace: huevo → larva → pupa → adulta."},
+		{"chapter": "La colonia", "title": "El Almacén", "focus": func(s: Simulation) -> Vector2: return _room(s, WorldGrid.Room.STORAGE), "zoom": Z_NEAR,
+			"text": "Las obreras dejan aquí la comida. Cuanto más grande, más comida puedes guardar."},
+		{"chapter": "La colonia", "title": "Los túneles", "focus": _nest, "zoom": Z_NEAR,
+			"text": "Unen las cámaras entre sí y con la superficie. Para cavar: tecla 1 y arrastra con clic derecho; las obreras hacen el trabajo. La roca gris no se cava."},
+		{"chapter": "Las castas", "title": "La reina", "focus": _queen, "zoom": Z_CLOSE,
+			"text": "La más grande. Pone todos los huevos y no pelea: protégela."},
+		{"chapter": "Las castas", "title": "Obreras", "focus": func(s: Simulation) -> Vector2: return _first_of(s, CasteDefs.Caste.WORKER), "zoom": Z_CLOSE,
+			"text": "Cavan, buscan comida y la traen al nido. Son la mayoría de la colonia."},
+		{"chapter": "Las castas", "title": "Soldados", "focus": func(s: Simulation) -> Vector2: return _first_of(s, CasteDefs.Caste.SOLDIER), "zoom": Z_CLOSE,
+			"text": "Patrullan tu mitad del mapa y pelean. Con «¡Atacar!» (tecla 8) marchan juntos contra la reina rival."},
+		{"chapter": "Las castas", "title": "Zánganos", "focus": func(s: Simulation) -> Vector2: return _first_of(s, CasteDefs.Caste.DRONE), "zoom": Z_CLOSE,
+			"text": "Llevan los huevos a la Guardería y escoltan a la reina. Si algo se le acerca, la defienden."},
+		{"chapter": "Las castas", "title": "Más hormigas", "focus": _queen, "zoom": Z_NEAR,
+			"text": "No eliges la casta: compras un huevo con comida (tecla 7) y nace obrera, soldado o zángano al azar."},
+		{"chapter": "El bioma", "title": "El árbol gigante", "focus": _tree, "zoom": Z_WIDE,
+			"text": "Está en el medio y es de las dos colonias. Las hojas caen por toda la copa; las semillas y frutas, que valen más, junto al tronco."},
+		{"chapter": "El bioma", "title": "La superficie", "focus": surface, "zoom": Z_WIDE,
+			"text": "Ahí está la comida, pero es peligrosa: arañas, ciempiés, mantis y las hormigas rivales."},
+		{"chapter": "El bioma", "title": "Bajo tierra", "focus": _mushroom, "zoom": Z_NEAR,
+			"text": "Tu refugio. La niebla tapa lo que todavía no exploraste. Cavando encuentras cuevas con hongos, que también son comida."},
+		{"chapter": "El bioma", "title": "Clima y estaciones", "focus": surface, "zoom": Z_WIDE,
+			"text": "De noche cae menos comida. La lluvia inunda los túneles bajos y borra los rastros. Cada estación trae un mapa nuevo y una rival más fuerte."},
+		{"chapter": "El bioma", "title": "La colonia rival", "focus": func(s: Simulation) -> Vector2: return s.rival_colony.queen.pos, "zoom": Z_NEAR,
+			"text": "Vive del otro lado del árbol. Crece sola, recoge lo que cae en su mitad y te manda incursiones. Ganas la estación si matas a su reina; pierdes si matan a la tuya."},
+		{"chapter": "Cómo se juega", "title": "Las 5 feromonas", "focus": _nest, "zoom": Z_WIDE,
+			"text": PHEROMONES_TEXT},
+		{"chapter": "Cómo se juega", "title": "Árbol de mejoras", "focus": _nest, "zoom": Z_WIDE,
 			"text": "Con comida compras mejoras en el árbol (tecla U). Elige una rama: Ataque, Defensa o Recolección; cada mejora abre la siguiente."},
-		{"id": "threats", "title": "Amenazas", "when": always,
-			"text": "Araña, ciempiés, mantis y lluvia. Feromona de Peligro: alejar. De Ataque: llamar soldados."},
-		{"id": "battle", "title": "Fin de estación", "when": always, "button": "¡A la batalla!  ⏎",
-			"on_close": func(s: Simulation) -> void: s.cmd_start_tutorial_battle(),
-			"text": "Cada estación termina con un ataque rival: gana quien mate a la reina. Te mandamos 3 soldados."},
-		{"id": "rival", "title": "La reina rival", "when": func(s: Simulation) -> bool: return s.rival_colony.battle_active,
-			"focus": func(s: Simulation) -> Vector2: return s.rival_colony.queen.pos, "zoom": Z_NEAR,
-			"text": "Lleva a tu colonia hasta ella con la feromona de Ataque (2, luego Q/E).",
-			"goal": "Derrota a la reina rival", "done": func(s: Simulation) -> bool: return s.game_over},
+		{"chapter": "Cómo se juega", "title": "¡A jugar!", "focus": _nest, "zoom": Z_WIDE, "button": "Empezar mi colonia  ⏎",
+			"text": "Tu colonia empieza chica y con el nido cerrado: ábrelo, junta comida y crece más rápido que la rival."},
 	]
 
 

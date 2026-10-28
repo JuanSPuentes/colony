@@ -16,11 +16,9 @@ var game: Node2D
 ## A dónde vuelve la flecha de Opciones: "menu" (se abrió desde el menú) o "game" (desde la tuerca).
 var _return_to := "menu"
 var confirm_dialog: ConfirmationDialog
-var tutorial_dialog: ConfirmationDialog
-## Fase 18: el Nivel 0 se empezó desde "Nueva partida": al ganarlo se pasa solo a la partida normal.
+## Fase 35: el tutorial se empezó desde "Nueva partida": al terminarlo arranca la partida normal
+## (si se pidió desde Opciones, vuelve al menú).
 var _chain_to_normal := false
-var _chain_wait := 0.0
-const CHAIN_DELAY_S := 4.0
 var _guide_from_options := false
 var _pending: Callable
 
@@ -35,12 +33,10 @@ func _ready() -> void:
 	# Papeles invertidos a propósito (ver nota en main_menu.gd): "Juego normal" es ahora la
 	# economía de comida/compra (antes "Modo infinito") y "Modo infinito" es la colonia con reina,
 	# castas y araña (antes "Juego normal"). `_start_game(incremental)` no cambió de significado.
-	menu.play_tutorial.connect(_start_tutorial)
 	menu.play_normal.connect(func() -> void: _start_game(true))
 	menu.play_infinite.connect(func() -> void: _start_game(false))
 	menu.play_test.connect(_start_test_game)
 	menu.open_options.connect(func() -> void: _open_options("menu"))
-	menu.open_guide.connect(_open_guide)
 	menu.quit_requested.connect(_ask_quit)
 
 	options = OptionsScreen.new()
@@ -51,6 +47,8 @@ func _ready() -> void:
 	options.brightness_changed.connect(_on_brightness_changed)
 	options.language_changed.connect(_on_language_changed)
 	options.quit_requested.connect(_ask_quit)
+	options.tips_changed.connect(_on_tips_changed)
+	options.tutorial_requested.connect(_on_tutorial_requested)
 
 	guide = GuideScreen.new()
 	guide.visible = false
@@ -73,23 +71,9 @@ func _ready() -> void:
 		"¿Volver al menú principal? Se pierde lo que no hayas guardado.", "Menú principal", _back_to_main_menu))
 	menu.play_continue.connect(_continue_game)
 
-	# Fase 18: "Nueva partida" pregunta si se quiere el tutorial (Nivel 0) primero; al ganarlo, la
-	# partida normal arranca sola (`_process`). "Cómo jugar" se abre desde las opciones de la partida.
-	menu.play_new.connect(_ask_tutorial)
-	tutorial_dialog = ConfirmationDialog.new()
-	tutorial_dialog.title = "Nueva partida"
-	tutorial_dialog.dialog_text = "¿Quieres hacer el tutorial primero?\nAl terminarlo empieza la partida normal."
-	tutorial_dialog.ok_button_text = "Hacer el tutorial"
-	tutorial_dialog.cancel_button_text = "Cancelar"
-	tutorial_dialog.add_button("Jugar directo", false, "direct")
-	add_child(tutorial_dialog)
-	tutorial_dialog.confirmed.connect(func() -> void:
-		_chain_to_normal = true
-		_start_tutorial())
-	tutorial_dialog.custom_action.connect(func(action: StringName) -> void:
-		if action == &"direct":
-			tutorial_dialog.hide()
-			_start_game(true))
+	# Fase 35: "Nueva partida" arranca el tutorial la primera vez (obligatorio); después, directo.
+	# "Cómo jugar" se abre desde las opciones de la partida.
+	menu.play_new.connect(_on_new_game)
 	options.how_to_play_requested.connect(func() -> void:
 		_guide_from_options = true
 		guide.visible = true)
@@ -121,24 +105,60 @@ func _start_game(incremental: bool) -> void:
 	# depurar ese modo con un mapa reproducible. F5 dentro de una partida sigue reiniciando con la
 	# MISMA semilla que ya estaba (ver `main.gd::start`); solo Shift+F5 sortea una nueva a mano.
 	var seed_value: int = randi() if incremental else game.cfg.world_seed
-	# Fase 14: en vez de la guía de una pantalla al empezar (Fase 12), "Juego normal" explica
-	# cada cosa la primera vez que aparece (`CoachView`). La guía sigue en el menú ("Cómo jugar").
-	game.coach_enabled = incremental
+	# Fase 35: los consejos de Juego normal (`CoachView`) solo si el jugador los pidió en Opciones;
+	# el tutorial ya explicó todo.
+	game.coach_enabled = incremental and settings.show_tips
 	# Fase 15: "Juego normal" arranca con el nido cerrado y árboles al azar (ver `main.gd`).
 	game.fresh_layout_enabled = incremental
 	game.start(seed_value, null, "incremental" if incremental else "historia")
 
 
-## Fase 14: Nivel 0. Mapa fijo (`cfg.world_seed`), para que la explicación sea la misma siempre.
+## Fase 35: el tutorial. Mapa fijo (`cfg.world_seed`), para que la explicación sea la misma
+## siempre. Al terminarlo (última tarjeta u "Omitir todo") `main` avisa con `tutorial_finished`.
 func _start_tutorial() -> void:
 	_new_game_scene()
 	game.coach_enabled = true
+	game.tutorial_finished.connect(_on_tutorial_finished)
 	game.start(game.cfg.world_seed, null, "tutorial")
 
 
-func _open_guide() -> void:
-	menu.visible = false
-	guide.visible = true
+func _on_new_game() -> void:
+	if settings.tutorial_done:
+		_start_game(true)
+	else:
+		_chain_to_normal = true
+		_start_tutorial()
+
+
+func _on_tutorial_finished() -> void:
+	settings.tutorial_done = true
+	settings.save()
+	var chain := _chain_to_normal
+	_close_game()
+	if chain:
+		_start_game(true)
+	else:
+		menu.refresh_continue()
+		menu.visible = true
+
+
+## Opciones → "Ver el tutorial". Con una partida abierta se pierde lo no guardado: se confirma.
+func _on_tutorial_requested() -> void:
+	var go := func() -> void:
+		_close_game()
+		_start_tutorial()
+	if game != null:
+		_confirm("¿Ver el tutorial? Se pierde lo que no hayas guardado.", "Ver el tutorial", go)
+	else:
+		options.visible = false
+		go.call()
+
+
+func _on_tips_changed(on: bool) -> void:
+	settings.show_tips = on
+	settings.save()
+	if game != null and game.game_mode == "incremental":
+		game.coach_enabled = on
 
 
 ## Fase 6: igual que `_start_game`, pero en el modo Test (sandbox, sin victoria/derrota). Función
@@ -155,6 +175,7 @@ func _open_options(return_to: String) -> void:
 		game.paused = true
 	options.set_values(settings.volume, settings.brightness)
 	options.set_language(settings.language)
+	options.set_tips(settings.show_tips)
 	options.set_in_game(game != null and return_to == "game")
 	options.visible = true
 	menu.visible = false
@@ -222,7 +243,6 @@ func _on_save_requested() -> void:
 ## Cierra la partida actual (sin guardar). Deja `game` en null.
 func _close_game() -> void:
 	_chain_to_normal = false
-	_chain_wait = 0.0
 	if game != null:
 		game.queue_free()
 		game = null
@@ -254,30 +274,7 @@ func _restart_same_mode() -> void:
 
 func _continue_game() -> void:
 	_new_game_scene()
-	game.coach_enabled = true
+	game.coach_enabled = settings.show_tips
 	game.load_game()
 	if game.sim == null:  # no había partida o el archivo no se pudo leer
 		_back_to_main_menu()
-
-
-# --- Fase 18: Nueva partida con tutorial opcional ------------------------------------------------
-
-func _ask_tutorial() -> void:
-	tutorial_dialog.popup_centered()
-
-
-## Si el Nivel 0 se empezó desde "Nueva partida", al ganarlo (y tras unos segundos para ver el
-## cartel de victoria) arranca la partida normal sola.
-func _process(delta: float) -> void:
-	if not _chain_to_normal or game == null or game.sim == null:
-		return
-	if not game.sim.tutorial_level:
-		_chain_to_normal = false
-		return
-	if game.sim.game_over and game.sim.victory:
-		_chain_wait += delta
-		if _chain_wait >= CHAIN_DELAY_S:
-			_chain_to_normal = false
-			_chain_wait = 0.0
-			_close_game()
-			_start_game(true)

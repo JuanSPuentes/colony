@@ -782,6 +782,9 @@ ya o nazcan después (sin cambios ahí).
 
 ## 21. Fase 14: controles de cámara, guía contextual y Nivel 0
 
+> **Fase 35:** el Nivel 0 se reemplazó por el tutorial obligatorio de la primera vez (ver la
+> sección «Fase 35» al final). Lo de abajo queda como historia.
+
 Pedido del jugador: (1) arrastrar el mapa con clic izquierdo y hacer las acciones con el derecho,
 con un WASD más cómodo; (2) en vez de instrucciones solo al principio, explicar cada cosa la primera
 vez que se puede hacer, acercando la cámara; (3) un "Nivel 0" que lo enseñe todo en orden de
@@ -1197,4 +1200,27 @@ Reemplaza las 4 mejoras con niveles sin tope (Fases 9-13) por un árbol (`sim/co
   vuelve como estaba (`Hud.toggle_upgrade_tree`).
 - **Panel lateral:** «Mejoras» queda en un solo botón que avisa cuántas alcanzan ya.
 - Pruebas: `tools/test_phase33.gd` (clic en la ventana).
+
+## Fase 35: tutorial obligatorio de la primera vez
+
+Reemplaza al Nivel 0 (Fase 14), que se quitó entero (`sim/colony/tutorial_level.gd`, su batalla
+y sus `tut_*` de config): era un nivel jugable con objetivos; ahora es una visita guiada.
+
+- **Colonia ya armada** (`Simulation.spawn_tutorial_start`): el mapa de Juego normal (árbol
+  madre, rival, niebla, las tres cámaras) con el nido abierto, más obreras, soldados, zánganos y
+  cría (`tut_extra_workers`, `tut_extra_soldiers`, `tut_drones`, `tut_eggs`, `tut_start_food`).
+  Sin lluvia, araña ni estaciones: la rival no crece ni ataca, solo está para verla.
+- **Tarjetas por capítulo** (`CoachView._tutorial_lessons`): Inicio, La colonia (Real, Guardería,
+  Almacén, túneles), Las castas (reina, obreras, soldados, zánganos, cómo nacen), El bioma (árbol
+  gigante, superficie, bajo tierra, clima y estaciones, la rival) y Cómo se juega (feromonas,
+  árbol de mejoras, despedida). La cámara va a lo que explica; la partida no se pausa.
+- **Botones:** «Siguiente» (o Enter), «Omitir» (salta el resto del capítulo) y «Omitir todo».
+  La última tarjeta no se puede omitir. Al terminar, `main` emite `tutorial_finished`.
+- **Obligatorio solo la primera vez** (`AppSettings.tutorial_done`): «Nueva partida» arranca el
+  tutorial y al terminarlo empieza la partida normal; después va directo. Se puede volver a ver
+  desde Opciones («Ver el tutorial»).
+- **Juego normal ya no explica:** sus consejos cortos (`CoachView._normal_lessons`) solo salen
+  con «Mostrar consejos» prendido en Opciones (`AppSettings.show_tips`, apagado por defecto). Los
+  avisos de eventos (incursiones, araña, lluvia) siguen saliendo siempre en el panel.
+- Pruebas: `tools/test_phase14.gd` (tutorial y tarjetas) y `tools/test_app_menu.gd` (flujo).
 

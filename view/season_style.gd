@@ -5,7 +5,7 @@ extends RefCounted
 ## o nieve (`RainView`) y partículas de ambiente (`AmbientView`). Como la colonia se muda al cambiar
 ## de estación (`Migration`), cada mapa nace con su estación: no hace falta transición.
 ##
-## En Historia y el Nivel 0 siempre es Primavera, que es el aspecto de antes. En el modo Test se
+## En Historia y el tutorial siempre es Primavera, que es el aspecto de antes. En el modo Test se
 ## cambia con el botón "Siguiente estación" del panel de pruebas.
 
 enum Season { SPRING, SUMMER, AUTUMN, WINTER }

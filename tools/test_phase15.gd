@@ -150,10 +150,10 @@ func _t_coach_lessons() -> void:
 		ids.append(l["id"])
 	_check("Juego normal: \"Abre el nido\" va justo después de la bienvenida", ids.size() > 1 and ids[1] == "open", str(ids))
 	_check("Juego normal: hay una tarjeta con las 5 feromonas", ids.has("pheromones"))
-	var level0_ids: Array[String] = []
-	for l in cv._level0_lessons():
-		level0_ids.append(l["id"])
-	_check("Nivel 0: también tiene la tarjeta de las 5 feromonas", level0_ids.has("pheromones"))
+	var tutorial_texts: Array[String] = []
+	for l in cv._tutorial_lessons():
+		tutorial_texts.append(l["text"])
+	_check("el tutorial también tiene la tarjeta de las 5 feromonas", tutorial_texts.has(CoachView.PHEROMONES_TEXT))
 	var t: String = CoachView.PHEROMONES_TEXT
 	var all_named := true
 	for name in ["Comida", "Hogar", "Peligro", "Ataque", "Evacuar"]:

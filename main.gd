@@ -35,6 +35,8 @@ const ROOM_TYPES: Array[int] = [WorldGrid.Room.NURSERY, WorldGrid.Room.STORAGE, 
 ## `main.tscn` directo (como hacen `ui_test.gd`/`screenshot.gd`), arranca solo, como siempre.
 var auto_start := true
 signal menu_requested
+## Fase 35: el jugador terminó el tutorial (última tarjeta u "Omitir todo"); lo escucha `app.gd`.
+signal tutorial_finished
 
 var cfg: SimConfig
 var sim: Simulation
@@ -66,7 +68,7 @@ var rain_view: RainView
 var ambient_view: AmbientView
 var hud: Hud
 var tutorial: TutorialView
-## Fase 14: guía contextual (Nivel 0 y Juego normal). Solo actúa si `coach_enabled`.
+## Fase 14: guía contextual (tutorial y consejos de Juego normal). Solo actúa si `coach_enabled`.
 var coach: CoachView
 ## Lo pone `app.gd`. `main.tscn` abierto directo (pruebas viejas) la deja apagada: si no, la
 ## primera tarjeta pausaría la partida sola.
@@ -332,7 +334,6 @@ func _process(delta: float) -> void:
 		var mult := PAN_FAST_MULT if _pan_fast else 1.0
 		camera.position += _pan_vel * (PAN_SPEED * mult / camera.zoom.x) * delta
 		_clamp_camera(camera.zoom.x)
-		coach.camera_moved = true
 	if not _panning and _drag_vel != Vector2.ZERO:
 		camera.position += _drag_vel * delta
 		_drag_vel = _drag_vel.move_toward(Vector2.ZERO, _drag_vel.length() * DRAG_FRICTION * delta + 1.0)
@@ -483,8 +484,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			var el := maxf(1.0, float(now - _drag_last_ms)) / 1000.0
 			_drag_vel = _drag_vel.lerp(-d / el, 0.5)
 			_drag_last_ms = now
-			if d != Vector2.ZERO:
-				coach.camera_moved = true
 		if _painting:
 			var cell := _world_cell(_to_world(mm.position))
 			_apply_line(_last_cell, cell)
