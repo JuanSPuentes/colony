@@ -68,7 +68,7 @@ func _run() -> void:
 	sim2.cmd_buy_egg()
 	_check("cmd_buy_egg incrementa sim.eggs_bought", sim2.eggs_bought == eggs_before + 1)
 	var upgrades_before := sim2.upgrades_bought
-	sim2.cmd_buy_upgrade(Upgrades.Stat.DAMAGE)
+	sim2.cmd_buy_upgrade(Upgrades.Id.MANDIBLES)
 	_check("cmd_buy_upgrade incrementa sim.upgrades_bought", sim2.upgrades_bought == upgrades_before + 1)
 
 	# --- "Modo infinito" (historia): sigue con sus 4 pasos de siempre, sin tocar ---

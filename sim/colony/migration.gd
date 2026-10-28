@@ -18,11 +18,7 @@ static func migrate(old: Simulation, seed_value: int) -> Simulation:
 	sim.season_index = old.season_index
 	sim.spawn_incremental_start(true)
 	# Mejoras primero: `add_ant_at` aplica `hp_mult` a las hormigas que se crean después.
-	sim.upgrades.levels = old.upgrades.levels.duplicate()
-	sim.upgrades.damage_mult = old.upgrades.damage_mult
-	sim.upgrades.hp_mult = old.upgrades.hp_mult
-	sim.upgrades.speed_mult = old.upgrades.speed_mult
-	sim.upgrades.work_mult = old.upgrades.work_mult
+	sim.upgrades.set_bought(old.upgrades.bought)
 	_carry_ants(old, sim)
 	sim.colony.food = old.colony.food
 	sim.econ.bought_eggs = old.econ.bought_eggs
@@ -58,8 +54,7 @@ static func _carry_ants(old: Simulation, sim: Simulation) -> void:
 			counts[old.brood.caste[i]] += 1
 	var queen_frac := 1.0
 	if old.queen_id >= 0 and old.ants.alive[old.queen_id] == 1:
-		var max_hp: float = old.cfg.queen_hp_base * CasteDefs.HP_MULT[CasteDefs.Caste.QUEEN] * old.upgrades.hp_mult
-		queen_frac = clampf(old.ants.hp[old.queen_id] / max_hp, 0.05, 1.0)
+		queen_frac = clampf(old.ants.hp[old.queen_id] / old.ants.max_hp(old.queen_id), 0.05, 1.0)
 	# Fuera las hormigas y la cría del arranque del jugador (la reina se queda: es la misma colonia;
 	# las de la rival nueva, también).
 	for i in sim.ants.count:
@@ -68,7 +63,7 @@ static func _carry_ants(old: Simulation, sim: Simulation) -> void:
 			sim.ants.alive_count -= 1  # sin `_kill`: no son muertes (ni cadáveres), solo no viajan
 	sim.ants._members_dirty = true
 	sim.brood = BroodSystem.new(sim)
-	sim.ants.hp[sim.queen_id] *= sim.upgrades.hp_mult * queen_frac
+	sim.ants.hp[sim.queen_id] = sim.ants.max_hp(sim.queen_id) * queen_frac
 	var spots := _nest_spots(sim)
 	var k := 0
 	for c in CARRIED_CASTES:

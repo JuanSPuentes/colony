@@ -147,8 +147,8 @@ func _t_upgrades_are_colony_wide() -> void:
 	var baseline_hp := sim.ants.hp[baseline]
 	var rival := sim.ants.add_ant_at(Vector2i(10, sim.cfg.surface_y - 1), CasteDefs.Caste.WORKER, 1)
 	var rival_hp := sim.ants.hp[rival]
-	_check("comprar la mejora de vida cuesta comida y sube el nivel",
-		sim.cmd_buy_upgrade(Upgrades.Stat.HP) and sim.upgrades.levels[Upgrades.Stat.HP] == 1)
+	_check("comprar la mejora de vida cuesta comida y queda comprada",
+		sim.cmd_buy_upgrade(Upgrades.Id.SHELL) and sim.upgrades.bought[Upgrades.Id.SHELL])
 	_check("una hormiga que YA vivía también sube de vida al comprar la mejora (progresiva)",
 		sim.ants.hp[baseline] > baseline_hp, "antes=%.2f después=%.2f" % [baseline_hp, sim.ants.hp[baseline]])
 	var upgraded := sim.ants.add_ant_at(Vector2i(10, sim.cfg.surface_y - 1), CasteDefs.Caste.WORKER, 0)
@@ -162,10 +162,12 @@ func _t_save_load_keeps_season_state() -> void:
 	var sim := _inc(_cfg(), 9)
 	sim.season_index = 2
 	sim.rival_colony.start_battle(4, 1.5)
-	sim.cmd_buy_upgrade(Upgrades.Stat.DAMAGE)
+	sim.cmd_buy_upgrade(Upgrades.Id.MANDIBLES)
 	var d := SaveSystem.to_dict(sim)
 	var loaded := SaveSystem.from_dict(d, sim.cfg)
 	_check("cargar conserva la estación actual", loaded.season_index == sim.season_index)
+	_check("cargar conserva las mejoras compradas", loaded.upgrades.bought == sim.upgrades.bought
+		and is_equal_approx(loaded.upgrades.damage_mult, sim.upgrades.damage_mult))
 	_check("cargar conserva si la batalla sigue activa", loaded.rival_colony.battle_active == sim.rival_colony.battle_active)
 	_check("cargar conserva la vida de la reina rival",
 		loaded.rival_colony.queen.hp == sim.rival_colony.queen.hp,

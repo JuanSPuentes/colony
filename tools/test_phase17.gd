@@ -341,8 +341,8 @@ func _t_hp_percent_counts_upgrade() -> void:
 	var sim := Simulation.new(cfg, 34)
 	sim.spawn_incremental_start()
 	sim.colony.food = 1.0e6
-	sim.cmd_buy_upgrade(Upgrades.Stat.HP)
-	sim.cmd_buy_upgrade(Upgrades.Stat.HP)
+	sim.cmd_buy_upgrade(Upgrades.Id.SHELL)
+	sim.cmd_buy_upgrade(Upgrades.Id.TOUGH_QUEEN)
 	var w := sim.ants.add_ant_at(Vector2i(cfg.nest_x, cfg.surface_y + cfg.shaft_depth + 1))
 	var pct_new := 100.0 * sim.ants.hp[w] / sim.ants.max_hp(w)
 	var q := sim.queen_id

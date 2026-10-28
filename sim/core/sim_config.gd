@@ -329,14 +329,12 @@ extends Resource
 ## Qué tan lejos de su montículo deambulan las guardias rivales (celdas).
 @export var rival_guard_radius := 6
 
-## Mejoras de la colonia (`sim/colony/upgrades.gd`), compradas con comida: solo afectan a las
-## hormigas nuevas desde que se compran. Mismo costo creciente que un huevo (`inc_egg_cost*growth`).
-@export var inc_upgrade_base_cost := 40.0
-@export var inc_upgrade_cost_growth := 1.12
-@export var inc_upgrade_damage_step := 0.15
-@export var inc_upgrade_hp_step := 0.15
-@export var inc_upgrade_speed_step := 0.08
-@export var inc_upgrade_work_step := 0.12
+## Fase 33: árbol de mejoras (`sim/colony/upgrades.gd`), comprado con comida. Precio por nivel de
+## la rama; cada compra multiplica el precio de todas las demás por `inc_upgrade_cost_growth`.
+@export var inc_upgrade_tier_cost: Array[float] = [40.0, 80.0, 140.0, 220.0]
+@export var inc_upgrade_cost_growth := 1.1
+## "Curación": fracción de la vida máxima que recupera por segundo una hormiga dentro del nido.
+@export var inc_upgrade_heal_per_s := 0.02
 
 ## Fase 14: Nivel 0 (tutorial jugable, ver `sim/colony/tutorial_level.gd`).
 ## Fase 14: patrulla del soldado (ver `AntCasteAI.patrol`).

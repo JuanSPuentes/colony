@@ -235,13 +235,6 @@ func _played_s(sim: Simulation) -> float:
 	return (sim.tick_count - _start_tick) * sim.dt
 
 
-static func _can_buy_any_upgrade(sim: Simulation) -> bool:
-	for s in sim.upgrades.levels.size():
-		if sim.upgrades.can_buy(s):
-			return true
-	return false
-
-
 # --- Lecciones ----------------------------------------------------------------------------------
 # Cada lección: id, title, text, when(sim) -> bool, y opcionales focus(sim) -> Vector2, zoom,
 # goal (texto) + done(sim) -> bool, on_close(sim), button. Textos cortos: solo lo mínimo para
@@ -289,7 +282,7 @@ func _level0_lessons() -> Array[Dictionary]:
 		{"id": "daynight", "title": "Día y noche", "when": always,
 			"text": "De noche no rebrotan las plantas. Arriba ves cuánto falta para que cambie."},
 		{"id": "upgrades", "title": "Mejoras", "when": always,
-			"text": "Con comida extra, mejora daño, vida, velocidad o trabajo (panel izquierdo)."},
+			"text": "Con comida compras mejoras en el árbol (tecla U). Elige una rama: Ataque, Defensa o Recolección; cada mejora abre la siguiente."},
 		{"id": "threats", "title": "Amenazas", "when": always,
 			"text": "Araña, ciempiés, mantis y lluvia. Feromona de Peligro: alejar. De Ataque: llamar soldados."},
 		{"id": "battle", "title": "Fin de estación", "when": always, "button": "¡A la batalla!  ⏎",
@@ -333,8 +326,8 @@ func _normal_lessons() -> Array[Dictionary]:
 			"text": "Escolta a la reina y la defiende si algo se acerca a ella o a los huevos. También lleva los huevos a la Guardería."},
 		{"id": "night", "title": "Cae la noche", "when": func(s: Simulation) -> bool: return s.is_night(),
 			"text": "De noche el árbol suelta la mitad de comida. Los hongos de abajo siguen creciendo: un túnel hasta una cueva ayuda."},
-		{"id": "upgrade", "title": "Mejoras", "when": func(s: Simulation) -> bool: return s.upgrades_bought == 0 and _can_buy_any_upgrade(s),
-			"text": "Ya te alcanza para una mejora (panel izquierdo)."},
+		{"id": "upgrade", "title": "Mejoras", "when": func(s: Simulation) -> bool: return s.upgrades_bought == 0 and s.upgrades.available_count() > 0,
+			"text": "Ya te alcanza para una mejora: abre el árbol con la tecla U."},
 		{"id": "rain", "title": "Lluvia", "when": func(s: Simulation) -> bool: return s.weather != Simulation.Weather.CLEAR,
 			"text": "Inunda los túneles bajos y borra feromonas. El agua se evapora sola."},
 		{"id": "spider", "title": "¡Una araña!", "when": func(s: Simulation) -> bool: return s.spider != null and s.spider.alive,

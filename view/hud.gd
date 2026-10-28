@@ -21,8 +21,8 @@ const SeasonSystem = preload("res://sim/colony/season_system.gd")
 
 const ERA_NAMES: Array[String] = ["Fundación", "Colonia joven", "Colonia madura"]
 const HEADER_COLOR := PixelUI.HEADER
-## Fase 28: ícono de cada mejora, en el orden de `Upgrades.Stat` (daño, vida, velocidad, trabajo).
-const UPGRADE_ICONS: Array[String] = ["damage", "health", "speed", "work"]
+## Fase 34: tinte del botón del árbol cuando ya alcanza para alguna mejora.
+const UPGRADE_READY_TINT := Color(1.0, 0.92, 0.6)
 ## Fase 30: la barra de arriba cuenta las hormigas con el sprite de hormiga del juego, de costado.
 const ANT_ICON := preload("res://view/sprites/ant/east.png")
 const TOP_ICON_PX := 36
@@ -118,11 +118,11 @@ var _caste_row: VBoxContainer
 var _caste_sliders: Array[HSlider] = []
 ## Fase 9 (antes sin interfaz): mejoras de colonia, solo modo incremental.
 var _upgrade_section: Control
-var _upgrade_btns: Array[Button] = []
-## Fase 14: estadísticas reales por casta (vida/velocidad/daño) + cavar, a pedido del jugador —
-## antes solo se podía ver el % de vida de una hormiga al pasar el mouse por encima (ver
-## `_process`), no los números base ni cómo los mueven las mejoras compradas.
-var _stats_label: RichTextLabel
+## Fase 34: botón que abre la ventana del árbol de mejoras, y la ventana.
+var _tree_btn: Button
+var _tree_view: UpgradeTreeView
+## Si el juego ya estaba en pausa al abrir el árbol (para no despausarlo al cerrar).
+var _tree_was_paused := false
 ## Fase 14: piezas del panel en columna (ver `_ready`).
 const SIDE_PAD := 3.0 * S
 var _scroll: ScrollContainer
@@ -224,29 +224,18 @@ func _ready() -> void:
 		_caste_sliders.append(s)
 		s.value_changed.connect(func(v: float) -> void: _m.sim.cmd_set_caste_target(c, v))
 
-	# Fase 9: mejoras de colonia, un botón por stat. Solo existen en el modo incremental
-	# (`Upgrades`/`cmd_buy_upgrade` atados a `sim.incremental`); se ocultan enteras en los demás
-	# modos (`update_info`), junto con las estadísticas que esas mejoras mueven.
+	# Fase 34: el árbol de mejoras tiene su propia ventana (`UpgradeTreeView`); acá queda solo el
+	# botón que la abre. Solo existe en el modo incremental (`Upgrades` atado a `sim.incremental`).
 	var up_box := VBoxContainer.new()
 	up_box.add_theme_constant_override("separation", int(3 * S))
 	col.add_child(up_box)
 	_upgrade_section = up_box
 	var upgrades := _section(up_box, "MEJORAS")
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", int(2 * S))
-	grid.add_theme_constant_override("v_separation", int(2 * S))
-	upgrades.add_child(grid)
-	for stat in Upgrades.STAT_COUNT:
-		var ub := _buy_button()
-		ub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		ub.custom_minimum_size = Vector2(0.0, 13.0 * S)
-		ub.icon = HudIcons.get_icon(UPGRADE_ICONS[stat], 2)  # Fase 28
-		grid.add_child(ub)
-		_upgrade_btns.append(ub)
-		ub.pressed.connect(func() -> void: _m.sim.cmd_buy_upgrade(stat))
-	var stats := _section(up_box, "ESTADÍSTICAS")
-	_stats_label = _rich(stats)
+	_tree_btn = _buy_button()
+	_tree_btn.custom_minimum_size = Vector2(CONTENT_W, 13.0) * S
+	_tree_btn.icon = HudIcons.get_icon("tree", 3)
+	upgrades.add_child(_tree_btn)
+	_tree_btn.pressed.connect(toggle_upgrade_tree)
 
 	_log_card = _section_card(col, "AVISOS")
 	_log = _rich(_log_card.get_child(0) as VBoxContainer)
@@ -299,6 +288,11 @@ func _ready() -> void:
 	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tooltip.visible = false
 	root.add_child(_tooltip)
+
+	# Fase 34: la ventana del árbol de mejoras, encima de todo lo demás.
+	_tree_view = UpgradeTreeView.new()
+	_tree_view.close_requested.connect(toggle_upgrade_tree)
+	root.add_child(_tree_view)
 
 
 func _build_top_bar(root: Control) -> void:
@@ -576,6 +570,23 @@ func _buy_button() -> Button:
 	return b
 
 
+## Fase 34: abre o cierra la ventana del árbol de mejoras. Abierta, el juego queda en pausa.
+func toggle_upgrade_tree() -> void:
+	if _m == null or not _m.sim.incremental:
+		return
+	_tree_view.visible = not _tree_view.visible
+	if _tree_view.visible:
+		_tree_view.sim = _m.sim
+		_tree_was_paused = _m.paused
+		_m.paused = true
+	else:
+		_m.paused = _tree_was_paused
+
+
+func is_upgrade_tree_open() -> bool:
+	return _tree_view.visible
+
+
 func toggle_sidebar() -> void:
 	sidebar_open = not sidebar_open
 	_layout()
@@ -679,9 +690,8 @@ func _world_rect(m: Node) -> Rect2:
 
 ## Modo incremental (Fase 3). Fase 30: el panel solo muestra lo que no está en la barra de arriba —
 ## la colonia (cuántas de cada casta y cuántas vienen en camino), la comida con su ritmo, y si hay
-## araña — más compras, mejoras y estadísticas. Día, clima y estación están en la barra.
+## araña — más compras y el botón del árbol de mejoras. Día, clima y estación están en la barra.
 func _update_incremental(sim: Simulation) -> void:
-	var cfg := sim.cfg
 	# Cría en camino por casta: la casta de cada huevo ya se sorteó al comprarlo
 	# (`IncrementalEconomy.buy_egg`), así que no es una previsión, es lo que va a nacer.
 	var coming := {CasteDefs.Caste.WORKER: 0, CasteDefs.Caste.SOLDIER: 0, CasteDefs.Caste.DRONE: 0}
@@ -718,31 +728,11 @@ func _update_incremental(sim: Simulation) -> void:
 	_attack_btn.disabled = rival.fighting()
 	_attack_btn.text = tr("Atacando...") if rival.fighting() else tr("[8] ¡Atacar a la reina rival!")
 
-	# Fase 9 (antes sin interfaz): mejoras de colonia.
-	var up := sim.upgrades
-	for stat in Upgrades.STAT_COUNT:
-		var b := _upgrade_btns[stat]
-		# Fase 28: sin "comida" (el precio siempre es comida): con el ícono no entraba en el botón.
-		b.text = tr("%s\nNv.%d · %.0f") % [tr(Upgrades.STAT_NAMES[stat]), up.levels[stat], up.cost(stat)]
-		b.disabled = not up.can_buy(stat)
-
-	# Fase 14: estadísticas reales por casta, con las mejoras ya aplicadas — vida/velocidad/daño
-	# salen de CasteDefs * cfg, multiplicados por el stat de Upgrades correspondiente (mismo
-	# cálculo que usa AntSystem al nacer/moverse/atacar, ver sim/colony/upgrades.gd). "Cavar" es
-	# por colonia, no por casta: cfg.dig_seconds / work_mult es lo que tarda cualquier hormiga
-	# cavando una celda marcada, sin importar quién sea.
-	# Tabla: la casta a la izquierda y una columna por número, para leerlos de un vistazo.
-	var dim := "[color=#9a94a0]%s[/color]"
-	var stats_text := "[table=4][cell][/cell][cell]%s  [/cell][cell]%s  [/cell][cell]%s[/cell]" % [dim % tr("Vida"), dim % tr("Vel."), dim % tr("Daño/s")]
-	for stat_caste in [CasteDefs.Caste.QUEEN, CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE]:
-		var base_hp: float = cfg.queen_hp_base if stat_caste == CasteDefs.Caste.QUEEN else cfg.ant_hp
-		var hp_val := base_hp * CasteDefs.HP_MULT[stat_caste] * up.hp_mult
-		var speed_val := cfg.ant_speed * CasteDefs.SPEED_MULT[stat_caste] * up.speed_mult
-		var dmg_val := CasteDefs.DAMAGE_PER_S[stat_caste] * up.damage_mult
-		stats_text += "[cell][color=#%s]%s[/color]  [/cell][cell]%.0f[/cell][cell]%.1f[/cell][cell]%.1f[/cell]" % [
-			CasteDefs.COLORS[stat_caste].to_html(false), tr(CasteDefs.NAMES[stat_caste]), hp_val, speed_val, dmg_val]
-	stats_text += "[/table]\n" + dim % (tr("Cavar una celda: %.1f s") % (cfg.dig_seconds / up.work_mult))
-	_stats_label.text = stats_text
+	# Fase 34: el botón del árbol avisa cuántas mejoras alcanzan ya.
+	var ready := sim.upgrades.available_count()
+	_tree_btn.text = tr("[U] Árbol de mejoras") + ("
+" + tr("%d para comprar") % ready if ready > 0 else "")
+	_tree_btn.self_modulate = UPGRADE_READY_TINT if ready > 0 else Color.WHITE
 
 
 ## Fase 5: tooltip al pasar el mouse. Se recalcula cada frame (barato: una hormiga cercana y una
@@ -872,7 +862,9 @@ func update_info(m: Node) -> void:
 	_threats_card.visible = not sim.incremental
 
 	var world_rect := _world_rect(m)
-	_pause_panel.visible = m.paused and not sim.game_over
+	if _tree_view.visible and (not sim.incremental or sim.game_over or _tree_view.sim != sim):
+		toggle_upgrade_tree()  # partida nueva o terminada: se cierra sola
+	_pause_panel.visible = m.paused and not sim.game_over and not _tree_view.visible
 	if _pause_panel.visible:
 		_pause_panel.position = world_rect.position + (world_rect.size - _pause_panel.size) * 0.5
 	_test_panel.visible = sim.test_mode

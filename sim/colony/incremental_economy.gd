@@ -97,7 +97,7 @@ func tick(dt: float) -> void:
 	colony.food_cap = cfg.base_food_cap + sim.rooms.capacity(WorldGrid.Room.STORAGE, cfg.storage_food_per_cell)
 	# Hojas -> comida, en el momento en que llegan al nido.
 	if sim.leaves_stored > 0:
-		var gain := sim.leaves_stored * cfg.inc_food_per_leaf
+		var gain := sim.leaves_stored * cfg.inc_food_per_leaf * sim.upgrades.carry_mult  # Fase 33: "Carga grande"
 		sim.leaves_stored = 0
 		food_earned += gain
 		_income_acc += gain
@@ -107,14 +107,14 @@ func tick(dt: float) -> void:
 	# esto, un cadáver vale solo 1.5 hojas acá contra las 6 hojas que vale en el modo clásico.
 	if sim.corpse_parts_stored > 0:
 		var inc_scale := cfg.inc_food_per_leaf / cfg.leaf_food_value
-		var gain_c := sim.corpse_parts_stored * cfg.corpse_food_value * inc_scale
+		var gain_c := sim.corpse_parts_stored * cfg.corpse_food_value * inc_scale * sim.upgrades.carry_mult
 		sim.corpse_parts_stored = 0
 		food_earned += gain_c
 		_income_acc += gain_c
 		colony.food = minf(colony.food_cap, colony.food + gain_c)
 	# Fase 29: lo caído del árbol madre trae su propio valor (hoja, semilla o fruta).
 	if sim.drop_food_stored > 0.0:
-		var gain_d := sim.drop_food_stored
+		var gain_d := sim.drop_food_stored * sim.upgrades.carry_mult
 		sim.drop_food_stored = 0.0
 		food_earned += gain_d
 		_income_acc += gain_d

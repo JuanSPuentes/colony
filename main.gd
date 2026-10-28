@@ -548,7 +548,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			else:
 				sim.cmd_nudge_caste(CasteDefs.Caste.SOLDIER, 0.08)
 		KEY_SPACE:
-			paused = not paused
+			if not hud.is_upgrade_tree_open():  # Fase 34: el árbol abierto maneja la pausa
+				paused = not paused
 		KEY_F1:
 			speed = 1
 		KEY_F2:
@@ -573,6 +574,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				start(seed_value)
 		KEY_I:
 			hud.toggle_sidebar()
+		KEY_U:
+			hud.toggle_upgrade_tree()  # Fase 34: ventana del árbol de mejoras
+		KEY_ESCAPE:
+			if hud.is_upgrade_tree_open():
+				hud.toggle_upgrade_tree()
 		KEY_F6:
 			save_game()
 		KEY_F7:

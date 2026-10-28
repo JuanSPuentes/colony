@@ -1163,3 +1163,38 @@ Separado en tres piezas, cada una con una sola responsabilidad:
 - **Simplificación deliberada:** la rival no usa feromonas ni gasta lo que junta. Un árbol de
   mejoras para el jugador queda planeado para la semana de balance.
 - Pruebas: `tools/test_phase32.gd`.
+
+## Fase 33: árbol de mejoras del jugador
+
+Reemplaza las 4 mejoras con niveles sin tope (Fases 9-13) por un árbol (`sim/colony/upgrades.gd`).
+
+- **3 ramas de 4 mejoras:** Ataque (Mandíbulas, Marcha, Mandíbulas II, Asalto real), Defensa
+  (Caparazón, Reina robusta, Caparazón II, Curación) y Recolección (Excavadoras, Patas ligeras,
+  Buen olfato, Carga grande). Dentro de una rama cada mejora pide la anterior.
+- **Precio:** `inc_upgrade_tier_cost` según el nivel en la rama; cada compra multiplica el precio
+  de todas las demás por `inc_upgrade_cost_growth`, así especializarse rinde más que repartir.
+- **Las mejoras son datos** (`Upgrades.NODES`): sumar una es agregar una fila y, si el efecto es
+  nuevo, un caso en `Upgrades._apply`. Los efectos se leen en vivo (`hp_factor`, `speed_factor`,
+  `damage`, `sight_mult`, `carry_mult`, `nest_heal`): afectan a toda la colonia del jugador, nunca
+  a la rival.
+- **Curación:** dentro del nido (bajo tierra y unida por túneles) se recupera
+  `inc_upgrade_heal_per_s` de la vida máxima por segundo.
+- **Guardado y mudanza:** se guarda la lista de compradas (`d["upgrades"]`; antes las mejoras no
+  se guardaban) y se recalculan los efectos al cargar (`Upgrades.set_bought`).
+- **HUD:** el panel «Mejoras» muestra una columna por rama; comprada en verde, bloqueada en gris,
+  la descripción al pasar el mouse.
+- Pruebas: `tools/test_phase33.gd`.
+
+## Fase 34: ventana del árbol de mejoras
+
+- **`view/upgrade_tree_view.gd`:** el árbol en su propia ventana (tecla U, o el botón con el ícono
+  de árbol del panel). Hexágonos unidos por líneas: la colonia en el centro y una rama por color
+  saliendo en estrella (Ataque rojo arriba, Defensa azul y Recolección verde abajo). Comprada:
+  encendida; alcanza: borde dorado; bloqueada: gris. Clic para comprar.
+- **A la derecha:** el detalle de la mejora bajo el mouse y lo que suman las compradas, con la
+  tabla por casta que antes estaba en «Estadísticas» del panel lateral (se quitó de ahí).
+- **Pausa:** mientras la ventana está abierta el juego queda en pausa; al cerrarla (U, Esc o la X)
+  vuelve como estaba (`Hud.toggle_upgrade_tree`).
+- **Panel lateral:** «Mejoras» queda en un solo botón que avisa cuántas alcanzan ya.
+- Pruebas: `tools/test_phase33.gd` (clic en la ventana).
+

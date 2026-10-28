@@ -13,15 +13,26 @@ const COLORS := {
 	"y": Color("e0a020"), "Y": Color("ffd43c"),  # oro / sol
 	"o": Color("a8661c"),
 	"w": Color("eef3f7"), "b": Color("8fb8e0"), "B": Color("4f86c6"),  # nieve / agua
-	"r": Color("c0392b"), "s": Color("b8bcc4"), "S": Color("e6e8ec"),  # rojo / acero
+	"r": Color("c0392b"), "S": Color("e6e8ec"),  # rojo / acero
 	"n": Color("d9822b"), "N": Color("f0b040"),  # otoño
 	"c": Color("cfd6df"), "m": Color("f2ecc4"),  # nube / luna
 	"t": Color("8a5a33"),
-	"h": Color("ff5a52"), "d": Color("c33a33"),  # corazón
-	"q": Color("4a4f57"), "Q": Color("7c838e"),  # hoja de pala / espada
 }
 
 const MAPS := {
+	"tree": [  # Fase 34: botón del árbol de mejoras
+		"....kkkk....",
+		"..kkGGGGkk..",
+		".kGGGgGGGGk.",
+		"kGGgGGGGgGGk",
+		"kGGGGGgGGGGk",
+		".kGgGGGGGgk.",
+		"..kkkttkkk..",
+		".....tt.....",
+		".....tt.....",
+		"....tttt....",
+		"...tt..tt...",
+		"............"],
 	"leaf": [
 		"..........k.",
 		"........kkGk",
@@ -205,58 +216,6 @@ const MAPS := {
 		"............",
 		"............"],
 	# Fase 28: íconos de las mejoras, basados en las referencias del jugador.
-	"damage": [
-		"kk........kk",
-		"kQk......kQk",
-		".kQk....kQk.",
-		"..kQk..kQk..",
-		"...kQkkQk...",
-		"....kQQk....",
-		"....kQQk....",
-		"...kQkkQk...",
-		"..kkk..kkk..",
-		".kyk....kyk.",
-		"kyk......kyk",
-		"kk........kk"],
-	"health": [
-		"............",
-		"..kkk..kkk..",
-		".khhhkkhhdk.",
-		"khwhhhhhhddk",
-		"khwhhhhhhddk",
-		"khhhhhhhhddk",
-		".khhhhhhddk.",
-		"..khhhhhdk..",
-		"...khhhdk...",
-		"....khdk....",
-		".....kk.....",
-		"............"],
-	"speed": [
-		"............",
-		"......kkkkk.",
-		".....kYYYk..",
-		"cc..kYYYk...",
-		"...kYYYkkkk.",
-		"cc.kYYYYYYk.",
-		"...kkkkYYk..",
-		"cc....kYk...",
-		".....kYk....",
-		"....kYk.....",
-		"....kk......",
-		"............"],
-	"work": [
-		".........rr.",
-		"........rrrr",
-		"........rr..",
-		".......tt...",
-		"......tt....",
-		".....tt.....",
-		"..kkkt......",
-		".kQQQk......",
-		"kQqqQQk.....",
-		"kQqQQk......",
-		".kQQk.......",
-		"..kk........"],
 	"gear": [
 		"............",
 		".....kk.....",

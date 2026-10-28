@@ -152,7 +152,7 @@ static func think_defend(ants, i: int, cx: int, cy: int, ci: int, threat, think_
 		ants.target[i] = ants.pos[i]
 		# Fase 9: mejora de daño del bando jugador (esta función solo la llaman hormigas de ese
 		# bando; las rivales pelean con su propio código en AntSystem._tick_rival).
-		threat.take_damage(CasteDefs.DAMAGE_PER_S[ants.caste[i]] * think_dt * sim.upgrades.damage_mult)
+		threat.take_damage(sim.upgrades.damage(ants.caste[i], threat) * think_dt)
 	else:
 		ants._step(i, cx, cy, ci, AntSystem.Mode.PLANT, threat.pos)
 
@@ -168,7 +168,7 @@ static func think_soldier(ants, i: int, cx: int, cy: int, ci: int, think_dt: flo
 		if d <= cfg.soldier_melee_range_px:
 			ants.state[i] = AntSystem.State.ATTACK
 			ants.target[i] = ants.pos[i]
-			threat.take_damage(CasteDefs.DAMAGE_PER_S[CasteDefs.Caste.SOLDIER] * think_dt * sim.upgrades.damage_mult)
+			threat.take_damage(sim.upgrades.damage(CasteDefs.Caste.SOLDIER, threat) * think_dt)
 			return
 		ants.state[i] = AntSystem.State.ATTACK
 		ants._step(i, cx, cy, ci, AntSystem.Mode.PLANT, threat.pos)

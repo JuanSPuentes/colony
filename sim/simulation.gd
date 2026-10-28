@@ -825,14 +825,14 @@ func cmd_buy_egg() -> bool:
 	return ok
 
 
-## Fase 9: compra un nivel de mejora de colonia (`Upgrades.Stat`) con comida.
 ## Fase 31: "¡Atacar!" — los soldados se reúnen en la salida y marchan contra la reina rival.
 func cmd_attack_rival() -> bool:
 	return rival_colony.cmd_attack()
 
 
-func cmd_buy_upgrade(stat: int) -> bool:
-	var ok := incremental and upgrades.buy(stat)
+## Fase 9: compra una mejora con comida (Fase 33: una del árbol, `Upgrades.Id`).
+func cmd_buy_upgrade(id: int) -> bool:
+	var ok := incremental and upgrades.buy(id)
 	if ok:
 		upgrades_bought += 1
 	return ok

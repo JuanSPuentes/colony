@@ -38,8 +38,8 @@ func _t_migration() -> void:
 	sim.cmd_add_caste_ants(CasteDefs.Caste.SOLDIER, 5)
 	sim.cmd_add_caste_ants(CasteDefs.Caste.DRONE, 2)
 	sim.colony.food = 900.0
-	sim.cmd_buy_upgrade(Upgrades.Stat.HP)
-	sim.cmd_buy_upgrade(Upgrades.Stat.DAMAGE)
+	sim.cmd_buy_upgrade(Upgrades.Id.SHELL)
+	sim.cmd_buy_upgrade(Upgrades.Id.MANDIBLES)
 	sim.cmd_buy_egg()
 	for k in 200:
 		sim.tick()
@@ -60,7 +60,7 @@ func _t_migration() -> void:
 	var rivals := moved.cfg.rival_start_ants
 	_check("el total de vivas cuadra (reina + las que viajan + guardias rivales)", moved.ants.alive_count == 1 + rivals + after.values().reduce(func(a, b): return a + b, 0), "alive_count=%d" % moved.ants.alive_count)
 	_check("se conserva la comida", is_equal_approx(moved.colony.food, food))
-	_check("se conservan las mejoras", moved.upgrades.levels == sim.upgrades.levels and is_equal_approx(moved.upgrades.hp_mult, sim.upgrades.hp_mult))
+	_check("se conservan las mejoras", moved.upgrades.bought == sim.upgrades.bought and is_equal_approx(moved.upgrades.hp_mult, sim.upgrades.hp_mult))
 	_check("se conserva el precio del huevo", moved.econ.egg_cost() == sim.econ.egg_cost())
 	_check("misma estación y mismo día", moved.season_index == 1 and moved.day_number() == day and moved.season_start_day == sim.season_start_day)
 	_check("el mapa es otro", moved.world.cells != old_cells)

@@ -134,6 +134,7 @@ static func to_dict(sim: Simulation) -> Dictionary:
 	d["mantis_next_s"] = sim.mantis_next_s
 
 	# Fase 9: estaciones + colonia rival (reemplaza lo que guardaba la Fase 8).
+	d["upgrades"] = Array(sim.upgrades.bought)  # Fase 33: árbol de mejoras
 	d["season_index"] = sim.season_index
 	d["season_start_day"] = sim.season_start_day
 	d["rival_colony"] = {
@@ -340,6 +341,7 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	# Fase 9: ausente en guardados de antes de esta fase; queda en "estación 0, sin batalla en
 	# curso", igual que si la partida nunca hubiera tenido este sistema.
 	sim.season_index = int(d.get("season_index", 0))
+	sim.upgrades.set_bought(d.get("upgrades", []))  # Fase 33
 	# Fase 17: ausente en guardados viejos; el inicio del ciclo de 5 días en curso, que es lo que
 	# esos guardados usaban (todas las estaciones duraban 5 días).
 	var day := sim.day_number()

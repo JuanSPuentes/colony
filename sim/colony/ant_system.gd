@@ -176,7 +176,7 @@ func add_ant_at(cell: Vector2i, ant_caste: int = CasteDefs.Caste.WORKER, ant_fac
 	hp[i] = (cfg.queen_hp_base if ant_caste == CasteDefs.Caste.QUEEN else cfg.ant_hp) * CasteDefs.HP_MULT[ant_caste]
 	# Fase 9: mejora de vida, solo bando jugador (las rivales no se benefician de tus mejoras).
 	if ant_faction == 0:
-		hp[i] *= sim.upgrades.hp_mult
+		hp[i] *= sim.upgrades.hp_factor(ant_caste)
 	timer[i] = sim.rng.randf_range(0.0, cfg.rest_seconds_max)
 	stuck_t[i] = 0.0
 	check_acc[i] = sim.rng.randf() * 0.5
@@ -190,10 +190,10 @@ func add_ant_at(cell: Vector2i, ant_caste: int = CasteDefs.Caste.WORKER, ant_fac
 ## bando del jugador (antes solo afectaba a las que nacieran después). `ratio` es el cambio del
 ## multiplicador (nuevo/viejo): escala `hp[i]` proporcional en vez de curar de golpe, así una
 ## hormiga a la mitad de vida sigue a la mitad de vida en el nuevo máximo.
-func apply_hp_upgrade(ratio: float) -> void:
+func apply_hp_upgrade(ratio: float, queen_ratio := 1.0) -> void:
 	for i in count:
 		if alive[i] == 1 and faction[i] == 0:
-			hp[i] *= ratio
+			hp[i] *= ratio * (queen_ratio if caste[i] == CasteDefs.Caste.QUEEN else 1.0)
 
 
 ## Fase 17: punto de reunión de los soldados en una batalla: la celda de la superficie más cerca
@@ -261,7 +261,7 @@ func max_hp(i: int) -> float:
 	var c := caste[i]
 	var m := (sim.cfg.queen_hp_base if c == CasteDefs.Caste.QUEEN else sim.cfg.ant_hp) * CasteDefs.HP_MULT[c]
 	if faction[i] == 0:
-		m *= sim.upgrades.hp_mult
+		m *= sim.upgrades.hp_factor(c)
 	return m
 
 
@@ -308,6 +308,10 @@ func tick() -> void:
 		if faction[i] == 1:
 			_tick_rival(i, cx, cy, ci, dt)
 			continue
+		# Fase 33: mejora "Curación": dentro del nido (bajo tierra y unido por túneles) recuperan vida.
+		if sim.upgrades.nest_heal and cy >= cfg.surface_y and sim.fields.nest_dist[ci] < FAR:
+			var top := max_hp(i)
+			hp[i] = minf(top, hp[i] + top * cfg.inc_upgrade_heal_per_s * dt)
 		if caste[i] == CasteDefs.Caste.QUEEN:
 			# La reina no decide sola (sin EXPLORE/FOOD/etc.): solo camina cuando el jugador la
 			# manda con `cmd_move_queen` (ver `_think_queen`), y se queda quieta el resto del
@@ -322,7 +326,7 @@ func tick() -> void:
 			# reina (ver `AntCasteAI.think_drone`); fuera de ese radio sigue sin perseguir a nadie.
 			var threat = _nearest_threat(p, cfg.soldier_melee_range_px)
 			if threat != null:
-				threat.take_damage(CasteDefs.DAMAGE_PER_S[CasteDefs.Caste.DRONE] * dt * sim.upgrades.damage_mult)
+				threat.take_damage(sim.upgrades.damage(CasteDefs.Caste.DRONE, threat) * dt)
 			if now >= next_think[i]:
 				_think_drone(i, cx, cy, ci)
 			_move(i, dt, lv)
@@ -427,7 +431,7 @@ func _move(i: int, dt: float, lv: float) -> void:
 	var cfg := sim.cfg
 	var mult := CasteDefs.SPEED_MULT[caste[i]]
 	if faction[i] == 0:  # Fase 9: mejora de velocidad, solo bando jugador.
-		mult *= sim.upgrades.speed_mult
+		mult *= sim.upgrades.speed_factor(caste[i])
 	if carry[i] == 1:
 		mult *= cfg.carry_speed_mult
 	if lv > 0.0:
@@ -610,7 +614,7 @@ func _think_idle(i: int, cx: int, cy: int, ci: int, think_dt: float) -> void:
 func _corpse_near(i: int) -> Corpse:
 	var cfg := sim.cfg
 	var best: Corpse = null
-	var best_d := cfg.sight_cells * cfg.cell_px
+	var best_d := cfg.sight_cells * cfg.cell_px * sim.upgrades.sight_mult  # Fase 33: "Buen olfato"
 	var p := pos[i]
 	for c in sim.corpses:
 		if c.food_value <= 0.0:
@@ -650,7 +654,7 @@ func _corpse_logic(i: int, cx: int, cy: int, ci: int) -> bool:
 func _plant_near(i: int) -> Plant:
 	var cfg := sim.cfg
 	var best: Plant = null
-	var best_d := cfg.sight_cells * cfg.cell_px
+	var best_d := cfg.sight_cells * cfg.cell_px * sim.upgrades.sight_mult  # Fase 33: "Buen olfato"
 	var p := pos[i]
 	for pl in sim.plants:
 		if pl.leaves <= 0:
