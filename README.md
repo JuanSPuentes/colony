@@ -1244,3 +1244,15 @@ y sus `tut_*` de config): era un nivel jugable con objetivos; ahora es una visit
 - **El nido viaja:** en la mudanza (`Migration._carry_nest`) cada túnel conectado al nido se cava
   igual en el mapa nuevo, con su cámara. Cambian superficie, árbol, cuevas y rival (NUCLEO.md).
 - Pruebas: `tools/test_phase36.gd`.
+
+## Fase 37: balance tras el primer playtest
+
+- **Reina rival más dura:** 200 de vida en la primera estación (antes 60), creciendo igual por
+  estación (`rival_queen_hp_base`).
+- **La defienden:** cuando la golpean, las hormigas rivales que no están de incursión acuden a ella
+  durante `rival_defend_s` (8 s) desde el último golpe (`RivalQueen.under_attack`).
+- **Matar da comida al instante:** 8 por hormiga rival y 60 por la reina (`kill_food_rival_ant`,
+  `kill_food_rival_queen`), además de los restos. Toda la comida ganada pasa por
+  `IncrementalEconomy.add_food` (respeta el tope del Almacén).
+- **Huevo más barato a la larga:** el precio sube 4% por compra (antes 7%).
+- Pruebas: `tools/test_phase37.gd`.

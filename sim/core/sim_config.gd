@@ -232,7 +232,8 @@ extends Resource
 ## por `growth`. Qué sale al nacer es al azar (`inc_egg_soldier_chance`), no una elección del
 ## jugador — ver README sección 9b.
 @export var inc_egg_cost := 20.0
-@export var inc_egg_cost_growth := 1.07
+## Fase 37 (playtest): 1.07 -> 1.04; perder una hormiga costaba demasiado.
+@export var inc_egg_cost_growth := 1.04
 ## Probabilidad de que un huevo nazca soldado; el resto, obrera. Las nodrizas no se compran en
 ## este modo (sin cambios: ver sección 9b).
 @export var inc_egg_soldier_chance := 0.3
@@ -303,8 +304,9 @@ extends Resource
 ## `rival_wave_ants_growth` más.
 @export var rival_wave_base_ants := 6
 @export var rival_wave_ants_growth := 4
-## Vida base de la reina rival (antes de `rival_queen_strength_growth` por estación).
-@export var rival_queen_hp_base := 60.0
+## Vida base de la reina rival (antes de `rival_queen_strength_growth` por estación). Fase 37
+## (playtest): 60 -> 200; dos soldados la mataban en segundos.
+@export var rival_queen_hp_base := 200.0
 @export var rival_queen_strength_growth := 0.5
 ## Qué tan lejos del nido (en celdas) aparece la oleada rival, a izquierda o derecha al azar.
 @export var rival_spawn_dist := 45
@@ -328,6 +330,12 @@ extends Resource
 @export var rival_forage_sight_cells := 4.0
 ## Qué tan lejos de su montículo deambulan las guardias rivales (celdas).
 @export var rival_guard_radius := 6
+## Fase 37 (playtest): cuando atacan a la reina rival, las hormigas rivales que no están de incursión
+## acuden a defenderla durante estos segundos desde el último golpe.
+@export var rival_defend_s := 8.0
+## Fase 37 (playtest): comida al instante por matar (además de los restos que quedan en el suelo).
+@export var kill_food_rival_ant := 8.0
+@export var kill_food_rival_queen := 60.0
 
 ## Fase 33: árbol de mejoras (`sim/colony/upgrades.gd`), comprado con comida. Precio por nivel de
 ## la rama; cada compra multiplica el precio de todas las demás por `inc_upgrade_cost_growth`.

@@ -583,6 +583,13 @@ func tick() -> void:
 			_check_victory()
 
 
+## Fase 37 (playtest): comida al instante por matar una hormiga o la reina rival. Solo en Juego
+## normal (el único modo con economía de comida).
+func reward_kill(amount: float) -> void:
+	if incremental:
+		econ.add_food(amount)
+
+
 ## Punto 4: cualquier hormiga o amenaza puede dejar restos al morir (ver `AntSystem._kill` y
 ## `Spider.take_damage`). Único punto de entrada para que ambos no dupliquen la lógica de creación.
 func spawn_corpse(p: Vector2, value: float) -> void:

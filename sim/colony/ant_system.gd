@@ -382,6 +382,8 @@ func _kill(i: int, drowned: bool) -> void:
 		sim.brood.claimed[carry_egg[i]] = -1  # el zángano murió a mitad de camino: el huevo queda libre
 		carry_egg[i] = -1
 	sim.spawn_corpse(pos[i], sim.cfg.corpse_food_value)  # Punto 4: deja restos recolectables
+	if faction[i] == 1 and not drowned:
+		sim.reward_kill(sim.cfg.kill_food_rival_ant)
 
 
 func _release_job(i: int) -> void:
@@ -934,6 +936,10 @@ func _tick_rival(i: int, cx: int, cy: int, ci: int, dt: float) -> void:
 					_kill(target_idx, false)
 			else:
 				_step(i, cx, cy, ci, Mode.PLANT, pos[target_idx])
+		elif raiding[i] == 0 and sim.rival_colony.queen.under_attack():
+			# Fase 37: a defender a la reina (al llegar, la pelea la decide la búsqueda de arriba).
+			state[i] = State.ATTACK
+			_step(i, cx, cy, ci, Mode.PLANT, sim.rival_colony.queen.pos)
 		elif raiding[i] == 1:
 			state[i] = State.EXPLORE
 			var goal := pos[sim.queen_id] if sim.queen_id >= 0 and alive[sim.queen_id] == 1 else pos[i]
