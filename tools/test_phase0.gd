@@ -180,7 +180,9 @@ func _t_paint_helps() -> void:
 				first_without += first
 				t20_without += t20
 	print("   planta lejana (50 celdas), media de 3 semillas: primera entrega %.0f s con pintura / %.0f s sin ella" % [first_with / 3.0, first_without / 3.0])
-	_check("pintar feromona hacia una planta lejana hace que la encuentren antes (entrega nº 20, misma semilla)", t20_with / 3.0 < t20_without / 3.0 * 0.8, "%.0f s con pintura vs %.0f s sin ella" % [t20_with / 3.0, t20_without / 3.0])
+	# Fase 38: el margen pasó de 20% a 10% porque mejoró el caso SIN pintura (59 s -> 46 s: la que
+	# abandona un rastro ahora explora de verdad); con pintura sigue igual (39 s) y junta el doble.
+	_check("pintar feromona hacia una planta lejana hace que la encuentren antes (entrega nº 20, misma semilla)", t20_with / 3.0 < t20_without / 3.0 * 0.9, "%.0f s con pintura vs %.0f s sin ella" % [t20_with / 3.0, t20_without / 3.0])
 	_check("pintar feromona aumenta las hojas recolectadas de la planta lejana", with_paint > without * 1.3, "con=%d sin=%d (3 semillas, 150 s)" % [with_paint, without])
 
 

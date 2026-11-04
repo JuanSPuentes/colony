@@ -152,6 +152,9 @@ extends Resource
 @export var nurse_range := 7
 @export var soldier_melee_range_px := 10.0
 @export var soldier_sight_px := 70.0
+## Fase 38: largo máximo (celdas) del camino real hasta una amenaza vista para ir a pelearla. Más
+## largo que eso (p. ej. está arriba, del otro lado de la tierra, y la salida queda lejos), se ignora.
+@export var threat_path_cells := 24
 
 @export_group("Fase 1: araña")
 @export var spider_hp := 40.0

@@ -143,36 +143,28 @@ static func think_nurse(ants, i: int, cx: int, cy: int, ci: int) -> void:
 ## pero con el daño de su propia casta (`CasteDefs.DAMAGE_PER_S`), bastante menor.
 ## `threat` no se tipa: puede ser `Spider` o `Centipede` (ver `AntSystem._nearest_threat`), que no
 ## comparten clase base, solo la misma forma (`.pos`, `.take_damage()`).
-static func think_defend(ants, i: int, cx: int, cy: int, ci: int, threat, think_dt: float) -> void:
+static func think_defend(ants, i: int, threat, step: int, think_dt: float) -> void:
 	var sim: Simulation = ants.sim
-	var cfg := sim.cfg
-	var d: float = ants.pos[i].distance_to(threat.pos)
 	ants.state[i] = AntSystem.State.ATTACK
-	if d <= cfg.soldier_melee_range_px:
+	if step == AntSystem.THREAT_MELEE:
 		ants.target[i] = ants.pos[i]
 		# Fase 9: mejora de daño del bando jugador (esta función solo la llaman hormigas de ese
 		# bando; las rivales pelean con su propio código en AntSystem._tick_rival).
 		threat.take_damage(sim.upgrades.damage(ants.caste[i], threat) * think_dt)
 	else:
-		ants._step(i, cx, cy, ci, AntSystem.Mode.PLANT, threat.pos)
+		ants.go_to_cell(i, step)  # Fase 38: por el camino real (`AntSystem.threat_step`)
 
 
 static func think_soldier(ants, i: int, cx: int, cy: int, ci: int, think_dt: float) -> void:
 	var sim: Simulation = ants.sim
 	var cfg := sim.cfg
 	var threat = ants._nearest_threat(ants.pos[i], cfg.soldier_sight_px)
-	if threat != null and not ants.can_reach(ants.pos[i], threat.pos):
-		threat = null  # Fase 16: la ve a través de la tierra pero no puede llegar
 	if threat != null:
-		var d: float = ants.pos[i].distance_to(threat.pos)
-		if d <= cfg.soldier_melee_range_px:
-			ants.state[i] = AntSystem.State.ATTACK
-			ants.target[i] = ants.pos[i]
-			threat.take_damage(sim.upgrades.damage(CasteDefs.Caste.SOLDIER, threat) * think_dt)
+		# Fase 38: por el camino real; si no hay uno corto (la ve a través de la tierra), la ignora.
+		var step: int = ants.threat_step(ci, threat.pos)
+		if step != AntSystem.THREAT_UNREACHABLE:
+			think_defend(ants, i, threat, step, think_dt)
 			return
-		ants.state[i] = AntSystem.State.ATTACK
-		ants._step(i, cx, cy, ci, AntSystem.Mode.PLANT, threat.pos)
-		return
 	# Fase 15: antes un soldado sin enemigo a la vista subía el rastro de Ataque hasta la punta y se
 	# quedaba ahí (o dando vueltas por el rastro mientras se desvanecía) más de un minuto, sin nadie
 	# a quien pegarle — el jugador lo vio como soldados "bugueados" amontonados. Ahora, al llegar a la
@@ -210,8 +202,8 @@ static func battle_formation(ants, i: int, cx: int, cy: int, ci: int) -> bool:
 	var on_surface := cy < cfg.surface_y
 	ants.state[i] = AntSystem.State.ATTACK
 	if not on_surface:
-		# Salir primero, por los túneles (misma tendencia hacia afuera que una obrera explorando).
-		ants._step(i, cx, cy, ci, AntSystem.Mode.EXPLORE, null)
+		# Salir primero, por los túneles, sin desviarse por los rastros (Fase 38: `Mode.SURFACE`).
+		ants._step(i, cx, cy, ci, AntSystem.Mode.SURFACE, null)
 		return true
 	if rival.marching and rival.queen.alive:
 		ants._step(i, cx, cy, ci, AntSystem.Mode.PLANT, rival.queen.pos)
@@ -255,8 +247,8 @@ static func patrol(ants, i: int, cx: int, cy: int, ci: int, think_dt: float) -> 
 		ants.patrol_x[i] = px
 		ants.timer[i] = cfg.soldier_patrol_timeout_s
 	if not on_surface:
-		# Bajo tierra, salir primero (misma tendencia hacia afuera que una obrera explorando).
-		ants._step(i, cx, cy, ci, AntSystem.Mode.EXPLORE, null)
+		# Bajo tierra, salir primero, sin desviarse por los rastros (Fase 38: `Mode.SURFACE`).
+		ants._step(i, cx, cy, ci, AntSystem.Mode.SURFACE, null)
 		return
 	ants._step(i, cx, cy, ci, AntSystem.Mode.PLANT, ants._center(px, cfg.surface_y - 1))
 

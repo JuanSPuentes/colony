@@ -10,7 +10,16 @@ extends RefCounted
 ## aditivos: si nada pinta esas feromonas (como en la Fase 0) nunca se activan.
 
 enum State { EXPLORE, GO_TO_FOOD, CARRY_HOME, DIG, FLEE_WATER, IDLE, FLEE_DANGER, EVACUATE, NURSE, GUARD, ATTACK, CARRY_EGG }
-enum Mode { EXPLORE, FOOD, NEST, DIG, FLEE, PLANT, TOWARD, AWAY, STORE, ROUTE }
+## Fase 38: `SURFACE` sale del nido hacia la superficie sin mirar feromonas (soldados y quien no
+## busca comida: `EXPLORE` los arrastraba por los rastros de Comida pintados y daban vueltas).
+enum Mode { EXPLORE, FOOD, NEST, DIG, FLEE, PLANT, TOWARD, AWAY, STORE, ROUTE, SURFACE }
+
+## Fase 38: diferencia mínima para que un vecino cuente como "más arriba" en el rastro de Comida
+## (el pincel sube `paint_ramp` = 0.012 por celda; por debajo de esto el rastro está plano).
+const TRAIL_FLAT := 0.002
+## Fase 38: resultados especiales de `threat_step`.
+const THREAT_MELEE := -2
+const THREAT_UNREACHABLE := -1
 
 const STATE_COLORS: Array[Color] = [
 	Color("e6d84a"),  # EXPLORE
@@ -515,12 +524,15 @@ func _think(i: int, cx: int, cy: int, ci: int) -> void:
 	# cría; el Soldado sigue con su propio `_think_soldier` (ya reacciona a esto de siempre).
 	if caste[i] != CasteDefs.Caste.NURSE and caste[i] != CasteDefs.Caste.SOLDIER and state[i] != State.FLEE_WATER:
 		var threat = _nearest_threat(pos[i], cfg.soldier_sight_px)
-		if threat != null and not can_reach(pos[i], threat.pos):
-			threat = null  # Fase 16: la ve a través de la tierra pero no hay camino (ver `can_reach`)
+		var step := THREAT_UNREACHABLE
+		if threat != null:
+			step = threat_step(ci, threat.pos)  # Fase 38: camino real, no línea recta
+			if step == THREAT_UNREACHABLE:
+				threat = null
 		if threat != null:
 			if state[i] != State.ATTACK:
 				_release_job(i)
-			_think_defend(i, cx, cy, ci, threat, think_dt)
+			_think_defend(i, threat, step, think_dt)
 			return
 		elif state[i] == State.ATTACK:
 			# La amenaza ya no está (murió o se fue de rango): vuelve a decidir desde cero.
@@ -803,7 +815,10 @@ func _think_food(i: int, cx: int, cy: int, ci: int) -> void:
 	if sim.tick_count < ignore_until[i] or maxf(here, best) < cfg.food_follow_threshold:
 		state[i] = State.EXPLORE
 		_step(i, cx, cy, ci, Mode.EXPLORE, null)
-	elif cy < cfg.surface_y and here >= best + 0.002:
+	elif cy < cfg.surface_y and best <= here + TRAIL_FLAT:
+		# Fase 38: también cuando el rastro se aplana (nada sube más adelante). Lo pintado satura en
+		# 1.0 en los trazos largos: en esa meseta no había por dónde subir ni se detectaba el final,
+		# y las obreras iban y venían por ella para siempre.
 		# Fin del rastro sin comida a la vista: la hormiga borra la punta (la feromona de un
 		# rastro agotado se va comiendo desde el final) y deja de fiarse de él un rato. Solo en la
 		# superficie (Fase 16): bajo tierra el "pico" es el pozo del nido, no el final de un rastro.
@@ -927,15 +942,18 @@ func _tick_rival(i: int, cx: int, cy: int, ci: int, dt: float) -> void:
 		last_think[i] = now
 		next_think[i] = now + sim.rng.randi_range(cfg.think_ticks_min, cfg.think_ticks_max)
 		var target_idx := _nearest_enemy_index(pos[i], cfg.soldier_sight_px, 0)
+		var step := THREAT_UNREACHABLE
 		if target_idx >= 0:
+			step = threat_step(ci, pos[target_idx])  # Fase 38: no quedarse arriba de un túnel
+		if step != THREAT_UNREACHABLE:
 			state[i] = State.ATTACK
-			if pos[i].distance_to(pos[target_idx]) <= cfg.soldier_melee_range_px:
+			if step == THREAT_MELEE:
 				target[i] = pos[i]
 				hp[target_idx] -= CasteDefs.DAMAGE_PER_S[caste[i]] * think_dt
 				if hp[target_idx] <= 0.0:
 					_kill(target_idx, false)
 			else:
-				_step(i, cx, cy, ci, Mode.PLANT, pos[target_idx])
+				go_to_cell(i, step)
 		elif raiding[i] == 0 and sim.rival_colony.queen.under_attack():
 			# Fase 37: a defender a la reina (al llegar, la pelea la decide la búsqueda de arriba).
 			state[i] = State.ATTACK
@@ -1018,26 +1036,66 @@ func _rival_drop_target(i: int) -> Corpse:
 	return best
 
 
+## Fase 38: cómo llegar a una amenaza que se ve. Devuelve `THREAT_MELEE` si ya está al alcance para
+## pegarle, `THREAT_UNREACHABLE` si no hay un camino real corto (`cfg.threat_path_cells`) hasta ella,
+## o la celda del primer paso de ese camino. La amenaza se detecta en línea recta, a través de la
+## tierra; antes (Fase 16) "hay camino" se aproximaba con `nest_dist` (los dos conectados al nido) y
+## se iba en línea recta: con el nido abierto, una obrera en un túnel bajo una hormiga enemiga creía
+## poder llegar, chocaba con la tierra y quedaba en bucle debajo (sin cavar ni buscar comida) hasta
+## que la enemiga moría.
+func threat_step(ci: int, threat_pos: Vector2) -> int:
+	if _center(ci % sim.world.w, ci / sim.world.w).distance_to(threat_pos) <= sim.cfg.soldier_melee_range_px:
+		return THREAT_MELEE
+	var goal := _cell_index(threat_pos)
+	if goal < 0 or goal >= sim.world.cells.size():
+		return THREAT_UNREACHABLE
+	return _path_first_step(ci, goal, sim.cfg.threat_path_cells)
+
+
+## Fase 38: pone como objetivo de movimiento la celda `step` que devolvió `threat_step`.
+func go_to_cell(i: int, step: int) -> void:
+	target[i] = _center(step % sim.world.w, step / sim.world.w)
+
+
+## BFS acotado (`max_len` pasos, 4 vecinos pasables) de `from` a `to`: la celda del primer paso, o
+## `THREAT_UNREACHABLE`.
+func _path_first_step(from: int, to: int, max_len: int) -> int:
+	if from == to:
+		return from
+	var world := sim.world
+	var w := world.w
+	var parent := {from: -1}
+	var frontier: Array[int] = [from]
+	for depth in max_len:
+		var next: Array[int] = []
+		for c in frontier:
+			for k in [0, 2, 4, 6]:  # derecha, abajo, izquierda, arriba (sin diagonales)
+				var nx: int = c % w + DX[k]
+				var ny: int = c / w + DY[k]
+				if not world.is_passable(nx, ny):
+					continue
+				var n := ny * w + nx
+				if parent.has(n):
+					continue
+				parent[n] = c
+				if n == to:
+					while parent[n] != from:
+						n = parent[n]
+					return n
+				next.append(n)
+		if next.is_empty():
+			break
+		frontier = next
+	return THREAT_UNREACHABLE
+
+
 ## Obrera y Zángano (en combate activo; el Zángano además pelea pasivo si lo alcanzan, ver
 ## `tick()`) defendiendo la colmena: igual de simple que el Soldado (acercarse y pegar), pero con
 ## el daño de su propia casta (`CasteDefs.DAMAGE_PER_S`), bastante menor. Decisión en `AntCasteAI`.
-## `threat` sin tipar: puede ser `Spider` o `Centipede` (ver `_nearest_threat`).
-## Fase 16: ¿hay camino entre dos puntos? La amenaza se detecta en línea recta (a través de la tierra);
-## sin esto, con el nido todavía cerrado y una araña arriba, las obreras de adentro soltaban la
-## excavación para "ir a pelear" sin poder llegar, y volvían a cavar en cuanto la araña se alejaba un
-## poco — en bucle, sin terminar nunca el túnel. Aproximación barata con `nest_dist`: los dos puntos
-## están del mismo lado si ambos están conectados al nido o ninguno de los dos lo está (p.ej. los dos
-## en la superficie con el nido cerrado).
-func can_reach(a: Vector2, b: Vector2) -> bool:
-	var ia := _cell_index(a)
-	var ib := _cell_index(b)
-	if ia < 0 or ib < 0 or ia >= sim.fields.nest_dist.size() or ib >= sim.fields.nest_dist.size():
-		return true
-	return (sim.fields.nest_dist[ia] < FAR) == (sim.fields.nest_dist[ib] < FAR)
-
-
-func _think_defend(i: int, cx: int, cy: int, ci: int, threat, think_dt: float) -> void:
-	AntCasteAI.think_defend(self, i, cx, cy, ci, threat, think_dt)
+## `threat` sin tipar: puede ser `Spider` o `Centipede` (ver `_nearest_threat`); `step`, lo que
+## devolvió `threat_step`.
+func _think_defend(i: int, threat, step: int, think_dt: float) -> void:
+	AntCasteAI.think_defend(self, i, threat, step, think_dt)
 
 
 func _think_soldier(i: int, cx: int, cy: int, ci: int, think_dt: float) -> void:
@@ -1080,15 +1138,18 @@ func _step(i: int, cx: int, cy: int, ci: int, mode: int, extra: Variant) -> void
 		match mode:
 			Mode.EXPLORE:
 				s = cfg.w_persist * head.dot(_dirs[k]) + cfg.w_noise * rng.randf()
-				s += cfg.w_food * sim.food.data[ni]
+				# Fase 38: la que dio un rastro por agotado (`ignore_until`) ya no se deja atraer por
+				# él; si no, seguía rondándolo y volvía a la punta vacía una y otra vez.
+				if sim.tick_count >= ignore_until[i]:
+					s += cfg.w_food * sim.food.data[ni]
 				s -= cfg.w_home_repel * sim.home.data[ni]
 				if not on_surface:
 					s += cfg.w_outward * float(f.surface_dist[ci] - f.surface_dist[ni])
 				elif ny >= cfg.surface_y:
 					s -= 2.0  # no meterse al nido por azar
 				s -= 3.0 * lw
-			Mode.FOOD:
-				if on_surface:
+			Mode.FOOD, Mode.SURFACE:
+				if on_surface and mode == Mode.FOOD:
 					s = cfg.w_food * (sim.food.data[ni] - sim.food.data[ci]) * 10.0
 				else:
 					# Fase 16: bajo tierra, salir hacia la superficie en vez de seguir el gradiente de

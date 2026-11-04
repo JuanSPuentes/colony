@@ -1257,3 +1257,19 @@ y sus `tut_*` de config): era un nivel jugable con objetivos; ahora es una visit
   `IncrementalEconomy.add_food` (respeta el tope del Almacén).
 - **Huevo más barato a la larga:** el precio sube 4% por compra (antes 7%).
 - Pruebas: `tools/test_phase37.gd`.
+
+## Fase 38: sin bucles (segundo reporte del playtest)
+
+- **Rastros de Comida que se aplanan:** lo pintado satura en 1.0 en los trazos largos; en esa
+  meseta las obreras iban y venían para siempre. Ahora un rastro plano cuenta como final
+  (`AntSystem.TRAIL_FLAT`), y la que da un rastro por agotado (`ignore_until`) ya no se deja
+  atraer por él mientras explora.
+- **Salir del nido sin desviarse:** soldados (patrulla y «¡Atacar!") usan `Mode.SURFACE`, que sube
+  a la superficie sin mirar feromonas; antes `EXPLORE` los arrastraba por la Comida pintada.
+- **Amenazas detrás de la tierra:** se persiguen por el camino real (`AntSystem.threat_step`, BFS
+  acotado a `threat_path_cells`), no en línea recta. Antes una obrera en un túnel bajo una enemiga
+  creía poder llegar, chocaba con la tierra y quedaba en bucle debajo. Reemplaza a `can_reach`.
+  Las rivales también persiguen así; las incursiones siguen yendo a la reina en línea recta (que
+  lleguen por los túneles las vuelve mucho más letales: decisión de balance pendiente).
+- Pruebas: `tools/test_phase38.gd`. `test_phase0` baja su margen de 20% a 10% porque mejoró el
+  caso sin pintura.

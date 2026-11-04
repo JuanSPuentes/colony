@@ -258,9 +258,14 @@ func _t_unreachable_threat_does_not_stop_digging() -> void:
 			break
 	_check("con una araña arriba y el nido cerrado, igual terminan el túnel", opened_at >= 0.0 and opened_at < 60.0,
 		"abierto a los %.1f s" % opened_at)
-	_check("can_reach: dentro del nido cerrado no se alcanza la superficie",
-		not sim.ants.can_reach(Vector2(sim.cfg.nest_x * 8, (sim.cfg.surface_y + sim.cfg.shaft_depth + 1) * 8), Vector2(sim.cfg.nest_x * 8 + 40, (sim.cfg.surface_y - 1) * 8))
-		or opened_at >= 0.0)
+	# Fase 38: `threat_step` (camino real) reemplazó a `can_reach`.
+	var closed := Simulation.new(_cfg(), 5)
+	closed.spawn_incremental_start(true)
+	var w := closed.world.w
+	var inside := (closed.cfg.surface_y + closed.cfg.shaft_depth + 1) * w + closed.cfg.nest_x
+	var above := Vector2((closed.cfg.nest_x + 5.5) * closed.cfg.cell_px, (closed.cfg.surface_y - 0.5) * closed.cfg.cell_px)
+	_check("threat_step: dentro del nido cerrado no se alcanza la superficie",
+		closed.ants.threat_step(inside, above) == AntSystem.THREAT_UNREACHABLE)
 
 
 ## Fase 21: si el agua corta el único camino hasta lo marcado, las obreras no se quedan trabadas
