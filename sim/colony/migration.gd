@@ -95,7 +95,7 @@ static func _carry_ants(old: Simulation, sim: Simulation) -> void:
 	sim.ants._recount()
 
 
-## Celdas abiertas del nido inicial (cámara Real, Guardería, Almacén y sus pasillos).
+## Celdas abiertas del nido (el que se trajo con `_carry_nest`: cámaras, túneles y el pozo).
 static func _nest_spots(sim: Simulation) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	var w := sim.world.w

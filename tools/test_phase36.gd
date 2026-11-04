@@ -66,6 +66,7 @@ func _t_nest_survives_migration() -> void:
 	var old := _fresh(2)
 	var cfg := old.cfg
 	var w := old.world.w
+	old._set_shaft(WorldGrid.Cell.TUNNEL)  # el jugador ya abrió el nido (el arranque lo trae cerrado)
 	# Un pasillo nuevo bajo la Guardería, conectado al nido, etiquetado como Almacén.
 	var y0 := cfg.surface_y + cfg.shaft_depth + cfg.chamber_h
 	var dug: Array[int] = []
@@ -96,7 +97,7 @@ func _t_nest_survives_migration() -> void:
 			same_rooms = same_rooms and sim.world.room[i] == old.world.room[i]
 	_check("todas las cámaras siguen donde estaban", same_rooms)
 	var top := cfg.surface_y * w + cfg.nest_x
-	_check("si el nido estaba abierto, sigue abierto", (old.world.cells[top] == WorldGrid.Cell.TUNNEL) == (sim.fields.nest_dist[top] < NestDistanceField.FAR))
+	_check("el nido abierto sigue abierto (el mapa nuevo lo traería cerrado)", sim.world.cells[top] == WorldGrid.Cell.TUNNEL and sim.fields.nest_dist[top - w] < NestDistanceField.FAR)
 	_check("un hueco suelto (fuera del nido) no se suma al nido", old.fields.nest_dist[loose] >= NestDistanceField.FAR and sim.fields.nest_dist[loose] >= NestDistanceField.FAR)
 	_check("el pasillo cuenta como nido en el mapa nuevo", sim.fields.nest_dist[dug[-1]] < NestDistanceField.FAR)
 	var on_nest := true

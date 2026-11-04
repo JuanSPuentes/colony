@@ -1043,7 +1043,8 @@ Separado en tres piezas, cada una con una sola responsabilidad:
   terreno, árboles llenos, hongos, niebla — con el mismo arranque de Juego normal.
 - **Se conserva:** comida, hormigas por casta (la cría en camino llega nacida), la vida de la
   reina en proporción, mejoras, precio del huevo, compra automática, estación, día y estadísticas.
-  Las hormigas aparecen repartidas por la cámara Real, la Guardería y el Almacén.
+  Las hormigas aparecen repartidas por la cámara Real, la Guardería y el Almacén. Desde la Fase 36
+  también se conserva el nido (túneles y cámaras): ver «Fase 36».
 - **Cómo se dispara:** `SeasonSystem` marca `sim.migration_pending` y `main.gd` cambia la
   simulación igual que al cargar una partida. El mapa fijo de las pruebas (sin niebla) no se muda.
 - Pruebas: `tools/test_phase25.gd`.
