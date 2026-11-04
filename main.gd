@@ -15,7 +15,8 @@ extends Node2D
 
 const CONFIG_PATH := "res://sim/core/default_config.tres"
 const SAVE_PATH := "user://save1.json"
-const ZOOM_LEVELS: Array[float] = [0.5, 1.0, 2.0, 3.0, 4.0]
+## 2026-11-04: todo se veía muy chico; el nivel inicial (1) pasó de 1.0 a 1.5.
+const ZOOM_LEVELS: Array[float] = [0.75, 1.5, 2.0, 3.0, 4.0]
 const MAX_TICKS_PER_FRAME := 40
 const OVERLAY_HZ := 5.0
 const WORLD_SIZE := Vector2(480.0, 270.0)
@@ -359,6 +360,8 @@ func _process(delta: float) -> void:
 			_migrate()
 	terrain_view.refresh()
 	day_night_view.refresh()
+	ant_renderer.modulate = day_night_view.unit_modulate
+	rival_queen_view.night_boost = day_night_view.unit_modulate
 	_overlay_acc += delta
 	if _overlay_acc >= 1.0 / OVERLAY_HZ:
 		_overlay_acc = 0.0

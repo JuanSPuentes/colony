@@ -22,8 +22,13 @@ func _body_size() -> Vector2:
 	return AntRenderer.BODY_SIZE * CasteDefs.VISUAL_SCALE[CasteDefs.Caste.QUEEN] * SIZE_MULT
 
 
+## Aclarado nocturno (`DayNightView.unit_modulate`): solo para la reina, no para el montículo ni la
+## barra de vida, que se dibujan en este mismo nodo y deben oscurecerse como el resto del mundo.
+var night_boost := Color.WHITE
+
+
 func _tint() -> Color:
-	return AntRenderer.RIVAL_COLOR
+	return AntRenderer.RIVAL_COLOR * night_boost
 
 
 ## Fase 31: con la rival en el mapa, su reina está en un montículo de tierra (la entrada de su
@@ -31,16 +36,19 @@ func _tint() -> Color:
 const MOUND := Color("6b4429")
 const MOUND_DARK := Color("4f3220")
 const MOUND_HOLE := Color("1d140d")
+const MOUND_SCALE := 2.0
 
 
 func _draw() -> void:
 	if sim != null and sim.rival_colony.home:
 		var cfg := sim.cfg
 		var base := Vector2((sim.rival_colony.home_x + 0.5) * cfg.cell_px, cfg.surface_y * cfg.cell_px)
-		# Loma en escalones de pixel: más ancha abajo, con un agujero oscuro al frente.
+		# Loma en escalones de pixel: más ancha abajo, con un agujero oscuro al frente. `MOUND_SCALE`
+		# la agranda (2026-11-04: el jugador la veía muy chica al lado del árbol).
+		var k_h := 3.0 * MOUND_SCALE
 		for k in 4:
-			var w := (7 - k * 1.6) * cfg.cell_px * 0.5
+			var w := (7 - k * 1.6) * cfg.cell_px * 0.5 * MOUND_SCALE
 			var c := MOUND if k % 2 == 0 else MOUND_DARK
-			draw_rect(Rect2(base.x - w, base.y - (k + 1) * 3.0, w * 2.0, 3.0), c)
-		draw_rect(Rect2(base.x - 3.0, base.y - 5.0, 6.0, 5.0), MOUND_HOLE)
+			draw_rect(Rect2(base.x - w, base.y - (k + 1) * k_h, w * 2.0, k_h), c)
+		draw_rect(Rect2(base.x - 3.0 * MOUND_SCALE, base.y - 5.0 * MOUND_SCALE, 6.0 * MOUND_SCALE, 5.0 * MOUND_SCALE), MOUND_HOLE)
 	super._draw()

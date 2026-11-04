@@ -1224,3 +1224,12 @@ y sus `tut_*` de config): era un nivel jugable con objetivos; ahora es una visit
   avisos de eventos (incursiones, araña, lluvia) siguen saliendo siempre en el panel.
 - Pruebas: `tools/test_phase14.gd` (tutorial y tarjetas) y `tools/test_app_menu.gd` (flujo).
 
+
+## Ajustes de visibilidad (2026-11-04)
+
+- **Noche legible:** la noche es algo menos oscura (`DayNightView.NIGHT`) y las hormigas y la
+  reina rival se compensan casi por completo (`DayNightView.unit_modulate`, `UNIT_BOOST = 0.8`):
+  el fondo se oscurece, ellas no. El montículo y la barra de vida se oscurecen como el mundo.
+- **Rival más visible:** rojo más claro (`AntRenderer.RIVAL_COLOR`) y montículo al doble
+  (`RivalQueenView.MOUND_SCALE`).
+- **Escala:** zoom inicial 1.5x en vez de 1.0x (`main.ZOOM_LEVELS = [0.75, 1.5, 2, 3, 4]`).

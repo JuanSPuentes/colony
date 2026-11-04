@@ -20,7 +20,7 @@ const BODY_SIZE := Vector2(7.5, 7.5)
 const ANT_COLOR := Color("120b08")
 ## Fase 9: tinte fijo de las hormigas rivales (bando 1), para distinguirlas de las propias durante
 ## una batalla de fin de estación sin arte nuevo (mismo sprite, otro color de instancia).
-const RIVAL_COLOR := Color("8b1a1a")
+const RIVAL_COLOR := Color("c22a2a")  # 2026-11-04: más claro, de noche no se veía
 const LEAF_COLOR := Color("5fe05f")
 ## Fase 29: color de lo que carga según `AntSystem.carry_kind` (hoja de árbol, restos, hoja caída,
 ## semilla, fruta). Provisorio: la etapa 2 trae sprites propios con animación.

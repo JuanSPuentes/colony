@@ -6,11 +6,16 @@ extends CanvasModulate
 ## (Fase 3) se aplica aquí mismo como multiplicador en vez de con un segundo CanvasModulate aparte
 ## (ese segundo nodo simplemente se ignoraba y el brillo no tenía ningún efecto visible).
 
-const NIGHT := Color(0.34, 0.38, 0.6)
+const NIGHT := Color(0.42, 0.46, 0.68)
+## Cuánto se compensa la oscuridad en las hormigas (0 = nada, 1 = se ven como de día). Pedido del
+## jugador (2026-11-04): de noche no se distinguían aliadas de rivales.
+const UNIT_BOOST := 0.8
 const DUSK_TINT := Color(1.25, 0.88, 0.7)
 
 var sim: Simulation
 var brightness := 1.0
+## Multiplicador para las hormigas y la reina rival: deshace casi toda la oscuridad (ver `UNIT_BOOST`).
+var unit_modulate := Color.WHITE
 
 
 func setup(s: Simulation) -> void:
@@ -35,3 +40,4 @@ func refresh() -> void:
 		var st := SkyView.storm(sim)
 		base = base * Color(1.0 - 0.28 * st, 1.0 - 0.25 * st, 1.0 - 0.2 * st)
 	color = base * Color(brightness, brightness, brightness)
+	unit_modulate = Color(lerpf(1.0, 1.0 / base.r, UNIT_BOOST), lerpf(1.0, 1.0 / base.g, UNIT_BOOST), lerpf(1.0, 1.0 / base.b, UNIT_BOOST))

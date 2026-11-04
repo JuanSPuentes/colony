@@ -25,7 +25,7 @@ const CARD_W := 270.0
 const TUTORIAL_CARD_W := 380.0
 const MARGIN := 12.0
 
-## Índices de `main.ZOOM_LEVELS` ([0.5, 1, 2, 3, 4]).
+## Índices de `main.ZOOM_LEVELS` ([0.75, 1.5, 2, 3, 4]).
 const Z_WIDE := 1
 const Z_NEAR := 2
 const Z_CLOSE := 3
