@@ -26,6 +26,11 @@ func get_v(x: int, y: int) -> float:
 	return data[y * w + x]
 
 
+## ¿El jugador pintó esta celda (`paint`)? Ahí las hormigas no depositan (ver `AntSystem._on_enter`).
+func is_painted(i: int) -> bool:
+	return not floor_v.is_empty() and floor_v[i] > 0.0
+
+
 func deposit(i: int, amount: float) -> void:
 	data[i] = minf(1.0, data[i] + amount)
 

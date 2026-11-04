@@ -1233,3 +1233,14 @@ y sus `tut_*` de config): era un nivel jugable con objetivos; ahora es una visit
 - **Rival más visible:** rojo más claro (`AntRenderer.RIVAL_COLOR`) y montículo al doble
   (`RivalQueenView.MOUND_SCALE`).
 - **Escala:** zoom inicial 1.5x en vez de 1.0x (`main.ZOOM_LEVELS = [0.75, 1.5, 2, 3, 4]`).
+
+## Fase 36: correcciones del primer playtest
+
+- **Feromonas:** las hormigas ya no depositan sobre lo que pinta el jugador
+  (`PheromoneField.is_painted`, `AntSystem._on_enter`). Lo pintado es una rampa hacia el objetivo
+  y lo depositado encima le hacía lomas donde las hormigas daban vueltas. Además, el rastro de
+  Comida se deja solo en la superficie: bajo tierra nadie lo sigue y llenaba el pozo, dejando la
+  boca pintada como un hueco del que no se salía.
+- **El nido viaja:** en la mudanza (`Migration._carry_nest`) cada túnel conectado al nido se cava
+  igual en el mapa nuevo, con su cámara. Cambian superficie, árbol, cuevas y rival (NUCLEO.md).
+- Pruebas: `tools/test_phase36.gd`.

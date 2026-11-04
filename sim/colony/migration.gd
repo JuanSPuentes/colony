@@ -1,9 +1,9 @@
 class_name Migration
 extends RefCounted
 ## Fase 25: al ganar la batalla de una estación la colonia se muda a un territorio nuevo. El mapa
-## (terreno, túneles, cámaras, árboles, hongos, niebla) se genera de cero con otra semilla; lo que
-## la colonia ganó se conserva: comida, hormigas por casta, mejoras, precio del huevo, estación y
-## estadísticas. La cría que estaba en camino llega ya nacida.
+## (terreno, árboles, hongos, niebla, la rival) se genera de cero con otra semilla; lo que la
+## colonia ganó se conserva: el nido (túneles y cámaras, ver `_carry_nest`), comida, hormigas por
+## casta, mejoras, precio del huevo, estación y estadísticas. La cría en camino llega ya nacida.
 ##
 ## No toca la `Simulation` vieja: arma una nueva con `spawn_incremental_start(true)` (el mismo
 ## arranque de "Juego normal") y le copia el estado que se lleva. `main.gd` la cambia por la vieja
@@ -19,6 +19,7 @@ static func migrate(old: Simulation, seed_value: int) -> Simulation:
 	sim.spawn_incremental_start(true)
 	# Mejoras primero: `add_ant_at` aplica `hp_mult` a las hormigas que se crean después.
 	sim.upgrades.set_bought(old.upgrades.bought)
+	_carry_nest(old, sim)  # antes que las hormigas: se reparten por todo el nido que se trajo
 	_carry_ants(old, sim)
 	sim.colony.food = old.colony.food
 	sim.econ.bought_eggs = old.econ.bought_eggs
@@ -43,6 +44,27 @@ static func migrate(old: Simulation, seed_value: int) -> Simulation:
 		sim.rain_start_tick = sim.tick_count + int(sim.cfg.inc_rain_first_s * sim.cfg.tick_rate)
 	sim.notify("Tu colonia migró a un territorio nuevo.")
 	return sim
+
+
+## 2026-11-04 (playtest): la colonia se lleva su nido. Cada celda de túnel bajo tierra conectada al
+## nido viejo se cava igual en el mapa nuevo (mismo lugar: el nido siempre está en `cfg.nest_x`), con
+## su etiqueta de cámara. Antes la mudanza arrancaba con el nido inicial y el jugador perdía todo lo
+## que había cavado. Las marcas sin cavar no viajan.
+static func _carry_nest(old: Simulation, sim: Simulation) -> void:
+	var w := sim.world.w
+	for i in range(sim.cfg.surface_y * w, old.world.cells.size()):
+		if old.world.cells[i] != WorldGrid.Cell.TUNNEL or old.fields.nest_dist[i] >= NestDistanceField.FAR:
+			continue
+		sim.world.cells[i] = WorldGrid.Cell.TUNNEL
+		sim.world.room[i] = old.world.room[i]
+		sim.world.changed.append(i)
+	sim.world.passable_version += 1
+	sim.world.rooms_version += 1
+	sim.world.jobs_version += 1
+	sim.fields.recompute_terrain()
+	sim.fields.recompute_dig()
+	if sim.fog != null:
+		sim.fog.update(sim.world, sim.fields, sim.cfg.surface_y)
 
 
 ## Reemplaza la colonia mínima del arranque por la de antes: misma cantidad por casta (más la cría

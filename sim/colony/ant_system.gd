@@ -450,14 +450,19 @@ func _move(i: int, dt: float, lv: float) -> void:
 func _on_enter(i: int, ci: int) -> void:
 	var cfg := sim.cfg
 	trip_steps[i] += 1
+	# Fase 36 (playtest): sobre un rastro que pintó el jugador no se deposita nada. Lo pintado es una
+	# rampa hacia el objetivo; lo depositado encima le hacía lomas y las hormigas daban vueltas en
+	# ellas hasta que se desvanecían, en vez de seguir el camino marcado. Y Comida solo en la
+	# superficie: bajo tierra nadie la sigue (`Mode.FOOD` sale hacia arriba) y el pozo lleno de
+	# feromona dejaba la boca pintada como un hueco más bajo que no dejaba salir.
 	if carry[i] == 1:
-		if trip_steps[i] < cfg.food_trail_range:
+		if trip_steps[i] < cfg.food_trail_range and ci < cfg.surface_y * sim.world.w and not sim.food.is_painted(ci):
 			sim.food.deposit(ci, cfg.food_deposit * (1.0 - float(trip_steps[i]) / cfg.food_trail_range))
 		if state[i] == State.CARRY_HOME and _at_drop(ci):
 			_deliver(i)
 	elif state[i] == State.EXPLORE or state[i] == State.GO_TO_FOOD:
 		var nd := sim.fields.nest_dist[ci]
-		if nd < cfg.home_range:
+		if nd < cfg.home_range and not sim.home.is_painted(ci):
 			sim.home.deposit(ci, cfg.home_deposit * (1.0 - float(nd) / cfg.home_range))
 
 

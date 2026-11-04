@@ -34,7 +34,8 @@ Todo lo que se agregue tiene que reforzar al menos uno.
 ## Estructura de la partida completa
 
 - **4 estaciones = 4 rivales**, cada una más fuerte. Cada estación es un mapa nuevo (la colonia
-  se muda) y conserva lo ganado: hormigas, comida y mejoras.
+  se muda) y conserva lo ganado: su nido (túneles y cámaras), hormigas, comida y mejoras. Cambian
+  la superficie, el árbol, las cuevas y la rival (ajuste del 2026-11-04, tras el primer playtest).
 - La estación cambia el árbol y el clima (ambiente ya hecho; recursos por estación, después).
 - Ganar las 4 estaciones gana el juego.
 - Duración objetivo: 15-25 minutos por estación, alrededor de 1 h 30 min la partida completa.
