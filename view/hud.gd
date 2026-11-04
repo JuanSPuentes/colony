@@ -219,7 +219,7 @@ func _ready() -> void:
 		s.step = 0.01
 		s.custom_minimum_size = Vector2(0.0, 8.0) * S
 		s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		s.modulate = CasteDefs.COLORS[c]
+		s.modulate = AntPalette.caste(c)
 		_caste_row.add_child(s)
 		_caste_sliders.append(s)
 		s.value_changed.connect(func(v: float) -> void: _m.sim.cmd_set_caste_target(c, v))
@@ -334,7 +334,7 @@ func _set_top_items(items: Array) -> void:
 			var icon := item.get_child(0) as TextureRect
 			var is_ant: bool = items[i][0] == "ant" or items[i][0] == "rival_ant"
 			icon.texture = ANT_ICON if is_ant else HudIcons.get_icon(items[i][0], 3)
-			icon.modulate = AntRenderer.RIVAL_COLOR if items[i][0] == "rival_ant" else Color.WHITE
+			icon.modulate = AntPalette.rival() if items[i][0] == "rival_ant" else Color.WHITE
 			(item.get_child(1) as Label).text = items[i][1]
 			item.tooltip_text = items[i][2]  # ya viene con tr()
 
@@ -703,10 +703,10 @@ func _update_incremental(sim: Simulation) -> void:
 	for caste in [CasteDefs.Caste.WORKER, CasteDefs.Caste.SOLDIER, CasteDefs.Caste.DRONE]:
 		var more := "[color=#a8d672]+%d[/color]" % coming[caste] if coming[caste] > 0 else ""
 		rows += "[cell][color=#%s]%s[/color]  [/cell][cell]%d  [/cell][cell]%s[/cell]" % [
-			CasteDefs.COLORS[caste].to_html(false), tr(CASTE_PLURALS[caste]), c[caste], more]
+			AntPalette.caste(caste).to_html(false), tr(CASTE_PLURALS[caste]), c[caste], more]
 	var queen_hp := sim.ants.hp[sim.queen_id] if sim.ants.alive[sim.queen_id] == 1 else 0.0
 	rows += "[cell][color=#%s]%s[/color]  [/cell][cell]%d%%[/cell][cell][/cell]" % [
-		CasteDefs.COLORS[CasteDefs.Caste.QUEEN].to_html(false), tr("Reina"),
+		AntPalette.caste(CasteDefs.Caste.QUEEN).to_html(false), tr("Reina"),
 		int(100.0 * queen_hp / maxf(sim.ants.max_hp(sim.queen_id), 0.01))]
 	_colony.text = "[table=3]%s[/table]" % rows
 	var food := tr("Comida: %.0f / %.0f") % [sim.colony.food, sim.colony.food_cap]
@@ -807,11 +807,11 @@ func _update_classic(sim: Simulation) -> void:
 		var queen_hp_max := sim.ants.max_hp(sim.queen_id)
 		# El bullet de cada casta usa el mismo color con el que se ve en el mundo.
 		_colony.text = "[color=#%s]•[/color]%d [color=#%s]•[/color]%d [color=#%s]•[/color]%d [color=#%s]•[/color]%d [color=#%s]•[/color]%d%%   %s" % [
-			CasteDefs.COLORS[CasteDefs.Caste.WORKER].to_html(false), c[CasteDefs.Caste.WORKER],
-			CasteDefs.COLORS[CasteDefs.Caste.NURSE].to_html(false), c[CasteDefs.Caste.NURSE],
-			CasteDefs.COLORS[CasteDefs.Caste.SOLDIER].to_html(false), c[CasteDefs.Caste.SOLDIER],
-			CasteDefs.COLORS[CasteDefs.Caste.DRONE].to_html(false), c[CasteDefs.Caste.DRONE],
-			CasteDefs.COLORS[CasteDefs.Caste.QUEEN].to_html(false), int(100.0 * queen_hp / maxf(queen_hp_max, 0.01)),
+			AntPalette.caste(CasteDefs.Caste.WORKER).to_html(false), c[CasteDefs.Caste.WORKER],
+			AntPalette.caste(CasteDefs.Caste.NURSE).to_html(false), c[CasteDefs.Caste.NURSE],
+			AntPalette.caste(CasteDefs.Caste.SOLDIER).to_html(false), c[CasteDefs.Caste.SOLDIER],
+			AntPalette.caste(CasteDefs.Caste.DRONE).to_html(false), c[CasteDefs.Caste.DRONE],
+			AntPalette.caste(CasteDefs.Caste.QUEEN).to_html(false), int(100.0 * queen_hp / maxf(queen_hp_max, 0.01)),
 			tr(ERA_NAMES[sim.era])]
 		_resources.text = tr("Cría %d/%d/%d   Comida %.0f%s  Agua %.0f%s") % [
 			sim.brood.counts_by_stage[BroodSystem.Stage.EGG], sim.brood.counts_by_stage[BroodSystem.Stage.LARVA], sim.brood.counts_by_stage[BroodSystem.Stage.PUPA],
@@ -895,7 +895,7 @@ func update_info(m: Node) -> void:
 	elif m.overlay.layer == OverlayView.Layer.CASTES:
 		var parts2 := ""
 		for k in CasteDefs.NAMES.size():
-			var col2: Color = CasteDefs.COLORS[k]
+			var col2: Color = AntPalette.caste(k)
 			parts2 += "[color=#%s]• %s[/color]  " % [col2.to_html(false), tr(CasteDefs.NAMES[k])]
 		_legend.text = parts2
 	else:

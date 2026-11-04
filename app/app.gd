@@ -27,6 +27,7 @@ func _ready() -> void:
 	settings = AppSettings.load_settings()
 	settings.apply_volume()
 	settings.apply_language()
+	AntPalette.apply(settings.colors)  # Fase 39
 
 	menu = MainMenu.new()
 	add_child(menu)
@@ -49,6 +50,8 @@ func _ready() -> void:
 	options.quit_requested.connect(_ask_quit)
 	options.tips_changed.connect(_on_tips_changed)
 	options.tutorial_requested.connect(_on_tutorial_requested)
+	options.color_changed.connect(_on_color_changed)
+	options.colors_reset.connect(_on_colors_reset)
 
 	guide = GuideScreen.new()
 	guide.visible = false
@@ -154,6 +157,24 @@ func _on_tutorial_requested() -> void:
 		go.call()
 
 
+## Fase 39: un color de las hormigas. Se ve al instante y queda guardado.
+func _on_color_changed(key: String, color: Color) -> void:
+	AntPalette.set_color(key, color)
+	_save_colors()
+
+
+## Fase 39: «Restablecer colores».
+func _on_colors_reset() -> void:
+	AntPalette.reset()
+	options.refresh_colors()
+	_save_colors()
+
+
+func _save_colors() -> void:
+	settings.colors = AntPalette.to_dict()
+	settings.save()
+
+
 func _on_tips_changed(on: bool) -> void:
 	settings.show_tips = on
 	settings.save()
@@ -176,6 +197,7 @@ func _open_options(return_to: String) -> void:
 	options.set_values(settings.volume, settings.brightness)
 	options.set_language(settings.language)
 	options.set_tips(settings.show_tips)
+	options.refresh_colors()
 	options.set_in_game(game != null and return_to == "game")
 	options.visible = true
 	menu.visible = false

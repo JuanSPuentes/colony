@@ -23,6 +23,9 @@ signal how_to_play_requested
 ## Fase 35: "Mostrar consejos" en Juego normal, y volver a ver el tutorial.
 signal tips_changed(on: bool)
 signal tutorial_requested
+## Fase 39: un color de `AntPalette` cambió, o se pidió volver a los originales.
+signal color_changed(key: String, color: Color)
+signal colors_reset
 
 const BG := Color(0.05, 0.04, 0.04, 1.0)
 const GOLD := Color("ffd43c")
@@ -38,6 +41,7 @@ var _tips: CheckButton
 var _controls_cols: HBoxContainer
 var _game_card: PanelContainer
 var _save_status: Label
+var _color_pickers := {}
 
 
 func _ready() -> void:
@@ -125,6 +129,8 @@ func _ready() -> void:
 	_tips.toggled.connect(func(on: bool) -> void: tips_changed.emit(on))
 	settings_body.add_child(_tips)
 	settings_body.add_child(_action_button("Ver el tutorial", func() -> void: tutorial_requested.emit()))
+
+	_colors_card(content)
 
 	var controls_card := _card("Controles")
 	content.add_child(controls_card)
@@ -260,6 +266,41 @@ func _slider_row(parent: VBoxContainer, label_text: String, lo: float, hi: float
 	slider.value_changed.connect(func(v: float) -> void:
 		value_label.text = fmt.call(v)
 		on_change.call(v))
+
+
+## Fase 39: «Colores»: un selector por casta, rivales y huevos (`AntPalette.SHOWN`), en dos columnas,
+## y «Restablecer» para volver a los originales.
+func _colors_card(content: VBoxContainer) -> void:
+	var card := _card("Colores")
+	content.add_child(card)
+	var body := card.get_meta("body") as VBoxContainer
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 16)
+	grid.add_theme_constant_override("v_separation", 10)
+	body.add_child(grid)
+	for k in AntPalette.SHOWN.size():
+		var key: String = AntPalette.SHOWN[k]
+		var label := Label.new()
+		label.text = AntPalette.LABELS[k]
+		label.custom_minimum_size = Vector2(150, 0)
+		label.add_theme_font_size_override("font_size", 16)
+		label.add_theme_color_override("font_color", CREAM)
+		grid.add_child(label)
+		var picker := ColorPickerButton.new()
+		picker.custom_minimum_size = Vector2(90, 30)
+		picker.edit_alpha = false
+		picker.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		picker.color_changed.connect(func(c: Color) -> void: color_changed.emit(key, c))
+		grid.add_child(picker)
+		_color_pickers[key] = picker
+	body.add_child(_action_button("Restablecer colores", func() -> void: colors_reset.emit()))
+
+
+## Fase 39: muestra en los selectores la paleta actual.
+func refresh_colors() -> void:
+	for key in _color_pickers:
+		(_color_pickers[key] as ColorPickerButton).color = AntPalette.get_color(key)
 
 
 ## `app.gd` llama esto cada vez que abre la pantalla, para que los sliders reflejen el valor

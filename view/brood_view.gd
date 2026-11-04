@@ -45,7 +45,7 @@ func _draw() -> void:
 		var p := brood.pos[i]
 		match brood.stage[i]:
 			BroodSystem.Stage.EGG:
-				draw_texture_rect(EGG_TEXTURE, Rect2(p - EGG_SIZE * 0.5, EGG_SIZE), false)
+				draw_texture_rect(EGG_TEXTURE, Rect2(p - EGG_SIZE * 0.5, EGG_SIZE), false, AntPalette.egg())  # Fase 39
 			BroodSystem.Stage.LARVA:
 				# Gusanito curvo: tres círculos que se achican.
 				for k in 3:

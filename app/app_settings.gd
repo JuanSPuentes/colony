@@ -22,6 +22,8 @@ var language := "es" if OS.get_locale_language() == "es" else "en"
 var tutorial_done := false
 ## Fase 35: consejos cortos durante Juego normal (`CoachView`). Apagados: el tutorial ya explicó.
 var show_tips := false
+## Fase 39: colores elegidos en Opciones (`AntPalette`): solo lo que difiere de lo original.
+var colors := {}
 
 
 static func load_settings() -> AppSettings:
@@ -41,6 +43,9 @@ static func load_settings() -> AppSettings:
 			s.language = lang
 		s.tutorial_done = bool(parsed.get("tutorial_done", false))
 		s.show_tips = bool(parsed.get("show_tips", false))
+		var c = parsed.get("colors", {})
+		if typeof(c) == TYPE_DICTIONARY:
+			s.colors = c
 	return s
 
 
@@ -49,7 +54,7 @@ func save() -> void:
 	if f == null:
 		return
 	f.store_string(JSON.stringify({"volume": volume, "brightness": brightness, "language": language,
-		"tutorial_done": tutorial_done, "show_tips": show_tips}))
+		"tutorial_done": tutorial_done, "show_tips": show_tips, "colors": colors}))
 	f.close()
 
 

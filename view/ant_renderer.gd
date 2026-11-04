@@ -18,9 +18,6 @@ extends Node2D
 ## pixel art se perdía: pedido del usuario tras ver la primera integración.
 const BODY_SIZE := Vector2(7.5, 7.5)
 const ANT_COLOR := Color("120b08")
-## Fase 9: tinte fijo de las hormigas rivales (bando 1), para distinguirlas de las propias durante
-## una batalla de fin de estación sin arte nuevo (mismo sprite, otro color de instancia).
-const RIVAL_COLOR := Color("c22a2a")  # 2026-11-04: más claro, de noche no se veía
 const LEAF_COLOR := Color("5fe05f")
 ## Fase 29: color de lo que carga según `AntSystem.carry_kind` (hoja de árbol, restos, hoja caída,
 ## semilla, fruta). Provisorio: la etapa 2 trae sprites propios con animación.
@@ -162,11 +159,11 @@ func update(alpha: float, frame_start_pos: PackedVector2Array = PackedVector2Arr
 		if color_by_state:
 			c = AntSystem.STATE_COLORS[ants.state[i]]
 		elif color_by_caste:
-			c = CasteDefs.COLORS[ants.caste[i]]
+			c = AntPalette.caste(ants.caste[i])
 		# Fase 9: una hormiga rival se tiñe siempre igual (sin importar casta/estado activo), para
 		# distinguirla de las propias a simple vista durante una batalla de fin de estación.
 		if ants.faction[i] == 1:
-			c = RIVAL_COLOR
+			c = AntPalette.rival()
 		var idx := body_n[dir]
 		# `t.x`/`t.y` en vez de `Transform2D.scaled()`: construido a mano para que el escalado sea
 		# de la hormiga alrededor de su propio centro, no de la traslación (mismo truco que ya

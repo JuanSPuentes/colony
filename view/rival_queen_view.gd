@@ -1,9 +1,9 @@
 class_name RivalQueenView
 extends ThreatSpriteView
 ## Vista de la reina rival (Fase 9, `Simulation.rival_colony.queen`). Reusa el mismo sprite de
-## hormiga que `AntRenderer` (`view/sprites/ant/`), escalado como la reina del jugador y teñido de
-## rojo oscuro (`AntRenderer.RIVAL_COLOR`) — sin arte nuevo para esta primera entrega, misma idea
-## que el tinte de las hormigas rivales. No se mueve ni cambia de dirección en la práctica (no
+## hormiga que `AntRenderer` (`view/sprites/ant/`), escalado como la reina del jugador y teñido
+## con el color rival (`AntPalette.rival()`, rojo por defecto) — sin arte nuevo, misma idea que el
+## tinte de las hormigas rivales. No se mueve ni cambia de dirección en la práctica (no
 ## tiene pathing, ver `sim/threats/rival_queen.gd`), pero hereda ese soporte gratis de
 ## `ThreatSpriteView` por si en algún momento se le agrega movimiento.
 
@@ -28,7 +28,7 @@ var night_boost := Color.WHITE
 
 
 func _tint() -> Color:
-	return AntRenderer.RIVAL_COLOR * night_boost
+	return AntPalette.rival() * night_boost
 
 
 ## Fase 31: con la rival en el mapa, su reina está en un montículo de tierra (la entrada de su

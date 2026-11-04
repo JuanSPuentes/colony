@@ -34,7 +34,8 @@ const VISUAL_SCALE: Array[float] = [1.8, 1.0, 1.0, 1.0, 1.0]
 ## Colores por casta: se ven siempre (no solo en la capa de depuración "Castas"), así que cada
 ## uno debe notarse de verdad contra la tierra, no solo el de la reina/nodriza/soldado. La reina
 ## es un tono "puro" (perla/marfil) bien distinto del ámbar sucio de la obrera; el zángano, morado,
-## para que no se confunda con ninguna otra casta.
+## para que no se confunda con ninguna otra casta. Fase 39: son los colores ORIGINALES; la vista
+## usa `AntPalette`, que el jugador puede cambiar en Opciones.
 const COLORS: Array[Color] = [
 	Color("fdf6ec"),  # Reina
 	Color("e8a33d"),  # Obrera

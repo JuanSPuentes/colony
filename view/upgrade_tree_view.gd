@@ -237,6 +237,6 @@ func _draw_stats(font: Font, x: float, y: float) -> void:
 			"%.1f" % up.damage(caste, null)]
 		for c in vals.size():
 			draw_string(font, Vector2(cols[c], y), vals[c], HORIZONTAL_ALIGNMENT_LEFT, -1, 18,
-				CasteDefs.COLORS[caste] if c == 0 else PixelUI.TEXT)
+				AntPalette.caste(caste) if c == 0 else PixelUI.TEXT)
 	draw_string(font, Vector2(x, y + 26.0), tr("Cavar una celda: %.1f s") % (cfg.dig_seconds / up.work_mult),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, PixelUI.TEXT_DIM)

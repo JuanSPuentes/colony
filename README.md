@@ -1273,3 +1273,15 @@ y sus `tut_*` de config): era un nivel jugable con objetivos; ahora es una visit
   lleguen por los túneles las vuelve mucho más letales: decisión de balance pendiente).
 - Pruebas: `tools/test_phase38.gd`. `test_phase0` baja su margen de 20% a 10% porque mejoró el
   caso sin pintura.
+
+## Fase 39: colores de las hormigas
+
+- **Opciones → «Colores»:** un selector por casta (reina, obreras, soldados, zánganos; la nodriza
+  no, porque solo existe en el Modo infinito, que es de desarrollo),
+  otro para las hormigas rivales y otro para los huevos, más «Restablecer colores». El cambio se
+  ve al instante, en el mundo y en el HUD.
+- **`view/ant_palette.gd` (`AntPalette`):** la paleta única que lee toda la vista, en lugar de
+  `CasteDefs.COLORS` (que queda como los colores originales) y del viejo `AntRenderer.RIVAL_COLOR`.
+- **Se guarda** en `AppSettings.colors` (`user://app_settings.json`), solo lo que difiere del
+  original. Es una preferencia de la app, no de la partida.
+- Pruebas: `tools/test_phase39.gd`; el dibujo se verificó con capturas.
