@@ -11,6 +11,12 @@ extends RefCounted
 ## los `Vector2`/`Vector2i` se aplanan a `[x, y]` a mano porque el JSON de Godot no los entiende.
 
 const SAVE_VERSION := 1
+## Fase 40: llaves sin las que no se puede reconstruir una partida (`from_dict` las lee sin
+## valor por defecto). Un archivo sin alguna de ellas no es una partida: se prueba la copia `.bak`.
+const REQUIRED_KEYS: Array[String] = ["seed", "rng_state", "tick_count", "world", "ants", "brood",
+	"colony", "water", "plants", "corpses"]
+const BACKUP_SUFFIX := ".bak"
+const TEMP_SUFFIX := ".tmp"
 
 
 # --- Serializar -----------------------------------------------------------------------------------
@@ -184,13 +190,63 @@ static func to_dict(sim: Simulation) -> Dictionary:
 
 
 static func save_file(sim: Simulation, path: String) -> Error:
-	var text := JSON.stringify(to_dict(sim))
-	var f := FileAccess.open(path, FileAccess.WRITE)
+	return write_text_atomic(path, JSON.stringify(to_dict(sim)))
+
+
+## Fase 40: escritura a prueba de cortes. Escribe a `path.tmp`, pasa el archivo anterior a
+## `path.bak` y recién entonces renombra el temporal. Si el juego se cierra a mitad de camino queda
+## la versión anterior, la nueva o la copia: nunca un archivo a medio escribir (antes se escribía
+## encima del guardado y un corte lo dejaba corrupto). También la usa `AppSettings`.
+static func write_text_atomic(path: String, text: String) -> Error:
+	var tmp := path + TEMP_SUFFIX
+	var f := FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:
 		return FileAccess.get_open_error()
-	f.store_string(text)
+	var ok := f.store_string(text)
 	f.close()
-	return OK
+	if not ok:
+		DirAccess.remove_absolute(tmp)
+		return ERR_FILE_CANT_WRITE
+	if FileAccess.file_exists(path):
+		var bak := path + BACKUP_SUFFIX
+		if FileAccess.file_exists(bak):
+			DirAccess.remove_absolute(bak)
+		var err := DirAccess.rename_absolute(path, bak)
+		if err != OK:
+			DirAccess.remove_absolute(tmp)
+			return err
+	return DirAccess.rename_absolute(tmp, path)
+
+
+## Fase 40: el primer Dictionary legible entre `path` y su copia `.bak` que cumpla `valid`, o null.
+static func read_json(path: String, valid: Callable) -> Variant:
+	for p in [path, path + BACKUP_SUFFIX]:
+		if not FileAccess.file_exists(p):
+			continue
+		var parsed = JSON.parse_string(FileAccess.get_file_as_string(p))
+		if typeof(parsed) == TYPE_DICTIONARY and valid.call(parsed):
+			return parsed
+	return null
+
+
+## Fase 40: ¿se puede cargar esta partida? Tiene que traer todas las llaves obligatorias y no ser de
+## una versión más nueva que este juego (no sabríamos leerla).
+static func is_loadable(d: Dictionary) -> bool:
+	if int(d.get("version", 1)) > SAVE_VERSION:
+		return false
+	for k in REQUIRED_KEYS:
+		if not d.has(k):
+			return false
+	return true
+
+
+## Fase 40: lleva una partida vieja al formato actual. El JSON de Godot devuelve los números como
+## float, así que `version` se pasa a int. Hoy todas son versión 1 y no hay pasos. Cuando cambie el
+## formato: subir `SAVE_VERSION` y agregar acá, en orden, un paso por versión
+## (`if d["version"] == N: <convertir>; d["version"] = N + 1`), sin tocar los anteriores.
+static func migrate(d: Dictionary) -> Dictionary:
+	d["version"] = int(d.get("version", 1))
+	return d
 
 
 # --- Cargar -----------------------------------------------------------------------------------
@@ -289,8 +345,8 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	sim.brood.timer = _to_typed_float(bd["timer"])
 	sim.brood.caste = _to_typed_int(bd["caste"])
 	sim.brood.alive = _to_typed_bool(bd["alive"])
-	# `d.get(..., default)`: un guardado de antes de esta función no trae estas dos llaves (sin
-	# versionado de compatibilidad todavía, ver README sección 9).
+	# `d.get(..., default)`: un guardado de antes de esta función no trae estas dos llaves (de antes
+	# de que hubiera migraciones, Fase 40: los cambios nuevos de formato van en `migrate`).
 	sim.brood.pos = _to_v2_arr(bd.get("pos", []))
 	if sim.brood.pos.size() != sim.brood.stage.size():
 		sim.brood.pos.resize(sim.brood.stage.size())  # guardado viejo: posiciones en (0,0)
@@ -460,18 +516,12 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	return sim
 
 
+## Fase 40: si el archivo está dañado o incompleto, prueba con la copia `.bak` del guardado anterior.
 static func load_file(path: String, cfg: SimConfig) -> Simulation:
-	if not FileAccess.file_exists(path):
+	var d = read_json(path, is_loadable)
+	if d == null:
 		return null
-	var f := FileAccess.open(path, FileAccess.READ)
-	if f == null:
-		return null
-	var text := f.get_as_text()
-	f.close()
-	var parsed = JSON.parse_string(text)
-	if typeof(parsed) != TYPE_DICTIONARY:
-		return null
-	return from_dict(parsed, cfg)
+	return from_dict(migrate(d), cfg)
 
 
 # --- Conversiones (Vector2 <-> Array, Dictionary con llaves int <-> String) --------------------

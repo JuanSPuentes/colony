@@ -68,6 +68,10 @@ func _t_file_roundtrip() -> void:
 	_check("guardar a un archivo real no da error", err == OK, "error=%d" % err)
 	var loaded := SaveSystem.load_file(SAVE_PATH, sim.cfg)
 	_check("cargar desde ese archivo da la misma huella", loaded != null and loaded.checksum() == before)
+	# Fase 40: no dejar el archivo de prueba (ni su copia .bak) en los datos del jugador.
+	for p in [SAVE_PATH, SAVE_PATH + SaveSystem.BACKUP_SUFFIX]:
+		if FileAccess.file_exists(p):
+			DirAccess.remove_absolute(p)
 
 
 func _t_continues_deterministically_after_load() -> void:

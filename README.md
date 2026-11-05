@@ -1285,3 +1285,20 @@ y sus `tut_*` de config): era un nivel jugable con objetivos; ahora es una visit
 - **Se guarda** en `AppSettings.colors` (`user://app_settings.json`), solo lo que difiere del
   original. Es una preferencia de la app, no de la partida.
 - Pruebas: `tools/test_phase39.gd`; el dibujo se verificó con capturas.
+
+## Fase 40: guardado seguro
+
+- **Escritura a prueba de cortes** (`SaveSystem.write_text_atomic`): se escribe a `.tmp`, el
+  guardado anterior pasa a `.bak` y recién entonces se renombra. Si el juego se cierra a mitad de
+  camino queda la versión anterior, la nueva o la copia; antes se escribía encima y un corte dejaba
+  la partida corrupta. Las preferencias (`AppSettings`) usan lo mismo.
+- **Carga defensiva** (`SaveSystem.load_file`): si el archivo está cortado, no es JSON o le faltan
+  datos (`REQUIRED_KEYS`), se carga la copia `.bak`. Una partida de una versión más nueva del juego
+  no se carga. `migrate` deja la versión como entero y es donde irán los pasos cuando cambie el
+  formato (subir `SAVE_VERSION`).
+- **Guardado automático** (`main.gd`): cada `AUTOSAVE_EVERY_S` (120 s) y al mudarse de estación,
+  en `user://autosave.json` (no pisa el guardado manual). No guarda en el tutorial, en Test,
+  durante una batalla ni con la partida terminada. «Continuar» carga el más reciente de los dos.
+- **Aviso corregido:** «Partida guardada» se mostraba con solo mirar si el archivo existía; ahora
+  usa el resultado real del guardado.
+- Pruebas: `tools/test_phase40.gd`.

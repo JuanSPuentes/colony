@@ -257,8 +257,7 @@ func _confirm(text: String, ok_text: String, action: Callable) -> void:
 func _on_save_requested() -> void:
 	if game == null:
 		return
-	game.save_game()
-	var ok := FileAccess.file_exists(game.SAVE_PATH)
+	var ok: bool = game.save_game() == OK
 	options.show_save_status(tr("Partida guardada.") if ok else tr("No se pudo guardar."))
 
 

@@ -15,6 +15,10 @@ extends Node2D
 
 const CONFIG_PATH := "res://sim/core/default_config.tres"
 const SAVE_PATH := "user://save1.json"
+## Fase 40: guardado automático, en su propio archivo para no pisar el que hizo el jugador.
+## «Continuar» carga el más reciente de los dos (`newest_save_path`).
+const AUTOSAVE_PATH := "user://autosave.json"
+const AUTOSAVE_EVERY_S := 120.0
 ## 2026-11-04: todo se veía muy chico; el nivel inicial (1) pasó de 1.0 a 1.5.
 const ZOOM_LEVELS: Array[float] = [0.75, 1.5, 2.0, 3.0, 4.0]
 const MAX_TICKS_PER_FRAME := 40
@@ -89,6 +93,7 @@ var zoom_index := 1
 var seed_value := 12345
 
 var _acc := 0.0
+var _autosave_acc := 0.0  # Fase 40: segundos desde el último guardado automático
 var _overlay_acc := 0.0
 var _painting := false
 var _erasing := false
@@ -246,6 +251,7 @@ func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> v
 	tutorial.step = 0
 	coach.reset(sim)
 	_acc = 0.0
+	_autosave_acc = 0.0
 	_painting = false
 	if sim.queen_id >= 0 and sim.ants.alive[sim.queen_id] == 1:
 		camera.position = sim.ants.pos[sim.queen_id]
@@ -254,19 +260,51 @@ func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> v
 	_apply_camera()
 
 
-## Fase 2: guardar y cargar partida.
-func save_game() -> void:
+## Fase 2: guardar y cargar partida. Fase 40: devuelve el resultado (antes `app.gd` solo miraba si
+## el archivo existía, y avisaba «guardada» aunque fallara si quedaba una partida anterior).
+func save_game() -> Error:
 	if sim == null:
-		return
+		return ERR_UNCONFIGURED
 	var err := SaveSystem.save_file(sim, SAVE_PATH)
 	if err == OK:
 		sim.notify("Partida guardada.")
 	else:
 		sim.notify("No se pudo guardar (error %s).", [err])
+	return err
+
+
+## Fase 40: la partida más reciente entre la guardada a mano y la automática, o "" si no hay ninguna.
+static func newest_save_path() -> String:
+	var best := ""
+	var best_t := -1
+	for p in [SAVE_PATH, AUTOSAVE_PATH]:
+		for f in [p, p + SaveSystem.BACKUP_SUFFIX]:
+			if FileAccess.file_exists(f) and FileAccess.get_modified_time(f) > best_t:
+				best_t = FileAccess.get_modified_time(f)
+				best = p
+	return best
+
+
+## Fase 40: guarda en el archivo automático cada `AUTOSAVE_EVERY_S` de juego y al mudarse de
+## estación. Solo en partidas de verdad (no tutorial ni Test) y nunca durante una batalla ni con la
+## partida terminada, para no guardar un momento a medias.
+func _autosave_tick(delta: float) -> void:
+	if sim.rival_colony.battle_active:
+		return
+	_autosave_acc += delta
+	if _autosave_acc >= AUTOSAVE_EVERY_S:
+		autosave()
+
+
+func autosave() -> void:
+	_autosave_acc = 0.0
+	if game_mode != "tutorial" and game_mode != "test" and not sim.game_over:
+		SaveSystem.save_file(sim, AUTOSAVE_PATH)
 
 
 func load_game() -> void:
-	var loaded := SaveSystem.load_file(SAVE_PATH, cfg)
+	var path := newest_save_path()
+	var loaded := SaveSystem.load_file(path, cfg) if path != "" else null
 	if loaded == null:
 		if sim != null:
 			sim.notify("No hay ninguna partida guardada.")
@@ -281,6 +319,7 @@ func _migrate() -> void:
 	var new_sim := Migration.migrate(sim, sim.rng.randi())
 	start(new_sim.rng.seed, new_sim)
 	_frame_start_pos = sim.ants.pos.duplicate()  # la interpolación no mezcla hormigas de los dos mapas
+	autosave()  # Fase 40: la estación nueva es un buen punto para guardar
 
 
 func _resize_world_container() -> void:
@@ -340,6 +379,7 @@ func _process(delta: float) -> void:
 		_drag_vel = _drag_vel.move_toward(Vector2.ZERO, _drag_vel.length() * DRAG_FRICTION * delta + 1.0)
 		_clamp_camera(camera.zoom.x)
 	if not paused and not sim.game_over:
+		_autosave_tick(delta)
 		_acc += delta
 		var tick_dt := sim.dt
 		var ran := 0

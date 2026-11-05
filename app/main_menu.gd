@@ -119,4 +119,4 @@ var _continue_btn: Button
 ## volver al menú, por si se acaba de guardar desde las opciones de la partida.
 func refresh_continue() -> void:
 	if _continue_btn != null:
-		_continue_btn.visible = FileAccess.file_exists("user://save1.json")
+		_continue_btn.visible = preload("res://main.gd").newest_save_path() != ""  # Fase 40: también el automático

@@ -28,14 +28,8 @@ var colors := {}
 
 static func load_settings() -> AppSettings:
 	var s := AppSettings.new()
-	if not FileAccess.file_exists(PATH):
-		return s
-	var f := FileAccess.open(PATH, FileAccess.READ)
-	if f == null:
-		return s
-	var parsed = JSON.parse_string(f.get_as_text())
-	f.close()
-	if typeof(parsed) == TYPE_DICTIONARY:
+	var parsed = SaveSystem.read_json(PATH, func(_d: Dictionary) -> bool: return true)  # Fase 40: con copia .bak
+	if parsed != null:
 		s.volume = clampf(float(parsed.get("volume", s.volume)), VOLUME_MIN, VOLUME_MAX)
 		s.brightness = clampf(float(parsed.get("brightness", s.brightness)), BRIGHTNESS_MIN, BRIGHTNESS_MAX)
 		var lang := str(parsed.get("language", s.language))
@@ -50,12 +44,9 @@ static func load_settings() -> AppSettings:
 
 
 func save() -> void:
-	var f := FileAccess.open(PATH, FileAccess.WRITE)
-	if f == null:
-		return
-	f.store_string(JSON.stringify({"volume": volume, "brightness": brightness, "language": language,
+	# Fase 40: misma escritura a prueba de cortes que las partidas.
+	SaveSystem.write_text_atomic(PATH, JSON.stringify({"volume": volume, "brightness": brightness, "language": language,
 		"tutorial_done": tutorial_done, "show_tips": show_tips, "colors": colors}))
-	f.close()
 
 
 ## Aplica el volumen al bus Master. No hay efectos de sonido todavía (ver README), pero el control
