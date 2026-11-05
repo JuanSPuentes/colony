@@ -26,6 +26,13 @@ const UPGRADE_READY_TINT := Color(1.0, 0.92, 0.6)
 ## Fase 30: la barra de arriba cuenta las hormigas con el sprite de hormiga del juego, de costado.
 const ANT_ICON := preload("res://view/sprites/ant/east.png")
 const TOP_ICON_PX := 36
+## Fase 41 (auditoría UX, punto 2): la barra superior se acomoda al ancho disponible. Primero achica
+## el espacio entre datos (de `TOP_SEP_MAX` a `TOP_SEP_MIN`); si igual no entra, baja la letra un
+## escalón (enteros: la fuente pixel se rompe en tamaños intermedios). Antes, a 1280x800 (Steam Deck)
+## la barra se salía de la pantalla y la cuenta de la batalla quedaba bajo la tuerca.
+const TOP_FONTS: Array[int] = [30, 24, 20]
+const TOP_SEP_MAX := 30
+const TOP_SEP_MIN := 10
 ## Fase 30: nombre en plural de cada casta para la tabla de Colonia (clave: `CasteDefs.Caste`).
 const CASTE_PLURALS := {CasteDefs.Caste.WORKER: "Obreras", CasteDefs.Caste.SOLDIER: "Soldados", CasteDefs.Caste.DRONE: "Zánganos"}
 ## Factor de escala del layout: ventana real / 480, reducido para que los paneles ocupen menos
@@ -135,6 +142,7 @@ var _log_card: PanelContainer
 ## Fase 14: barra de arriba del mapa: símbolos y números de lo más importante, de un vistazo.
 var _topbar: PanelContainer
 var _topbar_row: HBoxContainer
+var _top_font := 0  # tamaño de letra aplicado ahora en la barra (0 = todavía ninguno)
 
 
 func _ready() -> void:
@@ -281,8 +289,9 @@ func _ready() -> void:
 	end_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	end_row.add_theme_constant_override("separation", 12)
 	end_box.add_child(end_row)
-	_pause_button(end_row, "Jugar de nuevo", play_again_pressed.emit)
-	_pause_button(end_row, "Menú principal", main_menu_pressed.emit)
+	# Sin el ancho fijo del panel lateral: el cartel tiene que entrar aun en un mapa chico.
+	_pause_button(end_row, "Jugar de nuevo", play_again_pressed.emit).custom_minimum_size.x = 0.0
+	_pause_button(end_row, "Menú principal", main_menu_pressed.emit).custom_minimum_size.x = 0.0
 
 	_build_pause_panel(root)
 	_build_test_panel(root)
@@ -312,7 +321,7 @@ func _build_top_bar(root: Control) -> void:
 	root.add_child(_topbar)
 	_topbar_row = HBoxContainer.new()
 	_topbar_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_topbar_row.add_theme_constant_override("separation", 30)
+	_topbar_row.add_theme_constant_override("separation", TOP_SEP_MAX)
 	_topbar.add_child(_topbar_row)
 
 
@@ -330,10 +339,10 @@ func _set_top_items(items: Array) -> void:
 		icon.mouse_filter = Control.MOUSE_FILTER_PASS
 		item.add_child(icon)
 		var l := Label.new()
-		l.add_theme_font_size_override("font_size", 30)
 		l.mouse_filter = Control.MOUSE_FILTER_PASS
 		item.add_child(l)
 		_topbar_row.add_child(item)
+		_top_font = 0  # pieza nueva: que `_fit_top_bar` le aplique el tamaño
 	for i in _topbar_row.get_child_count():
 		var item := _topbar_row.get_child(i) as HBoxContainer
 		item.visible = i < items.size()
@@ -396,7 +405,36 @@ func _update_top_bar(m: Node, sim: Simulation) -> void:
 	var r := _world_rect(m)
 	var gear_w := TOPBAR_H + 8.0  # la tuerca (Fase 28) es un cuadrado del alto de la barra
 	_topbar.position = r.position + Vector2(8.0, 6.0)
+	_fit_top_bar(r.size.x - 16.0 - gear_w)
 	_topbar.size = Vector2(r.size.x - 16.0 - gear_w, TOPBAR_H)
+
+
+## Fase 41: elige letra y separación para que los datos visibles entren en `width` (ver `TOP_FONTS`).
+func _fit_top_bar(width: float) -> void:
+	var st := _topbar.get_theme_stylebox("panel")
+	var inner := width - st.content_margin_left - st.content_margin_right
+	for fs in TOP_FONTS:
+		_set_top_font(fs)
+		var items_w := 0.0
+		var n := 0
+		for item in _topbar_row.get_children():
+			if (item as Control).visible:
+				items_w += (item as Control).get_combined_minimum_size().x
+				n += 1
+		var sep := int((inner - items_w) / maxi(n - 1, 1))
+		if sep >= TOP_SEP_MIN or fs == TOP_FONTS[-1]:
+			_topbar_row.add_theme_constant_override("separation", clampi(sep, 4, TOP_SEP_MAX))
+			return
+
+
+func _set_top_font(fs: int) -> void:
+	if fs == _top_font:
+		return
+	_top_font = fs
+	var icon_px := roundf(TOP_ICON_PX * fs / float(TOP_FONTS[0]))
+	for item in _topbar_row.get_children():
+		(item.get_child(0) as Control).custom_minimum_size = Vector2(icon_px, icon_px)
+		(item.get_child(1) as Label).add_theme_font_size_override("font_size", fs)
 
 
 ## Botón "ocultar / mostrar" el panel lateral, fijo en la esquina superior izquierda de la ventana
@@ -514,11 +552,12 @@ func _build_pause_panel(root: Control) -> void:
 
 
 ## Botón de tablita de madera (`_buy_button`) con su acción: menú de pausa y fin de partida.
-func _pause_button(box: Container, text: String, cb: Callable) -> void:
+func _pause_button(box: Container, text: String, cb: Callable) -> Button:
 	var b := _buy_button()
 	b.text = text
 	b.pressed.connect(cb)
 	box.add_child(b)
+	return b
 
 
 ## Fase 6: panel del modo Test (sandbox) — reiniciar, poner/quitar amenazas, agregar hormigas de

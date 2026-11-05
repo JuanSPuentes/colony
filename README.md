@@ -1320,3 +1320,7 @@ y sus `tut_*` de config): era un nivel jugable con objetivos; ahora es una visit
   nuevo queda solo en Opciones, que también pregunta.
 - Pruebas: `tools/test_phase41.gd` (respalda y restaura el guardado real). `ui_test.gd` ahora toma
   los niveles de zoom de `main.ZOOM_LEVELS` en vez de tenerlos copiados.
+- **Barra superior que entra siempre** (auditoría UX, punto 2; `Hud._fit_top_bar`): achica el
+  espacio entre datos y, si no alcanza, baja la letra un escalón (`TOP_FONTS`: 30, 24, 20). Antes, a
+  1280x800 (Steam Deck) se salía de la pantalla. La escala general de la interfaz según la
+  resolución queda para el tema visual único (punto 3).

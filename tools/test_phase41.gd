@@ -105,6 +105,23 @@ func _run() -> void:
 	_check("Menú principal pide confirmación y no sale todavía", _app.confirm_dialog.visible and _app.game != null and _app.game.sim == sim_before)
 	_app.confirm_dialog.hide()
 
+	# Punto 2 de la auditoría: la barra superior entra entera, sin meterse bajo la tuerca, aun a
+	# 1280x800 (Steam Deck) y con todos los datos a la vista (lluvia y velocidad incluidas).
+	_app.game.close_pause_menu()
+	_app.game.sim.weather = Simulation.Weather.RAINING
+	_app.game.sim.rain_end_tick = _app.game.sim.tick_count + 100000
+	_app.game.speed = 4
+	for res in [Vector2i(1280, 800), Vector2i(1440, 810), Vector2i(1920, 1080)]:
+		root.size = res
+		await _frames(4)
+		var bar: Control = hud._topbar
+		var row_w: float = hud._topbar_row.get_combined_minimum_size().x
+		_check("a %dx%d la barra superior entra entera" % [res.x, res.y], row_w <= bar.size.x and bar.position.x + bar.size.x <= res.x - Hud.TOPBAR_H - 8.0 + 0.5,
+			"contenido %.0f px en %.0f px, letra %d" % [row_w, bar.size.x, hud._top_font])
+	root.size = Vector2i(1440, 810)
+	_app.game.speed = 1
+	await _frames(2)
+
 	# Fin de partida: botones en vez de "F5: jugar de nuevo" (F5 ya no existe fuera del editor).
 	_check("F5 y las amenazas forzadas son solo del editor", _app.game.dev_keys == OS.has_feature("editor"))
 	_app.game.sim.game_over = true
