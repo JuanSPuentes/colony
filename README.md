@@ -1324,3 +1324,17 @@ y sus `tut_*` de config): era un nivel jugable con objetivos; ahora es una visit
   espacio entre datos y, si no alcanza, baja la letra un escalón (`TOP_FONTS`: 30, 24, 20). Antes, a
   1280x800 (Steam Deck) se salía de la pantalla. La escala general de la interfaz según la
   resolución queda para el tema visual único (punto 3).
+
+## Fase 42: registro del playtest
+
+- **`app/playtest_log.gd` (`PlaytestLog`):** por cada partida de Juego normal o Modo infinito guarda
+  en `user://playtest/<fecha>_<modo>.json` la colonia más grande, el tiempo jugado a cada
+  velocidad, la estación alcanzada, el resultado, cuánto tiempo la simulación no llegó a la
+  velocidad pedida (y con cuántas hormigas) y los trabones (frames de más de 0,1 s; los primeros
+  2 s de carga no cuentan). Se guarda cada 30 s y al cerrar la partida.
+- **Solo local:** no se envía a ningún lado; quien prueba manda el archivo a mano. En Windows está en
+  `%APPDATA%\Godot\app_userdata\colony_under_the_earth\playtest\` (sale de `config/name`). No
+  escribe nada sin ventana (pruebas) ni en el tutorial o el modo Test.
+- Objetivo: decidir el rendimiento con datos. Antes de esto se probó acelerar la búsqueda de plantas
+  y no hubo mejora medible (se revirtió): el costo es el trabajo normal de cada hormiga en GDScript.
+  Pruebas: `tools/test_phase42.gd`.

@@ -104,6 +104,9 @@ var seed_value := 12345
 
 var _acc := 0.0
 var _autosave_acc := 0.0  # Fase 40: segundos desde el último guardado automático
+## Fase 42: registro del playtest de esta partida (ver `PlaytestLog`). Sigue igual al mudarse de
+## estación o cargar: es la misma sesión. Nulo en el tutorial y en Test.
+var playtest_log: PlaytestLog
 var _overlay_acc := 0.0
 var _painting := false
 var _erasing := false
@@ -147,6 +150,11 @@ var _pan_fast := false
 const DRAG_FRICTION := 6.0
 var _drag_vel := Vector2.ZERO
 var _drag_last_ms := 0
+
+
+func _exit_tree() -> void:
+	if playtest_log != null:
+		playtest_log.save()  # Fase 42: al cerrar la partida (menú, nueva partida o salir del juego)
 
 
 func _ready() -> void:
@@ -264,6 +272,8 @@ func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> v
 	coach.reset(sim)
 	_acc = 0.0
 	_autosave_acc = 0.0
+	if playtest_log == null and (game_mode == "incremental" or game_mode == "historia"):
+		playtest_log = PlaytestLog.new(game_mode)
 	_painting = false
 	if sim.queen_id >= 0 and sim.ants.alive[sim.queen_id] == 1:
 		camera.position = sim.ants.pos[sim.queen_id]
@@ -401,6 +411,7 @@ func _process(delta: float) -> void:
 		camera.position += _drag_vel * delta
 		_drag_vel = _drag_vel.move_toward(Vector2.ZERO, _drag_vel.length() * DRAG_FRICTION * delta + 1.0)
 		_clamp_camera(camera.zoom.x)
+	var behind := false  # Fase 42: la simulación no llegó a la velocidad pedida este frame
 	if not paused and not sim.game_over:
 		_autosave_tick(delta)
 		_acc += delta
@@ -419,8 +430,11 @@ func _process(delta: float) -> void:
 				break
 		if ran >= MAX_TICKS_PER_FRAME:
 			_acc = 0.0
+			behind = true
 		if sim.migration_pending:
 			_migrate()
+	if playtest_log != null:
+		playtest_log.sample(delta, sim, speed, paused, behind)
 	terrain_view.refresh()
 	day_night_view.refresh()
 	ant_renderer.modulate = day_night_view.unit_modulate
