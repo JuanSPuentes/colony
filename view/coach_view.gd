@@ -340,6 +340,9 @@ func _tutorial_lessons() -> Array[Dictionary]:
 	return [
 		{"chapter": "Inicio", "title": "Bienvenida", "focus": _nest, "zoom": Z_WIDE,
 			"text": "Esta colonia ya está armada para que veas cómo funciona. Después empiezas la tuya desde cero.\nMueve la cámara con clic izq. y arrastrando, o con WASD; la rueda acerca y aleja."},
+		# Fase 43: el tutorial no enseñaba a pausar ni a cambiar la velocidad.
+		{"chapter": "Inicio", "title": "Pausa y velocidad", "focus": _nest, "zoom": Z_WIDE,
+			"text": "Espacio pausa sin tapar nada: puedes mirar el mapa y seguir dando órdenes. Esc o P abren el menú de pausa (guardar, opciones).\nF1, F2 y F3 cambian la velocidad: x1, x2 y x4."},
 		{"chapter": "La colonia", "title": "La cámara Real", "focus": func(s: Simulation) -> Vector2: return _room(s, WorldGrid.Room.ROYAL), "zoom": Z_NEAR,
 			"text": "Aquí vive la reina. Es el corazón del nido: si la reina muere, pierdes."},
 		{"chapter": "La colonia", "title": "La Guardería", "focus": func(s: Simulation) -> Vector2: return _room(s, WorldGrid.Room.NURSERY), "zoom": Z_NEAR,

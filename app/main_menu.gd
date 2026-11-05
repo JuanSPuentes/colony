@@ -56,10 +56,10 @@ func _ready() -> void:
 
 	var subtitle := Label.new()
 	subtitle.text = "Guías la colonia con feromonas y el diseño del nido; las hormigas hacen el trabajo."
-	subtitle.add_theme_font_size_override("font_size", 16)
-	subtitle.add_theme_color_override("font_color", Color(0.85, 0.85, 0.88))
+	subtitle.add_theme_font_size_override("font_size", 18)  # Fase 43: se leía mal sobre las nubes
+	subtitle.add_theme_color_override("font_color", CREAM)
 	subtitle.add_theme_color_override("font_outline_color", Color.BLACK)
-	subtitle.add_theme_constant_override("outline_size", 3)
+	subtitle.add_theme_constant_override("outline_size", 6)
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	subtitle.position = Vector2(-320, 128)

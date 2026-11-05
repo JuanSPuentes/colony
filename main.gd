@@ -93,8 +93,9 @@ var paused := false
 ## Fase 41: Espacio es la pausa rápida (congela sin tapar nada: se sigue mirando y dando órdenes);
 ## Esc / P abren el menú de pausa (`Hud._pause_panel`). Esto dice cuál de las dos está activa.
 var pause_menu_open := false
-## Fase 41: atajos de desarrollo (F5 reinicia sin preguntar, F10/F11 fuerzan amenazas): solo desde
-## el editor de Godot, como el Modo infinito; en una build exportada no hacen nada.
+## Fase 41: atajos de desarrollo (F5 reinicia sin preguntar, F10/F11 fuerzan amenazas; Fase 43: F7
+## carga sin preguntar): solo desde el editor de Godot, como el Modo infinito; en una build
+## exportada no hacen nada. Para cargar está «Continuar» del menú.
 var dev_keys := OS.has_feature("editor")
 var tool := 1  # 1 = cavar, 2 = feromona, 3 = cámara, 4 = borrar
 var phero_index := 0
@@ -669,7 +670,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		KEY_F6:
 			save_game()
 		KEY_F7:
-			load_game()
+			if dev_keys:  # Fase 43: cargaba sin preguntar y se perdía la partida en curso
+				load_game()
 
 
 func _update_pan() -> void:

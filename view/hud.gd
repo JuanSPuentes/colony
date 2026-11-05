@@ -939,8 +939,8 @@ func update_info(m: Node) -> void:
 		sub = " · %s (Q/E)" % tr(OverlayView.LAYER_NAMES[m.phero_index + 1])
 	elif m.tool == 3:
 		sub = " · %s (Q/E)" % tr(WorldGrid.ROOM_NAMES[m.ROOM_TYPES[m.room_index]])
-	_tools.text = tr("%s%s\nCapa: %s\nZoom %sx   ·   Marcadas: %d") % [
-		tool_names[m.tool], sub, tr(OverlayView.LAYER_NAMES[m.overlay.layer]), "%.2f" % m.camera.zoom.x, sim.world.marked_count]
+	# Fase 43 (auditoría UX, punto 7): fuera «Capa» y «Zoom», que eran datos de desarrollo.
+	_tools.text = tr("%s%s\nPor cavar: %d celdas") % [tool_names[m.tool], sub, sim.world.marked_count]
 
 	_phero_badge.visible = m.tool == 2
 	if _phero_badge.visible:

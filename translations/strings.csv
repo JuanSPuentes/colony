@@ -107,10 +107,8 @@ STARVING!"
 "Borrar [4]","Erase [4]"
 "Mover reina [5]","Move queen [5]"
 "%s%s
-Capa: %s
-Zoom %sx   ·   Marcadas: %d","%s%s
-Layer: %s
-Zoom %sx   ·   Marked: %d"
+Por cavar: %d celdas","%s%s
+To dig: %d cells"
 "¡LA COLONIA PROSPERÓ!","THE COLONY THRIVED!"
 "LA COLONIA CAYÓ","THE COLONY FELL"
 "Lloviendo","Raining"
@@ -377,3 +375,7 @@ Move the camera with left click and drag, or WASD; the wheel zooms in and out."
 "Menú de pausa","Pause menu"
 "Esc / P","Esc / P"
 "Jugar de nuevo","Play again"
+"Pausa y velocidad","Pause and speed"
+"Espacio pausa sin tapar nada: puedes mirar el mapa y seguir dando órdenes. Esc o P abren el menú de pausa (guardar, opciones).
+F1, F2 y F3 cambian la velocidad: x1, x2 y x4.","Space pauses without covering anything: you can look at the map and keep giving orders. Esc or P open the pause menu (save, options).
+F1, F2 and F3 change the speed: x1, x2 and x4."

@@ -93,7 +93,7 @@ volumen, brillo) o te deja salir, sin perder la partida (vuelve exactamente a do
 | **F5** | Solo desde el editor: reiniciar con el mismo mapa |
 | **Shift+F5** | Solo desde el editor: reiniciar con un mapa nuevo |
 | **F6** | Guardar partida |
-| **F7** | Cargar la última partida guardada |
+| **F7** | Solo desde el editor: cargar la última partida guardada (para jugar: «Continuar») |
 | **I** | Plegar / desplegar el panel de estado (también con el botón "ocultar" del panel) |
 | Clic medio, arrastrar | Mover la cámara |
 
@@ -1338,3 +1338,14 @@ y sus `tut_*` de config): era un nivel jugable con objetivos; ahora es una visit
 - Objetivo: decidir el rendimiento con datos. Antes de esto se probó acelerar la búsqueda de plantas
   y no hubo mejora medible (se revirtió): el costo es el trabajo normal de cada hormiga en GDScript.
   Pruebas: `tools/test_phase42.gd`.
+
+## Fase 43: arreglos chicos antes del playtest
+
+- **Tutorial:** tarjeta nueva «Pausa y velocidad» (Espacio, Esc / P, F1-F3) después de la bienvenida;
+  antes no se enseñaba a pausar ni a acelerar.
+- **Panel izquierdo:** fuera «Capa» y «Zoom» (datos de desarrollo); queda la herramienta y «Por
+  cavar: N celdas».
+- **Árbol de mejoras:** el nombre de cada rama (ATAQUE, DEFENSA, RECOLECCIÓN) al final de su línea, en
+  su color (antes solo se distinguían por color), y las mejoras bloqueadas muestran su precio en gris.
+- **F7** (cargar sin preguntar) solo desde el editor; para cargar está «Continuar».
+- **Menú principal:** el subtítulo se lee mejor sobre las nubes (más grande, con más contorno).

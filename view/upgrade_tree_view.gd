@@ -21,6 +21,10 @@ const MARGIN_BOTTOM := 50.0
 const INFO_W := 400.0
 const LOCKED_FILL := Color("3a3129")
 const LOCKED_EDGE := Color("6b5f52")
+## Fase 43 (auditoría UX, punto 6): el nombre de cada rama va al final de su línea (antes solo se
+## distinguían por color, que no sirve con daltonismo). Espacio que se le reserva al acomodar.
+const LABEL_GAP := 30.0
+const LABEL_PAD := 40.0
 
 var sim: Simulation
 var _hover := -2  # -2: nada; -1: el centro; 0..: `Upgrades.Id`
@@ -53,9 +57,9 @@ func _layout() -> void:
 	var tree_w := size.x - INFO_W
 	var free_h := size.y - MARGIN_TOP - MARGIN_BOTTOM
 	# Alto del árbol: 4 pasos hacia arriba + la mitad de eso hacia abajo, más los hexágonos.
-	var up_h := Upgrades.TIERS * STEP + HEX_R
-	var need_h := up_h + Upgrades.TIERS * STEP * 0.5 + HEX_R
-	var need_w := Upgrades.TIERS * STEP * cos(deg_to_rad(30.0)) * 2.0 + HEX_R * 2.0
+	var up_h := Upgrades.TIERS * STEP + HEX_R + LABEL_PAD
+	var need_h := up_h + Upgrades.TIERS * STEP * 0.5 + HEX_R + LABEL_PAD
+	var need_w := Upgrades.TIERS * STEP * cos(deg_to_rad(30.0)) * 2.0 + HEX_R * 2.0 + LABEL_PAD * 4.0
 	_k = clampf(minf(tree_w / need_w, free_h / need_h), 0.4, 1.2)
 	_center = Vector2(tree_w * 0.5, MARGIN_TOP + (free_h - need_h * _k) * 0.5 + up_h * _k)
 
@@ -99,7 +103,19 @@ func _draw() -> void:
 	_text_center(font, _center + Vector2(0, 14) * _k, "%d / %d" % [up.bought_count, Upgrades.NODES.size()], 18, PixelUI.GOLD)
 	for id in Upgrades.NODES.size():
 		_draw_node(font, id)
+	_draw_branch_labels(font)
 	_draw_info(font)
+
+
+## Fase 43: nombre de la rama más allá de su última mejora, en el color de la rama.
+func _draw_branch_labels(font: Font) -> void:
+	for id in Upgrades.NODES.size():
+		var node: Dictionary = Upgrades.NODES[id]
+		if node.tier != Upgrades.TIERS - 1:
+			continue
+		var a := deg_to_rad(BRANCH_ANGLES[node.branch])
+		var p := hex_pos(id) + Vector2(cos(a), sin(a)) * (HEX_R + LABEL_GAP) * _k
+		_text_center(font, p, tr(Upgrades.BRANCH_NAMES[node.branch]).to_upper(), 20, BRANCH_COLORS[node.branch].lightened(0.35))
 
 
 func _draw_node(font: Font, id: int) -> void:
@@ -111,6 +127,7 @@ func _draw_node(font: Font, id: int) -> void:
 	var edge := LOCKED_EDGE
 	var text_col := PixelUI.TEXT_DIM
 	var price := ""
+	var price_col := PixelUI.GOLD
 	if up.bought[id]:
 		fill = base
 		edge = base.lightened(0.45)
@@ -120,6 +137,10 @@ func _draw_node(font: Font, id: int) -> void:
 		edge = PixelUI.GOLD if up.can_buy(id) else base
 		text_col = PixelUI.TEXT
 		price = "%.0f" % up.cost(id)
+	else:
+		# Fase 43: las bloqueadas también muestran cuánto costarán, apagado.
+		price = "%.0f" % up.cost(id)
+		price_col = PixelUI.TEXT_DIM
 	_draw_hex(p, fill, edge, _hover == id)
 	var words: PackedStringArray = tr(node.name).split(" ")
 	var lines: Array[String] = [words[0]]
@@ -130,7 +151,7 @@ func _draw_node(font: Font, id: int) -> void:
 		_text_center(font, p + Vector2(0, y) * _k, line, 17, text_col)
 		y += 17.0
 	if price != "":
-		_text_center(font, p + Vector2(0, y + 2.0) * _k, price, 17, PixelUI.GOLD)
+		_text_center(font, p + Vector2(0, y + 2.0) * _k, price, 17, price_col)
 
 
 func _draw_hex(p: Vector2, fill: Color, edge: Color, hover: bool) -> void:
