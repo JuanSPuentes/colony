@@ -186,10 +186,11 @@ func _run() -> void:
 	_check("WASD mueve la cámara", cam.position.x > x0 + 2.0, "x %.0f -> %.0f" % [x0, cam.position.x])
 	var z0: float = cam.zoom.x
 	await _wheel(true)
-	_check("la rueda hace zoom en pasos fijos", cam.zoom.x > z0 and [0.5, 1.0, 2.0, 3.0, 4.0].has(cam.zoom.x), "zoom %.1f -> %.1f" % [z0, cam.zoom.x])
+	# Los niveles salen de `main.ZOOM_LEVELS` (no copiados acá: cambiaron el 2026-11-04).
+	_check("la rueda hace zoom en pasos fijos", cam.zoom.x > z0 and _main.ZOOM_LEVELS.has(cam.zoom.x), "zoom %.2f -> %.2f" % [z0, cam.zoom.x])
 	for i in 8:
 		await _wheel(false)
-	_check("el zoom tiene un mínimo", cam.zoom.x == 0.5)
+	_check("el zoom tiene un mínimo", is_equal_approx(cam.zoom.x, _main.zoom_at(0)), "zoom %.2f, mínimo %.2f" % [cam.zoom.x, _main.zoom_at(0)])
 	await _wheel(true)
 
 	# Lluvia, capas y prueba de carga: ya no tienen tecla asignada (L/Tab/F9 se quitaron del juego

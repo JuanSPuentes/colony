@@ -70,8 +70,7 @@ func _ready() -> void:
 	options.save_requested.connect(_on_save_requested)
 	options.new_game_requested.connect(func() -> void: _confirm(
 		"¿Empezar una partida nueva? Se pierde lo que no hayas guardado.", "Nueva partida", _restart_same_mode))
-	options.main_menu_requested.connect(func() -> void: _confirm(
-		"¿Volver al menú principal? Se pierde lo que no hayas guardado.", "Menú principal", _back_to_main_menu))
+	options.main_menu_requested.connect(_ask_main_menu)
 	menu.play_continue.connect(_continue_game)
 
 	# Fase 35: "Nueva partida" arranca el tutorial la primera vez (obligatorio); después, directo.
@@ -98,6 +97,8 @@ func _new_game_scene() -> void:
 	add_child(game)
 	game.set_brightness(settings.brightness)
 	game.menu_requested.connect(func() -> void: _open_options("game"))
+	game.main_menu_requested.connect(_ask_main_menu)
+	game.play_again_requested.connect(_restart_same_mode)
 
 
 func _start_game(incremental: bool) -> void:
@@ -252,6 +253,15 @@ func _confirm(text: String, ok_text: String, action: Callable) -> void:
 	confirm_dialog.dialog_text = text
 	confirm_dialog.ok_button_text = ok_text
 	confirm_dialog.popup_centered()
+
+
+## Fase 17/41: volver al menú principal, desde Opciones, el menú de pausa o el fin de partida. Pregunta
+## salvo que la partida ya haya terminado (no hay nada que perder).
+func _ask_main_menu() -> void:
+	if game != null and game.sim != null and game.sim.game_over:
+		_back_to_main_menu()
+		return
+	_confirm("¿Volver al menú principal? Se pierde lo que no hayas guardado.", "Menú principal", _back_to_main_menu)
 
 
 func _on_save_requested() -> void:

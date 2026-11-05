@@ -84,13 +84,14 @@ volumen, brillo) o te deja salir, sin perder la partida (vuelve exactamente a do
 | Clic izquierdo, arrastrar | Mover la cámara (al soltar sigue un poco y frena sola) |
 | **7** | Modo normal: comprar un huevo con comida (también con el botón del panel; qué nace es al azar) |
 | **9** | Modo normal: auto-compra de huevos, apagada/encendida (compra sola en cuanto alcanza, dejando una reserva) |
-| **Espacio** | Pausa / reanudar |
+| **Espacio** | Pausa rápida / reanudar (sin menú: se sigue mirando y dando órdenes) |
+| **Esc / P** | Menú de pausa (Continuar, Guardar, Opciones, Menú principal) |
 | **F1 / F2 / F3** | Velocidad x1 / x2 / x4 |
 | **WASD / flechas** | Mover la cámara (con **Shift**, más rápido) |
 | Rueda del mouse | Zoom en pasos fijos |
 | **H** | Saltar a la reina |
-| **F5** | Reiniciar con el mismo mapa |
-| **Shift+F5** | Reiniciar con un mapa nuevo |
+| **F5** | Solo desde el editor: reiniciar con el mismo mapa |
+| **Shift+F5** | Solo desde el editor: reiniciar con un mapa nuevo |
 | **F6** | Guardar partida |
 | **F7** | Cargar la última partida guardada |
 | **I** | Plegar / desplegar el panel de estado (también con el botón "ocultar" del panel) |
@@ -207,7 +208,7 @@ débil o si varios soldados la rodean; vuelve otra más fuerte pasado un interva
 (soldados, primera lluvia) y Colonia madura (Peligro, Ataque, Evacuar, la araña).
 
 **Derrota:** la partida termina cuando muere la reina (ahogada, por la araña o por hambre/sed
-prolongadas); el HUD muestra la causa y F5 reinicia.
+prolongadas); el HUD muestra la causa con los botones «Jugar de nuevo» y «Menú principal» (Fase 41).
 
 **Guardar y cargar** (`sim/save_system.gd`, Fase 2): F6 guarda toda la partida en
 `user://save1.json` (terreno, cámaras, feromonas, agua, economía, cría, la araña y cada hormiga);
@@ -1302,3 +1303,20 @@ y sus `tut_*` de config): era un nivel jugable con objetivos; ahora es una visit
 - **Aviso corregido:** «Partida guardada» se mostraba con solo mirar si el archivo existía; ahora
   usa el resultado real del guardado.
 - Pruebas: `tools/test_phase40.gd`.
+
+## Fase 41: menú de pausa único (auditoría UX, punto 1)
+
+- **Dos pausas, como en el género:** **Espacio** es la pausa rápida (congela sin tapar nada: se
+  sigue mirando y dando órdenes) y **Esc / P** abren el menú de pausa: Continuar, Guardar partida
+  (con aviso de resultado), Opciones y Menú principal (`main.open_pause_menu`). Antes Espacio abría
+  un panel con «Reiniciar», que borraba la partida de un clic sin preguntar, y «Salir», que en
+  realidad abría Opciones.
+- **Atajos de desarrollo solo en el editor** (`main.dev_keys`): F5 / Shift+F5 (reiniciar sin
+  preguntar) y F10 / F11 (forzar araña / ciempiés) no hacen nada en una build exportada.
+- **Fin de partida con botones** «Jugar de nuevo» y «Menú principal» (antes decía «F5: jugar de
+  nuevo»); con la partida terminada, salir al menú no pregunta.
+- **Menú principal pide confirmación** igual desde la pausa que desde Opciones
+  (`app.gd._ask_main_menu`, señal `main.main_menu_requested` ← `Hud.main_menu_pressed`). Empezar de
+  nuevo queda solo en Opciones, que también pregunta.
+- Pruebas: `tools/test_phase41.gd` (respalda y restaura el guardado real). `ui_test.gd` ahora toma
+  los niveles de zoom de `main.ZOOM_LEVELS` en vez de tenerlos copiados.

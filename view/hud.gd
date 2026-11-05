@@ -54,13 +54,14 @@ const TOPBAR_H := 52.0  # Fase 30: más alta, para que los íconos se lean (pedi
 ## nueva en main.gd, se agrega aquí también para que el jugador la vea.
 ## Fase 5: COLONIA (comprar/ir a la reina) y PARTIDA (guardar/reiniciar) se quitaron de esta lista
 ## a propósito: son acciones de juego, no "opciones" — la pantalla de Opciones (que reusa esta
-## lista) terminó mostrando más de lo que su nombre promete. Las teclas 7/8/9/H/F5/F6/F7/Shift+F5
-## siguen funcionando igual en `main.gd`; solo se dejaron de documentar aquí.
+## lista) terminó mostrando más de lo que su nombre promete. Las teclas 7/8/9/H/F6/F7 siguen
+## funcionando igual en `main.gd`; solo se dejaron de documentar aquí. F5/Shift+F5 (Fase 41): solo
+## desde el editor (`main.dev_keys`).
 const CONTROLS := [
 	["HERRAMIENTAS", [["1", "Cavar túneles"], ["2 / 3", "Feromona / Cámara"], ["4", "Borrar todo bajo el pincel"],
 		["5", "Mover reina (Shift + clic der. cancela)"],
 		["Q / E", "Cambiar subtipo"], ["Clic derecho", "Usar la herramienta"], ["Shift + clic der.", "Borrar / quitar"]]],
-	["CÁMARA Y TIEMPO", [["Clic izq. y arrastrar", "Mover la cámara"], ["WASD / flechas", "Mover la cámara (Shift: rápido)"], ["Rueda", "Zoom"], ["Espacio", "Pausa"],
+	["CÁMARA Y TIEMPO", [["Clic izq. y arrastrar", "Mover la cámara"], ["WASD / flechas", "Mover la cámara (Shift: rápido)"], ["Rueda", "Zoom"], ["Espacio", "Pausa rápida"], ["Esc / P", "Menú de pausa"],
 		["F1 / F2 / F3", "Velocidad x1 / x2 / x4"], ["I", "Plegar / desplegar panel"]]],
 ]
 
@@ -70,6 +71,10 @@ var sidebar_open := true
 
 ## Fase 3 (menú): `main.gd` la reenvía como `menu_requested` para que `app.gd` abra Opciones.
 signal gear_pressed
+## Fase 41: «Menú principal» del menú de pausa; `app.gd` pide confirmación antes de salir.
+signal main_menu_pressed
+## Fase 41: «Jugar de nuevo» de la pantalla de fin de partida (antes solo se podía con F5).
+signal play_again_pressed
 ## `main.gd` la escucha para recalcular `_resize_world_container()`: el panel lateral reserva/
 ## libera sitio real del mundo, así que cambiar `sidebar_open` sin avisarle a `main` deja el
 ## `SubViewport` con el tamaño viejo (clics mapeando contra la franja equivocada).
@@ -95,9 +100,9 @@ var _end_panel: PanelContainer
 var _end_reason: Label
 ## Fase 5: tooltip al pasar el mouse sobre una hormiga (casta, vida) o una cámara (tipo, válida).
 var _tooltip: Label
-## Fase 5: panel visible mientras el juego está en pausa (Espacio), para que una persona nueva
-## pueda reiniciar o salir sin saber que Shift+F5/la tuerca existen.
+## Fase 5/41: el menú de pausa (Esc / P), ver `_build_pause_panel`.
 var _pause_panel: PanelContainer
+var _pause_status: Label
 ## Recuadro arriba al centro con la feromona activa (muestra de color + nombre), visible solo con
 ## la herramienta Feromona [2]. Sigue siendo un overlay sobre el mundo (no una sección del panel):
 ## es información espacial que se mira mientras se pinta, no mientras se lee el panel.
@@ -270,12 +275,14 @@ func _ready() -> void:
 	_end_reason.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_end_reason.custom_minimum_size = Vector2(440, 0)
 	end_box.add_child(_end_reason)
-	var end_hint := Label.new()
-	end_hint.text = "F5: jugar de nuevo   ·   ⚙: salir al menú"
-	end_hint.add_theme_font_size_override("font_size", 14)
-	end_hint.add_theme_color_override("font_color", Color(0.75, 0.72, 0.68))
-	end_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	end_box.add_child(end_hint)
+	# Fase 41: botones en vez de "F5: jugar de nuevo · ⚙: salir al menú" (F5 ahora es solo de
+	# desarrollo, y un jugador nuevo no tiene por qué saber las teclas).
+	var end_row := HBoxContainer.new()
+	end_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	end_row.add_theme_constant_override("separation", 12)
+	end_box.add_child(end_row)
+	_pause_button(end_row, "Jugar de nuevo", play_again_pressed.emit)
+	_pause_button(end_row, "Menú principal", main_menu_pressed.emit)
 
 	_build_pause_panel(root)
 	_build_test_panel(root)
@@ -382,7 +389,7 @@ func _update_top_bar(m: Node, sim: Simulation) -> void:
 	if sim.weather != Simulation.Weather.CLEAR:
 		items.append(["snow" if SeasonStyle.snows(sim) else "rain", tr("¡%ds!") % ceili(sim.rain_eta_s()) if sim.weather == Simulation.Weather.WARNING else _rain_word(sim), tr("Lluvia")])
 	if m.paused:
-		items.append(["pause", tr("Pausa"), tr("Espacio para seguir")])
+		items.append(["pause", tr("Pausa"), tr("Espacio para seguir · Esc: menú")])
 	elif m.speed > 1:
 		items.append(["fast", "x%d" % m.speed, tr("Velocidad")])
 	_set_top_items(items)
@@ -463,8 +470,11 @@ func _build_phero_badge(root: Control) -> void:
 	row.add_child(_phero_label)
 
 
-## Fase 5: panel centrado con Reiniciar/Salir, visible solo en pausa manual (Espacio), para que una
-## persona nueva no dependa de saber que Shift+F5 o la tuerca existen (prompt_fase3_godot.md 4.4).
+## Fase 5: panel centrado del menú de pausa, para que una persona nueva no dependa de saber que la
+## tuerca existe. Fase 41 (auditoría UX): se abre con Esc / P (Espacio es la pausa rápida, sin menú)
+## y tiene Continuar, Guardar, Opciones y Menú principal (este con confirmación en `app.gd`). Antes
+## era Reiniciar/Salir: Reiniciar borraba la partida de un clic sin preguntar y Salir en realidad
+## abría Opciones. Empezar de nuevo queda solo en Opciones, que también pregunta.
 func _build_pause_panel(root: Control) -> void:
 	var panel := PanelContainer.new()
 	var style := _panel_style()
@@ -489,15 +499,26 @@ func _build_pause_panel(root: Control) -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 
-	var restart := _buy_button()
-	restart.text = "Reiniciar"
-	restart.pressed.connect(func() -> void: _m.start(_m.seed_value))
-	box.add_child(restart)
+	_pause_button(box, "Continuar", func() -> void: _m.close_pause_menu())
+	_pause_button(box, "Guardar partida", func() -> void:
+		_pause_status.text = tr("Partida guardada.") if _m.save_game() == OK else tr("No se pudo guardar.")
+		_pause_status.visible = true)
+	_pause_button(box, "Opciones", func() -> void: gear_pressed.emit())
+	_pause_button(box, "Menú principal", func() -> void: main_menu_pressed.emit())
+	_pause_status = Label.new()
+	_pause_status.add_theme_font_size_override("font_size", PANEL_FONT)
+	_pause_status.add_theme_color_override("font_color", HEADER_COLOR)
+	_pause_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_pause_status.visible = false
+	box.add_child(_pause_status)
 
-	var quit := _buy_button()
-	quit.text = "Salir"
-	quit.pressed.connect(func() -> void: gear_pressed.emit())
-	box.add_child(quit)
+
+## Botón de tablita de madera (`_buy_button`) con su acción: menú de pausa y fin de partida.
+func _pause_button(box: Container, text: String, cb: Callable) -> void:
+	var b := _buy_button()
+	b.text = text
+	b.pressed.connect(cb)
+	box.add_child(b)
 
 
 ## Fase 6: panel del modo Test (sandbox) — reiniciar, poner/quitar amenazas, agregar hormigas de
@@ -863,7 +884,10 @@ func update_info(m: Node) -> void:
 	var world_rect := _world_rect(m)
 	if _tree_view.visible and (not sim.incremental or sim.game_over or _tree_view.sim != sim):
 		toggle_upgrade_tree()  # partida nueva o terminada: se cierra sola
-	_pause_panel.visible = m.paused and not sim.game_over and not _tree_view.visible
+	var was_open := _pause_panel.visible
+	_pause_panel.visible = m.paused and m.pause_menu_open and not sim.game_over and not _tree_view.visible
+	if _pause_panel.visible and not was_open:
+		_pause_status.visible = false  # Fase 41: el aviso de «guardada» es de la pausa anterior
 	if _pause_panel.visible:
 		_pause_panel.position = world_rect.position + (world_rect.size - _pause_panel.size) * 0.5
 	_test_panel.visible = sim.test_mode

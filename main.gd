@@ -40,6 +40,10 @@ const ROOM_TYPES: Array[int] = [WorldGrid.Room.NURSERY, WorldGrid.Room.STORAGE, 
 ## `main.tscn` directo (como hacen `ui_test.gd`/`screenshot.gd`), arranca solo, como siempre.
 var auto_start := true
 signal menu_requested
+## Fase 41: «Menú principal» del menú de pausa (`Hud.main_menu_pressed`).
+signal main_menu_requested
+## Fase 41: «Jugar de nuevo» de la pantalla de fin de partida.
+signal play_again_requested
 ## Fase 35: el jugador terminó el tutorial (última tarjeta u "Omitir todo"); lo escucha `app.gd`.
 signal tutorial_finished
 
@@ -86,6 +90,12 @@ var camera: Camera2D
 
 var speed := 1
 var paused := false
+## Fase 41: Espacio es la pausa rápida (congela sin tapar nada: se sigue mirando y dando órdenes);
+## Esc / P abren el menú de pausa (`Hud._pause_panel`). Esto dice cuál de las dos está activa.
+var pause_menu_open := false
+## Fase 41: atajos de desarrollo (F5 reinicia sin preguntar, F10/F11 fuerzan amenazas): solo desde
+## el editor de Godot, como el Modo infinito; en una build exportada no hacen nada.
+var dev_keys := OS.has_feature("editor")
 var tool := 1  # 1 = cavar, 2 = feromona, 3 = cámara, 4 = borrar
 var phero_index := 0
 var room_index := 0
@@ -183,6 +193,8 @@ func _ready() -> void:
 	world_vp.add_child(camera)
 	hud = Hud.new()
 	hud.gear_pressed.connect(func() -> void: menu_requested.emit())
+	hud.main_menu_pressed.connect(func() -> void: main_menu_requested.emit())
+	hud.play_again_pressed.connect(func() -> void: play_again_requested.emit())
 	hud.sidebar_toggled.connect(_resize_world_container)
 	add_child(hud)
 	# `hud` no existía todavía en la llamada de arriba (línea ~122): esa primera vez
@@ -258,6 +270,17 @@ func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> v
 	else:
 		camera.position = Vector2(cfg.nest_x * cfg.cell_px, (cfg.surface_y + 2) * cfg.cell_px)
 	_apply_camera()
+
+
+## Fase 41: menú de pausa (Esc / P). Abrirlo pausa; cerrarlo (o «Continuar») reanuda.
+func open_pause_menu() -> void:
+	paused = true
+	pause_menu_open = true
+
+
+func close_pause_menu() -> void:
+	paused = false
+	pause_menu_open = false
 
 
 ## Fase 2: guardar y cargar partida. Fase 40: devuelve el resultado (antes `app.gd` solo miraba si
@@ -592,6 +615,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		KEY_SPACE:
 			if not hud.is_upgrade_tree_open():  # Fase 34: el árbol abierto maneja la pausa
 				paused = not paused
+				pause_menu_open = false
 		KEY_F1:
 			speed = 1
 		KEY_F2:
@@ -599,28 +623,35 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		KEY_F3:
 			speed = 4
 		KEY_F10:
-			sim.cmd_force_spider()
+			if dev_keys:
+				sim.cmd_force_spider()
 		KEY_F11:
-			sim.cmd_force_centipede()
+			if dev_keys:
+				sim.cmd_force_centipede()
 		KEY_H:
 			if sim.queen_id >= 0:
 				_jump_from = camera.position
 				_jump_to = sim.ants.pos[sim.queen_id]
 				_jump_t = 0.0
 		KEY_F5:
-			if k.shift_pressed:
-				var rng := RandomNumberGenerator.new()
-				rng.randomize()
-				start(rng.randi() % 1000000)
-			else:
-				start(seed_value)
+			if dev_keys:  # Shift+F5: mapa nuevo; F5: el mismo
+				var new_seed := seed_value
+				if k.shift_pressed:
+					var rng := RandomNumberGenerator.new()
+					rng.randomize()
+					new_seed = rng.randi() % 1000000
+				start(new_seed)
 		KEY_I:
 			hud.toggle_sidebar()
 		KEY_U:
 			hud.toggle_upgrade_tree()  # Fase 34: ventana del árbol de mejoras
-		KEY_ESCAPE:
+		KEY_ESCAPE, KEY_P:
 			if hud.is_upgrade_tree_open():
 				hud.toggle_upgrade_tree()
+			elif pause_menu_open and paused:
+				close_pause_menu()
+			else:
+				open_pause_menu()
 		KEY_F6:
 			save_game()
 		KEY_F7:
