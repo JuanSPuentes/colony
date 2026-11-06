@@ -321,8 +321,12 @@ extends Resource
 ## nido. Se gana la estación matando a su reina cuando el jugador quiera ("¡Atacar!").
 ## Apagarla deja la rival como antes (solo la oleada final); lo usan pruebas de otras cosas.
 @export var rival_home := true
-## Pedido del jugador (2026-10-28): arranca con la reina y 2 soldados, y suma 1 cada 1,5 días.
-@export var rival_start_ants := 2
+## Pedido del jugador (2026-10-28): arranca con la reina y unas pocas hormigas, y suma 1 cada 1,5
+## días. Fase 44: arranca con 4 (antes 2) y 2 más en cada estación siguiente; esas son su guarnición
+## y nunca salen de incursión. Con 2 y sin crecer, el jugador automático (`tools/sim_full_game.gd`)
+## ganaba las 4 estaciones en 2-4 días de juego; con 4/+2 llega a la última estación en unos 11.
+@export var rival_start_ants := 4
+@export var rival_start_ants_per_season := 2
 @export var rival_grow_days := 1.5
 @export var rival_max_ants := 40
 @export var rival_raid_s := 150.0
@@ -336,6 +340,12 @@ extends Resource
 ## Fase 37 (playtest): cuando atacan a la reina rival, las hormigas rivales que no están de incursión
 ## acuden a defenderla durante estos segundos desde el último golpe.
 @export var rival_defend_s := 8.0
+## Fase 44: una obrera atacada (por una rival o un depredador) lejos del nido huye estos segundos como mínimo
+## (cerca del nido, a `worker_defend_cells` o menos por los túneles, pelea). Los soldados acuden a la
+## alarma que deja durante `alarm_s`.
+@export var worker_flee_s := 4.0
+@export var worker_defend_cells := 8
+@export var alarm_s := 20.0
 ## Fase 37 (playtest): comida al instante por matar (además de los restos que quedan en el suelo).
 @export var kill_food_rival_ant := 8.0
 @export var kill_food_rival_queen := 60.0

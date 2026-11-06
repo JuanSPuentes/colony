@@ -113,8 +113,15 @@ func forager_count() -> int:
 func spawn_home() -> void:
 	var cfg := sim.cfg
 	queen.spawn(home_pos(), 1.0 + cfg.rival_queen_strength_growth * sim.season_index)
-	for k in cfg.rival_start_ants:
+	for k in garrison():
 		_add_ant()
+
+
+## Fase 44: con cuántas hormigas arranca la rival en esta estación. Es también su guarnición: esas
+## se quedan defendiendo a la reina y las incursiones salen solo de lo que creció después
+## (`_send_raid`). Así una rival grande cuesta atacarla pero no arrasa al jugador al principio.
+func garrison() -> int:
+	return sim.cfg.rival_start_ants + sim.cfg.rival_start_ants_per_season * sim.season_index
 
 
 func home_pos() -> Vector2:
@@ -160,9 +167,10 @@ func _send_raid() -> void:
 	for i in ants.count:
 		if ants.alive[i] == 1 and ants.faction[i] == 1 and ants.raiding[i] == 0:
 			guards.append(i)
-	if guards.is_empty():
+	# Fase 44: la guarnición no sale de incursión (antes salía la mitad de todas, mínimo 1).
+	var n := int(round(maxi(0, guards.size() - garrison()) * sim.cfg.rival_raid_fraction))
+	if n <= 0:
 		return
-	var n := maxi(1, int(round(guards.size() * sim.cfg.rival_raid_fraction)))
 	for k in n:
 		ants.raiding[guards[k]] = 1
 	sim.notify("¡Incursión rival: %s hormigas vienen hacia tu nido!", [n])

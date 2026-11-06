@@ -9,7 +9,7 @@ extends RefCounted
 ## su propio `_think_*`. Los estados nuevos (FLEE_DANGER, EVACUATE, NURSE, GUARD, ATTACK) son
 ## aditivos: si nada pinta esas feromonas (como en la Fase 0) nunca se activan.
 
-enum State { EXPLORE, GO_TO_FOOD, CARRY_HOME, DIG, FLEE_WATER, IDLE, FLEE_DANGER, EVACUATE, NURSE, GUARD, ATTACK, CARRY_EGG }
+enum State { EXPLORE, GO_TO_FOOD, CARRY_HOME, DIG, FLEE_WATER, IDLE, FLEE_DANGER, EVACUATE, NURSE, GUARD, ATTACK, CARRY_EGG, FLEE_ENEMY }
 ## Fase 38: `SURFACE` sale del nido hacia la superficie sin mirar feromonas (soldados y quien no
 ## busca comida: `EXPLORE` los arrastraba por los rastros de Comida pintados y daban vueltas).
 enum Mode { EXPLORE, FOOD, NEST, DIG, FLEE, PLANT, TOWARD, AWAY, STORE, ROUTE, SURFACE }
@@ -34,9 +34,11 @@ const STATE_COLORS: Array[Color] = [
 	Color("ff8040"),  # GUARDIA
 	Color("ff0000"),  # ATTACK
 	Color("9b59b6"),  # CARRY_EGG (mismo morado del Zángano)
+	Color("ff7ad9"),  # FLEE_ENEMY
 ]
 const STATE_NAMES: Array[String] = ["EXPLORAR", "IR A COMIDA", "LLEVAR A CASA", "CAVAR", "HUIR DEL AGUA", "DESCANSO",
-	"HUIR DEL PELIGRO", "EVACUAR", "CUIDAR CRÍA", "GUARDIA", "ATACAR", "CARGAR HUEVO"]
+	"HUIR DEL PELIGRO", "EVACUAR", "CUIDAR CRÍA", "GUARDIA", "ATACAR", "CARGAR HUEVO",
+	"HUIR DEL ENEMIGO"]
 const DX: Array[int] = [1, 1, 0, -1, -1, -1, 0, 1]
 const DY: Array[int] = [0, 1, 1, 1, 0, -1, -1, -1]
 const FAR := NestDistanceField.FAR
@@ -103,6 +105,10 @@ var raiding := PackedByteArray()
 ## rehace solo cuando nace una hormiga (`_grow`); las muertas se siguen saltando por `alive`.
 var _members: Array[PackedInt32Array] = [PackedInt32Array(), PackedInt32Array()]
 var _members_dirty := true
+## Fase 44: alarma de la colonia. Una obrera que huye de un enemigo lejos del nido marca dónde la
+## atacaron; los soldados sin pelea acuden durante `cfg.alarm_s` (`AntCasteAI.answer_alarm`).
+var alarm_pos := Vector2.ZERO
+var alarm_tick := -1
 
 var max_stuck_seen := 0.0
 var _bfs_q := PackedInt32Array()
@@ -522,6 +528,15 @@ func _think(i: int, cx: int, cy: int, ci: int) -> void:
 	# Tiene prioridad sobre huir de la feromona de Peligro (que sigue existiendo tal cual para avisos
 	# del jugador sin amenaza real detrás) pero no sobre ahogarse. La Nodriza se queda cuidando la
 	# cría; el Soldado sigue con su propio `_think_soldier` (ya reacciona a esto de siempre).
+	# Fase 44: la obrera que huye de un enemigo (`_should_flee`) no vuelve a decidir hasta que pasa
+	# `cfg.worker_flee_s`; después sigue con lo que hacía (llevar lo que carga, o descansar).
+	if state[i] == State.FLEE_ENEMY:
+		timer[i] -= think_dt
+		if timer[i] > 0.0:
+			_think_flee_enemy(i, cx, cy, ci)
+			return
+		state[i] = State.CARRY_HOME if carry[i] == 1 else State.IDLE
+		target[i] = pos[i]
 	if caste[i] != CasteDefs.Caste.NURSE and caste[i] != CasteDefs.Caste.SOLDIER and state[i] != State.FLEE_WATER:
 		var threat = _nearest_threat(pos[i], cfg.soldier_sight_px)
 		var step := THREAT_UNREACHABLE
@@ -529,6 +544,13 @@ func _think(i: int, cx: int, cy: int, ci: int) -> void:
 			step = threat_step(ci, threat.pos)  # Fase 38: camino real, no línea recta
 			if step == THREAT_UNREACHABLE:
 				threat = null
+		if threat != null and _should_flee(i, ci, threat):
+			_release_job(i)
+			raise_alarm(threat.pos)
+			state[i] = State.FLEE_ENEMY
+			timer[i] = cfg.worker_flee_s
+			_think_flee_enemy(i, cx, cy, ci)
+			return
 		if threat != null:
 			if state[i] != State.ATTACK:
 				_release_job(i)
@@ -588,6 +610,34 @@ func _think(i: int, cx: int, cy: int, ci: int) -> void:
 				_step(i, cx, cy, ci, Mode.STORE if _use_storage(ci) else Mode.NEST, null)
 		State.DIG:
 			_think_dig(i, cx, cy, ci)
+
+
+## Fase 44: una obrera lejos del nido no se queda a morir contra una hormiga rival o un depredador
+## (pega 3, un soldado rival 8): huye hacia el nido con lo que cargue y da la alarma. Cerca del nido
+## (`cfg.worker_defend_cells` por los túneles) pelea toda la colmena, como siempre. La reina rival
+## no persigue a nadie: contra ella no hay de qué huir.
+func _should_flee(i: int, ci: int, threat) -> bool:
+	if caste[i] != CasteDefs.Caste.WORKER or threat is RivalQueen:
+		return false
+	return sim.fields.nest_dist[ci] > sim.cfg.worker_defend_cells
+
+
+## Huye hacia el nido; la duración mínima (`cfg.worker_flee_s`) evita que vuelva a pelear en cuanto
+## pierde de vista a la rival y quede yendo y viniendo. Si llega a dejar lo que carga, lo entrega.
+func _think_flee_enemy(i: int, cx: int, cy: int, ci: int) -> void:
+	if carry[i] == 1 and _at_drop(ci):
+		_deliver(i)
+	_step(i, cx, cy, ci, Mode.NEST, null)
+
+
+func raise_alarm(p: Vector2) -> void:
+	alarm_pos = p
+	alarm_tick = sim.tick_count
+
+
+## ¿Hay una alarma reciente (`cfg.alarm_s`)?
+func alarm_active() -> bool:
+	return alarm_tick >= 0 and sim.tick_count - alarm_tick <= int(sim.cfg.alarm_s * sim.cfg.tick_rate)
 
 
 func _think_idle(i: int, cx: int, cy: int, ci: int, think_dt: float) -> void:

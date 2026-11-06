@@ -184,6 +184,8 @@ static func think_soldier(ants, i: int, cx: int, cy: int, ci: int, think_dt: flo
 				return
 	if sim.rival_colony.fighting() and battle_formation(ants, i, cx, cy, ci):
 		return
+	if ants.alarm_active() and answer_alarm(ants, i, cx, cy, ci):
+		return
 	ants.state[i] = AntSystem.State.GUARD
 	patrol(ants, i, cx, cy, ci, think_dt)
 
@@ -214,6 +216,21 @@ static func battle_formation(ants, i: int, cx: int, cy: int, ci: int) -> bool:
 	else:
 		ants._step(i, cx, cy, ci, AntSystem.Mode.PLANT, rp)
 	return true
+
+## Fase 44: acude a la alarma de una obrera (`AntSystem.raise_alarm`): sale a la superficie y va
+## hasta el punto; la pelea la decide `think_soldier` al ver a la rival. Devuelve false al llegar
+## (sigue patrullando desde ahí).
+static func answer_alarm(ants, i: int, cx: int, cy: int, ci: int) -> bool:
+	var sim: Simulation = ants.sim
+	if ants.pos[i].distance_to(ants.alarm_pos) <= 2.0 * sim.cfg.cell_px:
+		return false
+	ants.state[i] = AntSystem.State.ATTACK
+	if cy >= sim.cfg.surface_y and ants._cell_index(ants.alarm_pos) / sim.world.w < sim.cfg.surface_y:
+		ants._step(i, cx, cy, ci, AntSystem.Mode.SURFACE, null)
+	else:
+		ants._step(i, cx, cy, ci, AntSystem.Mode.PLANT, ants.alarm_pos)
+	return true
+
 
 ## Fase 14: patrulla de verdad. Antes el soldado "exploraba" con la misma puntuación que una obrera
 ## (atraído por la feromona de comida, repelido por la de hogar) y terminaba yendo y viniendo por

@@ -1349,3 +1349,19 @@ y sus `tut_*` de config): era un nivel jugable con objetivos; ahora es una visit
   su color (antes solo se distinguían por color), y las mejoras bloqueadas muestran su precio en gris.
 - **F7** (cargar sin preguntar) solo desde el editor; para cargar está «Continuar».
 - **Menú principal:** el subtítulo se lee mejor sobre las nubes (más grande, con más contorno).
+
+## Fase 44: huida, alarma y una rival más fuerte
+
+- **Huida:** una obrera atacada lejos del nido (más de `worker_defend_cells`, 8 celdas por los túneles)
+  por una hormiga rival o un depredador huye al nido con lo que carga durante al menos
+  `worker_flee_s` (4 s), estado «HUIR DEL ENEMIGO». Cerca del nido sigue defendiendo con toda la
+  colmena. Antes se quedaba peleando hasta morir: en 6 días de juego, 16 de 22 obreras muertas
+  eran por rivales en el árbol.
+- **Alarma:** la obrera que huye marca dónde la atacaron; durante `alarm_s` (20 s) los soldados sin
+  batalla acuden a ese punto. Se guarda con la partida.
+- **Rival:** arranca con `rival_start_ants` 4 (antes 2) y `rival_start_ants_per_season` 2 más en cada
+  estación. Esa guarnición no sale de incursión; las incursiones salen solo de lo que creció después.
+- **`tools/sim_full_game.gd`:** jugador automático que juega Juego normal completo (mudanzas,
+  batallas, guardar/cargar en cada estación) y mide en qué día se gana cada estación. Variables
+  `SEEDS`, `RIVAL_START`, `RIVAL_PER_SEASON`, `VERBOSE`. Con 2/+0 ganaba las 4 estaciones en 2-4
+  días; con 4/+2 llega a la última en unos 11 (sin pintar feromonas).

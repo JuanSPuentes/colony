@@ -173,6 +173,7 @@ static func to_dict(sim: Simulation) -> Dictionary:
 		"stuck_t": Array(ants.stuck_t), "check_acc": Array(ants.check_acc),
 		"max_stuck_seen": ants.max_stuck_seen,
 		"faction": Array(ants.faction),  # Fase 9: 0 jugador, 1 rival.
+		"alarm": [ants.alarm_pos.x, ants.alarm_pos.y, ants.alarm_tick],  # Fase 44
 		"raiding": Array(ants.raiding),  # Fase 31: rival que va contra el nido (1) o guardia (0).
 	}
 
@@ -468,6 +469,9 @@ static func from_dict(d: Dictionary, cfg: SimConfig) -> Simulation:
 	if ants.faction.size() != ants.count:
 		ants.faction.resize(ants.count)  # 0 por defecto: bando jugador
 	# Fase 31: ausente en guardados viejos: sin montículo, toda rival viva era de la oleada (ataca).
+	var alarm: Array = ad.get("alarm", [0.0, 0.0, -1])
+	ants.alarm_pos = Vector2(alarm[0], alarm[1])
+	ants.alarm_tick = int(alarm[2])
 	var raiding_in: Array = ad.get("raiding", [])
 	ants.raiding = PackedByteArray(raiding_in)
 	ants.raiding.resize(ants.count)
