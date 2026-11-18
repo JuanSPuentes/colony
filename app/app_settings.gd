@@ -15,6 +15,10 @@ const LANGUAGES: Array[String] = ["es", "en"]
 const LANGUAGE_NAMES: Array[String] = ["Español", "English"]
 
 var volume := 0.8
+## Fase 45: volumen de los efectos de sonido (bus `Sfx.BUS`), aparte del general.
+var sfx_volume := 0.8
+## Fase 45: temblor de pantalla en los golpes grandes (se puede apagar: a algunos les marea).
+var screen_shake := true
 var brightness := 1.0
 ## Sin preferencia guardada: el idioma del sistema si es español, si no inglés.
 var language := "es" if OS.get_locale_language() == "es" else "en"
@@ -31,6 +35,8 @@ static func load_settings() -> AppSettings:
 	var parsed = SaveSystem.read_json(PATH, func(_d: Dictionary) -> bool: return true)  # Fase 40: con copia .bak
 	if parsed != null:
 		s.volume = clampf(float(parsed.get("volume", s.volume)), VOLUME_MIN, VOLUME_MAX)
+		s.sfx_volume = clampf(float(parsed.get("sfx_volume", s.sfx_volume)), VOLUME_MIN, VOLUME_MAX)
+		s.screen_shake = bool(parsed.get("screen_shake", true))
 		s.brightness = clampf(float(parsed.get("brightness", s.brightness)), BRIGHTNESS_MIN, BRIGHTNESS_MAX)
 		var lang := str(parsed.get("language", s.language))
 		if lang in LANGUAGES:
@@ -45,19 +51,24 @@ static func load_settings() -> AppSettings:
 
 func save() -> void:
 	# Fase 40: misma escritura a prueba de cortes que las partidas.
-	SaveSystem.write_text_atomic(PATH, JSON.stringify({"volume": volume, "brightness": brightness, "language": language,
+	SaveSystem.write_text_atomic(PATH, JSON.stringify({"volume": volume, "sfx_volume": sfx_volume,
+		"screen_shake": screen_shake, "brightness": brightness, "language": language,
 		"tutorial_done": tutorial_done, "show_tips": show_tips, "colors": colors}))
 
 
-## Aplica el volumen al bus Master. No hay efectos de sonido todavía (ver README), pero el control
-## queda listo para cuando los haya: en 0 silencia el bus entero.
+## Aplica el volumen general (bus Master) y el de efectos (Fase 45, bus `Sfx.BUS`); en 0 silencia el
+## bus entero.
 func apply_volume() -> void:
-	var idx := AudioServer.get_bus_index("Master")
+	_set_bus_volume(AudioServer.get_bus_index("Master"), volume)
+	_set_bus_volume(Sfx.ensure_bus(), sfx_volume)
+
+
+static func _set_bus_volume(idx: int, v: float) -> void:
 	if idx < 0:
 		return
-	AudioServer.set_bus_mute(idx, volume <= 0.001)
-	if volume > 0.001:
-		AudioServer.set_bus_volume_db(idx, linear_to_db(volume))
+	AudioServer.set_bus_mute(idx, v <= 0.001)
+	if v > 0.001:
+		AudioServer.set_bus_volume_db(idx, linear_to_db(v))
 
 
 ## Fase 27: cambia el idioma de todo el juego. Los botones y etiquetas con texto fijo se traducen

@@ -56,8 +56,9 @@ func _t_migration() -> void:
 	var moved := Migration.migrate(sim, 99)
 	var after := moved.ants.count_by_caste(CASTES)
 	_check("se conservan las hormigas por casta (la cría llega nacida)", after == before, "%s -> %s" % [before, after])
-	# Fase 31: el mapa nuevo trae también las guardias de la rival nueva (bando 1).
-	var rivals := moved.cfg.rival_start_ants
+	# Fase 31: el mapa nuevo trae también las guardias de la rival nueva (bando 1). Fase 44: tantas
+	# como su guarnición, que crece con cada estación.
+	var rivals := moved.rival_colony.garrison()
 	_check("el total de vivas cuadra (reina + las que viajan + guardias rivales)", moved.ants.alive_count == 1 + rivals + after.values().reduce(func(a, b): return a + b, 0), "alive_count=%d" % moved.ants.alive_count)
 	_check("se conserva la comida", is_equal_approx(moved.colony.food, food))
 	_check("se conservan las mejoras", moved.upgrades.bought == sim.upgrades.bought and is_equal_approx(moved.upgrades.hp_mult, sim.upgrades.hp_mult))

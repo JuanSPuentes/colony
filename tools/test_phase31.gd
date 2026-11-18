@@ -80,20 +80,23 @@ func _t_growth_and_raids() -> void:
 	var cfg := sim.cfg
 	var rival := sim.rival_colony
 	var grow_s := cfg.rival_grow_days * cfg.day_length_s
-	_check("arranca con la reina y 2 soldados", rival.queen.alive and _rivals(sim).size() == 2)
+	_check("arranca con la reina y su guarnición", rival.queen.alive and _rivals(sim).size() == rival.garrison())
 	rival.update_home(grow_s - 1.0)
-	_check("antes de 1,5 días no crece", _rivals(sim).size() == 2)
+	_check("antes de 1,5 días no crece", _rivals(sim).size() == rival.garrison())
 	rival.update_home(grow_s * 2.0 + 1.01)
 	_check("suma una hormiga cada 1,5 días", _rivals(sim).size() == cfg.rival_start_ants + 3, "%d" % _rivals(sim).size())
 	# La incursión, en un mapa nuevo: con varios días de golpe ya habría salido una en el medio.
 	var raid := _fresh(5)
+	for k in 4:  # Fase 44: las incursiones salen de lo que creció por encima de la guarnición
+		raid.rival_colony._add_ant()
 	raid.rival_colony.update_home(cfg.rival_raid_s - 1.0)
 	_check("la próxima incursión se cuenta hacia atrás", raid.rival_colony.raid_eta_s() < cfg.rival_raid_s
 		and _rivals(raid, 1).is_empty())
 	raid.rival_colony.update_home(1.01)
 	var raiders := _rivals(raid, 1).size()
-	_check("cada incursión manda a la mitad", raiders == maxi(1, int(round(_rivals(raid).size() * cfg.rival_raid_fraction))),
+	_check("cada incursión manda a la mitad de lo que creció", raiders == int(round(4 * cfg.rival_raid_fraction)),
 		"incursión=%d de %d" % [raiders, _rivals(raid).size()])
+	_check("la guarnición no sale de incursión", _rivals(raid, 0).size() >= raid.rival_colony.garrison())
 	var noted := false
 	for n in raid.notifications:
 		noted = noted or n.begins_with("¡Incursión rival")
@@ -141,6 +144,8 @@ func _t_guards_and_raiders() -> void:
 		if absf(sim.ants.pos[i].x / cfg.cell_px - rival.home_x) > cfg.rival_guard_radius + 3:
 			far += 1
 	_check("las guardias se quedan cerca de su montículo", guards > 0 and far == 0, "guardias=%d lejos=%d" % [guards, far])
+	for k in 4:
+		rival._add_ant()
 	rival.update_home(cfg.rival_raid_s)
 	var raiders := _rivals(sim, 1)
 	var d0 := 0.0
@@ -192,6 +197,8 @@ func _t_last_day_fallback() -> void:
 func _t_save_and_migrate() -> void:
 	var sim := _fresh(10)
 	var rival := sim.rival_colony
+	for k in 4:  # Fase 44: que haya crecido por encima de la guarnición, para que salga la incursión
+		rival._add_ant()
 	rival.update_home(sim.cfg.rival_raid_s * 0.5)
 	rival.update_home(sim.cfg.rival_raid_s * 0.6)
 	var loaded := SaveSystem.from_dict(SaveSystem.to_dict(sim), sim.cfg)
@@ -203,7 +210,8 @@ func _t_save_and_migrate() -> void:
 	SeasonSystem._advance_season(sim)
 	var moved := Migration.migrate(sim, 77)
 	_check("al mudarse hay una rival nueva, más fuerte", moved.rival_colony.home and moved.rival_colony.queen.alive
-		and moved.rival_colony.queen.max_hp > hp0 and _rivals(moved).size() == moved.cfg.rival_start_ants)
+		and moved.rival_colony.queen.max_hp > hp0 and _rivals(moved).size() == moved.rival_colony.garrison()
+		and moved.rival_colony.garrison() > moved.cfg.rival_start_ants)
 	_check("y el árbol sigue en el medio", moved.home_tree.x == (moved.cfg.nest_x + moved.rival_colony.home_x) / 2)
 
 

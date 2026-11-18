@@ -56,6 +56,14 @@ const TURN_EPS2 := 0.0004
 const BOB_AMPLITUDE := 0.55
 const BOB_FREQ := 0.9
 const BOB_PHASE_STEP := 2.399963
+## Fase 45: «!» amarillo sobre la obrera que huye de un enemigo (palito y punto), y destello claro
+## unos cuadros al recibir daño.
+const ALERT_COLOR := Color("ffd23f")
+const ALERT_BAR := Vector2(0.9, 2.2)
+const ALERT_DOT := Vector2(0.9, 0.9)
+const ALERT_Y := -6.5
+const FLASH_FRAMES := 6
+const FLASH_COLOR := Color(1, 1, 1)
 
 var sim: Simulation
 var color_by_state := false
@@ -64,7 +72,11 @@ var color_by_caste := false
 var _body_mm: Array[MultiMesh] = []
 var _leaf_mm: MultiMesh
 var _wings_mm: MultiMesh
+var _alert_mm: MultiMesh
 var _capacity := 0
+## Fase 45: vida de cada hormiga en el cuadro anterior y cuadros de destello que le quedan.
+var _prev_hp := PackedFloat32Array()
+var _flash := PackedInt32Array()
 ## Último índice de dirección de cada hormiga (por índice de hormiga, no de instancia del
 ## MultiMesh), para que una hormiga detenida mantenga el sprite de hacia dónde miraba en vez de
 ## volver al de "este" por defecto.
@@ -82,7 +94,10 @@ func setup(s: Simulation) -> void:
 		for d in DIR_COUNT:
 			_body_mm.append(_add_mm_node(quad, DIR_TEXTURES[d]))
 		_leaf_mm = _add_mm_node(_make_quad_mesh(Vector2(1, 1)), null)
+		_alert_mm = _add_mm_node(_make_quad_mesh(Vector2(1, 1)), null)
 	_capacity = 0
+	_prev_hp = sim.ants.hp.duplicate()
+	_flash.resize(0)
 	_ensure_capacity(maxi(sim.ants.count, 1))
 
 
@@ -122,8 +137,11 @@ func _ensure_capacity(n: int) -> void:
 	_leaf_mm.visible_instance_count = 0
 	_wings_mm.instance_count = _capacity * 2  # 2 alas por zángano vivo, caso extremo "todos zánganos"
 	_wings_mm.visible_instance_count = 0
+	_alert_mm.instance_count = _capacity * 2  # palito y punto
+	_alert_mm.visible_instance_count = 0
 	if _last_dir.size() < _capacity:
 		_last_dir.resize(_capacity)
+	_flash.resize(_capacity)
 
 
 ## `alpha` (0..1) es qué fracción del tick actual ha transcurrido. `frame_start_pos`, si viene con
@@ -138,7 +156,16 @@ func update(alpha: float, frame_start_pos: PackedVector2Array = PackedVector2Arr
 	body_n.resize(DIR_COUNT)
 	var leaves := 0
 	var wings := 0
+	var alerts := 0
+	if _prev_hp.size() < ants.count:
+		var old := _prev_hp.size()
+		_prev_hp.resize(ants.count)
+		for k in range(old, ants.count):
+			_prev_hp[k] = ants.hp[k]
 	for i in ants.count:
+		if ants.hp[i] < _prev_hp[i] - 0.001:
+			_flash[i] = FLASH_FRAMES
+		_prev_hp[i] = ants.hp[i]
 		if ants.alive[i] == 0:
 			continue
 		var from := frame_start_pos[i] if has_frame_start else ants.prev[i]
@@ -164,6 +191,9 @@ func update(alpha: float, frame_start_pos: PackedVector2Array = PackedVector2Arr
 		# distinguirla de las propias a simple vista durante una batalla de fin de estación.
 		if ants.faction[i] == 1:
 			c = AntPalette.rival()
+		if _flash[i] > 0:
+			_flash[i] -= 1
+			c = c.lerp(FLASH_COLOR, 0.75)
 		var idx := body_n[dir]
 		# `t.x`/`t.y` en vez de `Transform2D.scaled()`: construido a mano para que el escalado sea
 		# de la hormiga alrededor de su propio centro, no de la traslación (mismo truco que ya
@@ -182,6 +212,13 @@ func update(alpha: float, frame_start_pos: PackedVector2Array = PackedVector2Arr
 			_leaf_mm.set_instance_transform_2d(leaves, Transform2D(0.0, p + Vector2(0, -2.0)))
 			_leaf_mm.set_instance_color(leaves, CARRY_COLORS[mini(ants.carry_kind[i], CARRY_COLORS.size() - 1)])
 			leaves += 1
+		if ants.state[i] == AntSystem.State.FLEE_ENEMY:
+			var top := p + Vector2(0, ALERT_Y * scale)
+			_alert_mm.set_instance_transform_2d(alerts, Transform2D(0.0, ALERT_BAR, 0.0, top))
+			_alert_mm.set_instance_transform_2d(alerts + 1, Transform2D(0.0, ALERT_DOT, 0.0, top + Vector2(0, 2.0)))
+			_alert_mm.set_instance_color(alerts, ALERT_COLOR)
+			_alert_mm.set_instance_color(alerts + 1, ALERT_COLOR)
+			alerts += 2
 		if ants.caste[i] == CasteDefs.Caste.DRONE:
 			var fwd := Vector2(cos(delta.angle()), sin(delta.angle())) if delta.length_squared() > TURN_EPS2 else Vector2.RIGHT
 			var perp := fwd.orthogonal()
@@ -193,3 +230,4 @@ func update(alpha: float, frame_start_pos: PackedVector2Array = PackedVector2Arr
 		_body_mm[d].visible_instance_count = body_n[d]
 	_leaf_mm.visible_instance_count = leaves
 	_wings_mm.visible_instance_count = wings
+	_alert_mm.visible_instance_count = alerts

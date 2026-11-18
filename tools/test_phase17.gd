@@ -283,6 +283,12 @@ func _t_seasons_last_full_length() -> void:
 		new_battle = new_battle or sim.rival_colony.battle_active
 	_check("ganarla el último día no trae otra oleada al instante", not new_battle and sim.season_index == 1)
 	_check("la reina rival no revive", not sim.rival_colony.queen.alive)
+	# Fase 44: en este mapa de pruebas no hay mudanza y las rivales que sobreviven a la batalla siguen
+	# atacando; las obreras ya no salen a pelearles (huyen) y la colonia chica de la prueba moría
+	# antes de la batalla siguiente. Esta prueba mide los días de la estación: se retiran.
+	for i in sim.ants.count:
+		if sim.ants.alive[i] == 1 and sim.ants.faction[i] == 1:
+			sim.ants._kill(i, false)
 	guard = 0
 	while not sim.rival_colony.battle_active and guard < per_day * (cfg.season_days[1] + 3):
 		sim.tick()

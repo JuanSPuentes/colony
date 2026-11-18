@@ -31,6 +31,8 @@ var home := false
 var home_x := 0
 var grow_acc := 0.0
 var raid_acc := 0.0
+## Fase 45: incursiones enviadas en esta simulación. Solo lo mira la vista (sonido); no se guarda.
+var raids_sent := 0
 ## El jugador pidió atacar ("¡Atacar!"): sus soldados se reúnen y marchan como en una batalla.
 var player_attack := false
 ## Fase 32: comida total que la rival llevó a su montículo (para el HUD y las pruebas).
@@ -173,6 +175,7 @@ func _send_raid() -> void:
 		return
 	for k in n:
 		ants.raiding[guards[k]] = 1
+	raids_sent += 1
 	sim.notify("¡Incursión rival: %s hormigas vienen hacia tu nido!", [n])
 
 

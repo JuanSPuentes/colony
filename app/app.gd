@@ -25,6 +25,7 @@ var _pending: Callable
 
 func _ready() -> void:
 	settings = AppSettings.load_settings()
+	add_child(Sfx.new())  # Fase 45: primero, para que también suenen los botones del menú
 	settings.apply_volume()
 	settings.apply_language()
 	AntPalette.apply(settings.colors)  # Fase 39
@@ -45,6 +46,8 @@ func _ready() -> void:
 	add_child(options)
 	options.back_pressed.connect(_on_options_back)
 	options.volume_changed.connect(_on_volume_changed)
+	options.sfx_volume_changed.connect(_on_sfx_volume_changed)
+	options.shake_changed.connect(_on_shake_changed)
 	options.brightness_changed.connect(_on_brightness_changed)
 	options.language_changed.connect(_on_language_changed)
 	options.quit_requested.connect(_ask_quit)
@@ -96,6 +99,7 @@ func _new_game_scene() -> void:
 	game.auto_start = false
 	add_child(game)
 	game.set_brightness(settings.brightness)
+	game.shake_enabled = settings.screen_shake
 	game.menu_requested.connect(func() -> void: _open_options("game"))
 	game.main_menu_requested.connect(_ask_main_menu)
 	game.play_again_requested.connect(_restart_same_mode)
@@ -176,6 +180,19 @@ func _save_colors() -> void:
 	settings.save()
 
 
+func _on_sfx_volume_changed(v: float) -> void:
+	settings.sfx_volume = v
+	settings.apply_volume()
+	settings.save()
+
+
+func _on_shake_changed(on: bool) -> void:
+	settings.screen_shake = on
+	settings.save()
+	if game != null:
+		game.shake_enabled = on
+
+
 func _on_tips_changed(on: bool) -> void:
 	settings.show_tips = on
 	settings.save()
@@ -195,7 +212,7 @@ func _open_options(return_to: String) -> void:
 	_return_to = return_to
 	if game != null and return_to == "game":
 		game.paused = true
-	options.set_values(settings.volume, settings.brightness)
+	options.set_values(settings.volume, settings.brightness, settings.sfx_volume, settings.screen_shake)
 	options.set_language(settings.language)
 	options.set_tips(settings.show_tips)
 	options.refresh_colors()

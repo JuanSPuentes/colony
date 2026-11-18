@@ -71,6 +71,9 @@ func _t_flat_trail_is_an_end() -> void:
 	_check("en un rastro que sube, lo sigue", sim2.ants.state[j] == AntSystem.State.GO_TO_FOOD and sim2.ants.target[j].x > sim2.ants.pos[j].x)
 
 
+const SAMPLES := 400
+
+
 func _t_ignoring_ant_not_pulled() -> void:
 	var sim := _fresh(2)
 	var cfg := sim.cfg
@@ -81,20 +84,21 @@ func _t_ignoring_ant_not_pulled() -> void:
 	sim.cmd_paint_phero(sim.food, cell.x - 1, y - 1, 1.0)
 	var i := _worker(sim)
 	var ci := _place(sim, i, cell)
-	sim.ants.heading[i] = Vector2.RIGHT
-	sim.ants.ignore_until[i] = sim.tick_count + 1000
-	var left := 0
-	for k in 40:
-		sim.ants._step(i, cell.x, cell.y, ci, AntSystem.Mode.EXPLORE, null)
-		left += int(sim.ants.target[i].x < sim.ants.pos[i].x)
-	_check("la que ignora un rastro ya no se deja atraer por él", left < 20, "%d de 40 hacia el rastro" % left)
-	sim.ants.ignore_until[i] = 0
-	left = 0
-	for k in 40:
-		sim.ants.heading[i] = Vector2.RIGHT
-		sim.ants._step(i, cell.x, cell.y, ci, AntSystem.Mode.EXPLORE, null)
-		left += int(sim.ants.target[i].x < sim.ants.pos[i].x)
-	_check("sin ignorarlo, explorando sí lo sigue", left >= 30, "%d de 40 hacia el rastro" % left)
+	# Muchas muestras: el paso de explorar es al azar y con 40 el resultado dependía de la semilla
+	# (Fase 44: con otra cantidad de rivales en el mapa daba 20 de 40, justo en el límite).
+	var counts: Array[int] = []
+	for ignoring in [true, false]:
+		sim.ants.ignore_until[i] = sim.tick_count + 1000 if ignoring else 0
+		var left := 0
+		for k in SAMPLES:
+			sim.ants.heading[i] = Vector2.RIGHT
+			sim.ants._step(i, cell.x, cell.y, ci, AntSystem.Mode.EXPLORE, null)
+			left += int(sim.ants.target[i].x < sim.ants.pos[i].x)
+		counts.append(left)
+	_check("la que ignora un rastro ya no se deja atraer por él", counts[0] < SAMPLES / 2,
+		"%d de %d hacia el rastro" % [counts[0], SAMPLES])
+	_check("sin ignorarlo, explorando sí lo sigue", counts[1] >= SAMPLES * 3 / 4,
+		"%d de %d hacia el rastro" % [counts[1], SAMPLES])
 
 
 func _t_surface_mode_ignores_food() -> void:

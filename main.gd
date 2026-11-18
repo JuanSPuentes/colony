@@ -87,6 +87,12 @@ var coach_enabled := false
 ## directo (las pruebas) sigue con el mapa de siempre.
 var fresh_layout_enabled := false
 var camera: Camera2D
+## Fase 45: sonidos y temblor de pantalla según lo que pasa en la simulación. El temblor se puede
+## apagar en Opciones (`app.gd` fija `shake_enabled`).
+var sfx_director: SfxDirector
+var shake_enabled := true
+var _shake := 0.0
+const SHAKE_DECAY := 14.0  # cuánto se apaga el temblor por segundo
 
 var speed := 1
 var paused := false
@@ -214,6 +220,11 @@ func _ready() -> void:
 	add_child(tutorial)
 	coach = CoachView.new()
 	add_child(coach)
+	sfx_director = SfxDirector.new()
+	sfx_director.shake_requested.connect(func(strength: float) -> void:
+		if shake_enabled:
+			_shake = maxf(_shake, strength))
+	add_child(sfx_director)
 	if auto_start:
 		start(seed_value)
 
@@ -271,6 +282,7 @@ func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> v
 	ambient_view.setup(sim, sky_view)
 	tutorial.step = 0
 	coach.reset(sim)
+	sfx_director.setup(sim)
 	_acc = 0.0
 	_autosave_acc = 0.0
 	if playtest_log == null and (game_mode == "incremental" or game_mode == "historia"):
@@ -281,6 +293,16 @@ func start(new_seed: int, loaded_sim: Simulation = null, mode: String = "") -> v
 	else:
 		camera.position = Vector2(cfg.nest_x * cfg.cell_px, (cfg.surface_y + 2) * cfg.cell_px)
 	_apply_camera()
+
+
+## Fase 45: el temblor mueve solo el desplazamiento de la cámara (no su posición), así que no
+## interfiere con el zoom, el arrastre ni los límites del mapa.
+func _apply_shake(delta: float) -> void:
+	if _shake <= 0.0:
+		return
+	_shake = maxf(0.0, _shake - SHAKE_DECAY * delta)
+	var r := _shake / camera.zoom.x
+	camera.offset = Vector2(randf_range(-r, r), randf_range(-r, r)) if _shake > 0.0 else Vector2.ZERO
 
 
 ## Fase 41: menú de pausa (Esc / P). Abrirlo pausa; cerrarlo (o «Continuar») reanuda.
@@ -412,6 +434,7 @@ func _process(delta: float) -> void:
 		camera.position += _drag_vel * delta
 		_drag_vel = _drag_vel.move_toward(Vector2.ZERO, _drag_vel.length() * DRAG_FRICTION * delta + 1.0)
 		_clamp_camera(camera.zoom.x)
+	_apply_shake(delta)
 	var behind := false  # Fase 42: la simulación no llegó a la velocidad pedida este frame
 	if not paused and not sim.game_over:
 		_autosave_tick(delta)

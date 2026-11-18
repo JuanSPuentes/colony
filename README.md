@@ -1365,3 +1365,18 @@ y sus `tut_*` de config): era un nivel jugable con objetivos; ahora es una visit
   batallas, guardar/cargar en cada estación) y mide en qué día se gana cada estación. Variables
   `SEEDS`, `RIVAL_START`, `RIVAL_PER_SEASON`, `VERBOSE`. Con 2/+0 ganaba las 4 estaciones en 2-4
   días; con 4/+2 llega a la última en unos 11 (sin pintar feromonas).
+
+## Fase 45: sonido y efectos
+
+- **Sonidos generados con código** (`app/sound_synth.gd`, al estilo jsfxr): sin archivos de audio ni
+  licencias. `Sfx` (`app/sfx.gd`) los crea al arrancar, los reproduce por el bus `SFX` con una
+  pequeña variación de tono y un tiempo mínimo entre repeticiones, y pone un clic en todos los botones.
+- **`SfxDirector`** (`view/sfx_director.gd`) decide qué suena mirando contadores de la simulación
+  (cavar, entregar, huevo, nacimiento, muertes por bando, alarma, incursión, amenaza, golpes,
+  reina rival, estación, victoria y derrota). La simulación no sabe de sonido y sigue determinística.
+- **Temblor de pantalla** al matar a la reina rival y al perder (se apaga en Opciones).
+- **«!» amarillo** sobre la obrera que huye y **destello** de la hormiga que recibe daño.
+- **Opciones:** volumen de «Efectos» aparte del general y casilla «Temblor de pantalla».
+- **Pruebas:** `test_phase45` (sonidos, director, huida y alarma de la Fase 44, «!» y destello).
+  Se corrigieron 6 pruebas de las fases 17, 25, 31 y 38 que fallaban desde la Fase 44 (esperaban la
+  rival anterior o dependían del azar con pocas muestras).

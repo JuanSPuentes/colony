@@ -9,6 +9,8 @@ extends CanvasLayer
 
 signal back_pressed
 signal volume_changed(v: float)
+signal sfx_volume_changed(v: float)  # Fase 45
+signal shake_changed(on: bool)  # Fase 45
 signal brightness_changed(b: float)
 ## Fase 27: código de idioma (`AppSettings.LANGUAGES`).
 signal language_changed(code: String)
@@ -34,6 +36,9 @@ const PANEL_BG := Color(0.07, 0.06, 0.08, 0.92)
 
 var _volume_slider: HSlider
 var _volume_value: Label
+var _sfx_slider: HSlider
+var _sfx_value: Label
+var _shake: CheckButton
 var _brightness_slider: HSlider
 var _brightness_value: Label
 var _language: OptionButton
@@ -116,18 +121,21 @@ func _ready() -> void:
 		func(v: float) -> void: volume_changed.emit(v))
 	_volume_slider = _last_slider
 	_volume_value = _last_value_label
+	_slider_row(settings_body, "Efectos", 0.0, 1.0, 0.01,
+		func(v: float) -> String: return "%d%%" % int(v * 100.0),
+		func(v: float) -> void: sfx_volume_changed.emit(v))
+	_sfx_slider = _last_slider
+	_sfx_value = _last_value_label
 	_slider_row(settings_body, "Brillo", AppSettings.BRIGHTNESS_MIN, AppSettings.BRIGHTNESS_MAX, 0.02,
 		func(v: float) -> String: return "%d%%" % int(v * 100.0),
 		func(v: float) -> void: brightness_changed.emit(v))
 	_brightness_slider = _last_slider
 	_brightness_value = _last_value_label
 	_language_row(settings_body)
-	_tips = CheckButton.new()
-	_tips.text = "Mostrar consejos"
-	_tips.add_theme_font_size_override("font_size", 16)
-	_tips.add_theme_color_override("font_color", CREAM)
-	_tips.toggled.connect(func(on: bool) -> void: tips_changed.emit(on))
+	_tips = _check_button("Mostrar consejos", func(on: bool) -> void: tips_changed.emit(on))
 	settings_body.add_child(_tips)
+	_shake = _check_button("Temblor de pantalla", func(on: bool) -> void: shake_changed.emit(on))
+	settings_body.add_child(_shake)
 	settings_body.add_child(_action_button("Ver el tutorial", func() -> void: tutorial_requested.emit()))
 
 	_colors_card(content)
@@ -149,6 +157,15 @@ func _ready() -> void:
 	quit_btn.position = Vector2(-200, -60)
 	quit_btn.pressed.connect(func() -> void: quit_requested.emit())
 	root.add_child(quit_btn)
+
+
+func _check_button(text: String, on_toggle: Callable) -> CheckButton:
+	var b := CheckButton.new()
+	b.text = text
+	b.add_theme_font_size_override("font_size", 16)
+	b.add_theme_color_override("font_color", CREAM)
+	b.toggled.connect(on_toggle)
+	return b
 
 
 func _action_button(text: String, cb: Callable) -> Button:
@@ -305,9 +322,12 @@ func refresh_colors() -> void:
 
 ## `app.gd` llama esto cada vez que abre la pantalla, para que los sliders reflejen el valor
 ## guardado (no el último que quedó de una sesión anterior de esta misma instancia).
-func set_values(volume: float, brightness: float) -> void:
+func set_values(volume: float, brightness: float, sfx_volume: float, shake: bool) -> void:
 	_volume_slider.set_value_no_signal(volume)
 	_volume_value.text = "%d%%" % int(volume * 100.0)
+	_sfx_slider.set_value_no_signal(sfx_volume)
+	_sfx_value.text = "%d%%" % int(sfx_volume * 100.0)
+	_shake.set_pressed_no_signal(shake)
 	_brightness_slider.set_value_no_signal(brightness)
 	_brightness_value.text = "%d%%" % int(brightness * 100.0)
 

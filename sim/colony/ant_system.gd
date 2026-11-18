@@ -109,6 +109,9 @@ var _members_dirty := true
 ## atacaron; los soldados sin pelea acuden durante `cfg.alarm_s` (`AntCasteAI.answer_alarm`).
 var alarm_pos := Vector2.ZERO
 var alarm_tick := -1
+## Fase 45: muertes por bando ([0] jugador, [1] rival) desde que se creó esta simulación. Solo lo
+## mira la vista (sonidos); no se guarda.
+var killed: Array[int] = [0, 0]
 
 var max_stuck_seen := 0.0
 var _bfs_q := PackedInt32Array()
@@ -389,6 +392,7 @@ func _kill(i: int, drowned: bool) -> void:
 	_release_job(i)
 	alive[i] = 0
 	alive_count -= 1
+	killed[faction[i]] += 1
 	if drowned:
 		sim.deaths += 1
 	carry[i] = 0
