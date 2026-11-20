@@ -76,7 +76,7 @@ func _run() -> void:
 	for u in s.entrance_use:
 		used += u
 	_check("Las hormigas entran y salen por la salida", used > 10, "(cruces: %d)" % used)
-	_check("Las hojas llegan a la cámara del nido", s.food[0] > 0 and s.food[1] > 0,
+	_check("La comida llega a la cámara del nido", s.food[0] > 0 and s.food[1] > 0,
 		"(jugador %d, rival %d)" % [s.food[0], s.food[1]])
 	var lost := 0
 	for i in s.count():
@@ -103,7 +103,7 @@ func _run() -> void:
 		painted.paint(painted.nests[0].lerp(painted.tree_center + Vector2(-40, 0), k / 59.0))
 	_run_for(plain, 120)
 	_run_for(painted, 120)
-	_check("Pintar un rastro al árbol trae más hojas", painted.food[0] > plain.food[0],
+	_check("Pintar un rastro al árbol trae más comida", painted.food[0] > plain.food[0],
 		"(sin rastro %d, con rastro %d)" % [plain.food[0], painted.food[0]])
 
 	# --- Niebla ---
@@ -113,6 +113,38 @@ func _run() -> void:
 	f.paint(f.tree_center + Vector2(-40, 0))
 	_check("No se puede pintar en la niebla",
 		f.trails[0].data[f._cell(f.tree_center + Vector2(-40, 0))] == 0.0)
+
+	# --- C: recursos que se rompen en trozos ---
+	var r := ProtoSurface.new(8)
+	var before := r.dropped
+	_run_for(r, 30)
+	_check("El árbol suelta objetos con el tiempo", r.dropped >= before + 9, "(%d -> %d)" % [before, r.dropped])
+	var fruit := ProtoSurface.new(8)
+	fruit.item_pos.clear(); fruit.item_kind.clear(); fruit.item_left.clear()
+	fruit.add_item(Vector2(300, 100), ProtoSurface.Kind.FRUIT)
+	var carried := 0
+	for k in 3:
+		var i := k * 2  # tres hormigas del jugador, puestas junto a la fruta
+		fruit.state[i] = ProtoSurface.SEARCH
+		fruit.pos[i] = Vector2(300 - 6.4, 100)
+		fruit.timer[i] = 0.0
+	for k in 120:  # 2 s: lo justo para cortar un trozo cada una
+		fruit.step(1.0 / 60.0)
+		fruit._drop_t = 0.0
+		fruit._bug_t = 0.0
+		fruit._bush_t = 0.0
+	for k in 3:
+		if fruit.carry[k * 2] == ProtoSurface.Kind.FRUIT:
+			carried += 1
+	_check("Una fruta se corta en trozos: cada hormiga lleva uno", carried == 3, "(%d)" % carried)
+	_check("La fruta se achica (le quedan trozos)", fruit.item_left.size() == 1 and fruit.item_left[0] == 5,
+		"(%s)" % str(fruit.item_left))
+	var st := _opened(5)
+	_run_for(st, 150)
+	var stored := 0
+	for v in st.stock:
+		stored += v
+	_check("Los trozos quedan guardados en la cámara", stored > 0, "(%s)" % str(st.stock))
 
 	var n := ProtoSurface.new(3)
 	_check("Son 20 hormigas en total", n.count() == 20, "(%d)" % n.count())

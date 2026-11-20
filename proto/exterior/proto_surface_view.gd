@@ -143,6 +143,11 @@ func _reset() -> void:
 		if _shot.get("view", "nest") == "ext":
 			_set_mode(EXT)
 			zooms[EXT] = 0
+		if _shot.has("zoom"):
+			zooms[mode] = int(_shot["zoom"])
+		if _shot.has("cam"):
+			var xy: PackedStringArray = _shot["cam"].split(",")
+			cams[mode] = Vector2(float(xy[0]), float(xy[1]))
 	_ground.queue_redraw()
 
 
@@ -173,7 +178,7 @@ func _process(delta: float) -> void:
 	_msg_t -= delta
 	_msg.visible = _msg_t > 0.0
 	var where := "EXTERIOR (desde arriba)" if mode == EXT else "NIDO (de lado)"
-	_label.text = "PROTOTIPO · %s   Hojas: %d   Rival: %d   Salidas: %d   Explorado: %d%%   x%d%s%s" % [
+	_label.text = "PROTOTIPO · %s   Comida: %d   Rival: %d   Salidas: %d   Explorado: %d%%   x%d%s%s" % [
 		where, sim.food[0], sim.food[1], sim.entrances_px.size(), int(sim.revealed_ratio() * 100),
 		speed, "  (PAUSA)" if paused else "", "  · siguiendo hormiga" if follow >= 0 else ""]
 	_ext.queue_redraw()
@@ -473,6 +478,9 @@ func _draw_ext() -> void:
 		_ext.draw_circle(p, r, Color("a07c52"))
 		_ext.draw_circle(p, 2.5, Color("1a120b"))
 		_ext.draw_arc(p, r + 5, 0, TAU, 24, Color(0.4, 0.9, 1.0, 0.8), 1.0)
+	for k in sim.item_pos.size():
+		_draw_item(_ext, sim.item_pos[k], sim.item_kind[k],
+			float(sim.item_left[k]) / ProtoSurface.KIND_PIECES[sim.item_kind[k]])
 	var rv := sim.nests[1]
 	_ext.draw_circle(rv, 13, Color("8b6a45"))
 	_ext.draw_circle(rv, 9, Color("a07c52"))
@@ -484,9 +492,6 @@ func _draw_ext() -> void:
 	_ext.draw_circle(sim.tree_center, ProtoSurface.CANOPY, Color(0.18, 0.38, 0.16, 0.5))
 	_ext.draw_circle(sim.tree_center + Vector2(-12, -9), 46, Color(0.22, 0.45, 0.2, 0.4))
 	_ext.draw_circle(sim.tree_center, sim.trunk_radius, Color("5a3d24"))
-	for k in sim.leaves_pos.size():
-		if sim.leaves[k] > 0:
-			_ext.draw_circle(sim.leaves_pos[k], 1.0 + sim.leaves[k] * 0.35, Color("9be35a"))
 
 
 func _draw_ant(canvas: Node2D, i: int) -> void:
@@ -496,10 +501,45 @@ func _draw_ant(canvas: Node2D, i: int) -> void:
 	canvas.draw_circle(p - d * 2.0, 1.4, body)
 	canvas.draw_circle(p, 0.9, body)
 	canvas.draw_circle(p + d * 1.6, 1.0, body)
-	if sim.has_leaf[i] == 1:
-		canvas.draw_circle(p + d * 3.0, 1.8, Color("7cc24a"))
+	if sim.carry[i] >= 0:
+		# El trozo va en la boca, delante de la cabeza.
+		canvas.draw_circle(p + d * 3.2, 1.3, KIND_COLOR[sim.carry[i]])
+	elif sim.state[i] == ProtoSurface.CUT:
+		# Cortando: las mandíbulas se abren y cierran.
+		var o := 0.6 + 0.6 * absf(sin(sim.time * 14.0 + i))
+		var side := d.orthogonal() * o
+		canvas.draw_line(p + d * 2.2 + side, p + d * 3.4, body, 0.5)
+		canvas.draw_line(p + d * 2.2 - side, p + d * 3.4, body, 0.5)
 	if i == follow:
 		canvas.draw_arc(p, 6.0, 0, TAU, 20, Color(1, 1, 1, 0.9), 0.8)
+
+
+const KIND_COLOR := [Color("7cc24a"), Color("c8a060"), Color("e2553a"), Color("5a4a6a")]
+
+
+## Un objeto del suelo. `left` (0..1) achica lo que queda a medida que se lo llevan en trozos.
+func _draw_item(canvas: Node2D, p: Vector2, kind: int, left: float) -> void:
+	var r: float = ProtoSurface.KIND_SIZE[kind] * (0.45 + 0.55 * left)
+	var c: Color = KIND_COLOR[kind]
+	match kind:
+		ProtoSurface.Kind.LEAF:
+			canvas.draw_circle(p + Vector2(-r * 0.35, 0), r * 0.7, c)
+			canvas.draw_circle(p + Vector2(r * 0.35, 0), r * 0.7, c)
+			canvas.draw_line(p - Vector2(r, 0), p + Vector2(r, 0), c.darkened(0.4), 0.4)
+		ProtoSurface.Kind.SEED:
+			canvas.draw_circle(p, r, c)
+		ProtoSurface.Kind.FRUIT:
+			canvas.draw_circle(p + Vector2(0, 0.6), r, c.darkened(0.35))
+			canvas.draw_circle(p, r, c)
+			canvas.draw_circle(p + Vector2(-r * 0.35, -r * 0.35), r * 0.3, c.lightened(0.4))
+		ProtoSurface.Kind.BUG:
+			for s in [-1.0, 1.0]:
+				for j in 3:
+					var base := p + Vector2((j - 1) * r * 0.5, 0)
+					canvas.draw_line(base, base + Vector2((j - 1) * 0.6, s * r * 0.9), c.darkened(0.3), 0.4)
+			canvas.draw_circle(p + Vector2(-r * 0.6, 0), r * 0.55, c)
+			canvas.draw_circle(p + Vector2(r * 0.3, 0), r * 0.4, c)
+			canvas.draw_circle(p + Vector2(r * 0.8, 0), r * 0.25, c)
 
 
 # --- Dibujo: nido -------------------------------------------------------------------------
@@ -518,6 +558,16 @@ func _draw_nest() -> void:
 	var ch := sim.nest.chamber
 	_nest.draw_string(ThemeDB.fallback_font, Vector2(ch.position.x * ProtoNest.CELL, ch.position.y * ProtoNest.CELL - 3),
 		"Cámara", HORIZONTAL_ALIGNMENT_LEFT, -1, 6, Color(1, 1, 1, 0.6))
+	# Reservas: cada trozo que llegó queda apilado en el piso de la cámara.
+	var n := 0
+	var floor_y := ch.end.y * ProtoNest.CELL - 1.5
+	var x0 := ch.position.x * ProtoNest.CELL + 2.0
+	var per_row := int((ch.size.x * ProtoNest.CELL - 4.0) / 2.6)
+	for kind in sim.stock.size():
+		for j in mini(sim.stock[kind], 200 - n):
+			_nest.draw_circle(Vector2(x0 + (n % per_row) * 2.6, floor_y - (n / per_row) * 2.4), 1.2,
+				KIND_COLOR[kind])
+			n += 1
 	for i in sim.count():
 		if sim.team[i] == 0 and not sim.outside(i):
 			_draw_ant(_nest, i)

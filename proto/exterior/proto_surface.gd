@@ -17,6 +17,10 @@ extends RefCounted
 ## y = CUT_Y. Arranca SIN salida: hasta que un túnel llega arriba no hay orificio y nadie sale.
 ## Cada salida cavada aparece aquí como un orificio con montículo. Las hormigas cruzan de un mundo
 ## al otro por cualquier salida. (La rival sigue simplificada: un montículo fijo.)
+##
+## Paso C: los recursos son objetos sueltos que el árbol (y los arbustos) dejan caer con el tiempo,
+## más insectos muertos que aparecen. Lo grande no se lleva entero: las hormigas se paran a cortarlo
+## y cada una se lleva UN trozo en la boca. El objeto se achica hasta desaparecer.
 
 const CELL := 4.0            # px por celda (feromona y niebla)
 const MAP_W := 960.0
@@ -28,11 +32,8 @@ const SENSOR_DIST := 7.0
 const SENSOR_ANGLE := 0.6
 const TURN := 3.2            # rad/s máximo de giro hacia el olor
 const JITTER := 1.4          # rad/s de giro al azar
-const PICK_RADIUS := 5.0
 const HOME_RADIUS := 6.0
 const UNLOAD_S := 1.2        # tiempo "dentro del nido" antes de volver a salir
-const LEAF_MAX := 6
-const LEAF_REGROW_S := 8.0
 const SIGHT := 14.0          # px que descubre cada hormiga del jugador a su alrededor
 const NEST_SIGHT := 48.0     # px descubiertos al empezar alrededor del nido
 const CANOPY := 70.0
@@ -41,7 +42,18 @@ const DIG_S := 0.8           # segundos que tarda una hormiga en cavar una celda
 const GIVE_UP_S := 30.0      # buscando sin éxito este tiempo, vuelve a casa con las manos vacías
 const DIG_SHARE := 0.7       # con marcas pendientes, parte de las hormigas libres que va a cavar
 
-enum { SEARCH, RETURN, INSIDE, N_IN, N_OUT, N_DIG, N_IDLE }
+enum Kind { LEAF, SEED, FRUIT, BUG }
+const KIND_PIECES := [3, 1, 8, 6]          # trozos que da cada objeto
+const KIND_CUT_S := [1.0, 0.3, 1.5, 1.4]   # segundos para cortar un trozo
+const KIND_FOOD := [1, 2, 1, 2]            # comida que vale cada trozo al llegar a la cámara
+const KIND_SIZE := [3.5, 1.6, 5.0, 4.5]    # radio del objeto entero (px)
+const DROP_S := 3.0          # el árbol suelta algo cada tanto
+const BUSH_DROP_S := 9.0     # los arbustos sueltan hojas
+const BUG_S := 22.0          # aparece un insecto muerto
+const ITEMS_MAX := 40
+const SEE_ITEM := 18.0       # a esta distancia una hormiga ve un objeto y va derecho a él
+
+enum { SEARCH, RETURN, INSIDE, N_IN, N_OUT, N_DIG, N_IDLE, CUT }
 
 var rng := RandomNumberGenerator.new()
 var trails: Array[PheromoneField] = []      # rastro de comida por equipo
@@ -49,10 +61,15 @@ var nests: Array[Vector2] = [Vector2(110, 270), Vector2(890, 270)]
 var food: Array[int] = [0, 0]
 var tree_center := Vector2(480, 270)
 var trunk_radius := 14.0
-## Fuentes de hojas: el anillo de la copa del árbol + arbustos sueltos para que explorar pague.
-var leaves_pos := PackedVector2Array()
-var leaves := PackedInt32Array()
-var leaf_timer := PackedFloat32Array()
+## Objetos sueltos en el suelo (recursos).
+var item_pos := PackedVector2Array()
+var item_kind := PackedInt32Array()
+var item_left := PackedInt32Array()        # trozos que le quedan
+var stock: Array[int] = [0, 0, 0, 0]       # trozos guardados en tu cámara, por tipo
+var dropped := 0                           # veces que soltó algo el árbol (para pruebas)
+var _drop_t := 0.0
+var _bush_t := 0.0
+var _bug_t := 0.0
 var bushes: Array[Vector3] = []             # x, y, radio (solo dibujo)
 var rocks: Array[Vector3] = []              # x, y, radio
 var revealed := PackedByteArray()           # niebla del jugador: 1 = descubierto
@@ -69,7 +86,7 @@ var state := PackedInt32Array()
 var team := PackedInt32Array()
 var timer := PackedFloat32Array()
 var carry_t := PackedFloat32Array()         # segundos desde que tomó la hoja (frescura del rastro)
-var has_leaf := PackedByteArray()           # 1 = vuelve con hoja (0 = vuelve con las manos vacías)
+var carry := PackedInt32Array()             # tipo del trozo que lleva en la boca, -1 = nada
 var time := 0.0
 var ticks := 0
 var _decay_acc := 0.0
@@ -80,18 +97,12 @@ func _init(seed_v: int, ants_per_team := 10) -> void:
 	rng.seed = seed_v
 	for t in 2:
 		trails.append(PheromoneField.new(W, H, 0.04))
-	# Hojas en la copa: un anillo alrededor del tronco.
-	for k in 12:
-		var a := TAU * k / 12.0 + rng.randf_range(-0.2, 0.2)
-		_add_leaf(tree_center + Vector2(cos(a), sin(a)) * rng.randf_range(30.0, 60.0))
 	# Todo lo demás en espejo, para que la carrera sea pareja.
 	for k in 3:
 		var b := Vector3(rng.randf_range(150, 380), rng.randf_range(50, 490), rng.randf_range(10, 16))
 		for side in 2:
 			var bx := b.x if side == 0 else MAP_W - b.x
 			bushes.append(Vector3(bx, b.y, b.z))
-			for j in 3:
-				_add_leaf(Vector2(bx, b.y) + Vector2.from_angle(TAU * j / 3.0) * b.z * 0.6)
 	for k in 7:
 		var p := Vector2(rng.randf_range(130, 400), rng.randf_range(30, 510))
 		var r := rng.randf_range(10, 22)
@@ -104,6 +115,11 @@ func _init(seed_v: int, ants_per_team := 10) -> void:
 	for y in H:
 		for x in W:
 			_solid[y * W + x] = 1 if _blocked_slow(Vector2((x + 0.5) * CELL, (y + 0.5) * CELL)) else 0
+	# Lo que ya está en el suelo al empezar.
+	for k in 6:
+		_tree_drop()
+	for k in bushes.size() / 2:
+		_bush_drop(k)
 	nest = ProtoNest.new(int(nests[0].x / CELL))
 	_reveal(nests[0], NEST_SIGHT)
 	for t in 2:
@@ -111,10 +127,55 @@ func _init(seed_v: int, ants_per_team := 10) -> void:
 			_spawn(t)
 
 
-func _add_leaf(p: Vector2) -> void:
-	leaves_pos.append(p)
-	leaves.append(LEAF_MAX)
-	leaf_timer.append(0.0)
+func add_item(p: Vector2, kind: int) -> void:
+	if item_pos.size() >= ITEMS_MAX or blocked(p):
+		return
+	item_pos.append(p)
+	item_kind.append(kind)
+	item_left.append(KIND_PIECES[kind])
+
+
+func _remove_item(k: int) -> void:
+	item_pos.remove_at(k)
+	item_kind.remove_at(k)
+	item_left.remove_at(k)
+
+
+## El árbol suelta algo bajo la copa (en espejo: lo mismo de cada lado, para que sea parejo).
+func _tree_drop() -> void:
+	var r := rng.randf()
+	var kind := Kind.LEAF if r < 0.6 else (Kind.SEED if r < 0.85 else Kind.FRUIT)
+	var a := rng.randf_range(-PI * 0.5, PI * 0.5)
+	var off := Vector2.from_angle(a) * rng.randf_range(trunk_radius + 6.0, CANOPY - 4.0)
+	dropped += 1
+	add_item(tree_center - off, kind)
+	add_item(tree_center + Vector2(off.x, -off.y), kind)
+
+
+func _bush_drop(k: int) -> void:
+	var off := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(4.0, 14.0)
+	for side in 2:
+		var b := bushes[k * 2 + side]
+		var o := off if side == 0 else Vector2(-off.x, off.y)
+		add_item(Vector2(b.x, b.y) + o, Kind.LEAF)
+
+
+func _bug_drop() -> void:
+	var p := Vector2(rng.randf_range(150, 400), rng.randf_range(30, 510))
+	add_item(p, Kind.BUG)
+	add_item(Vector2(MAP_W - p.x, p.y), Kind.BUG)
+
+
+## Objeto más cercano a `p` dentro de `radius` (contando el tamaño del objeto), o -1.
+func item_near(p: Vector2, radius: float) -> int:
+	var best := -1
+	var best_d := INF
+	for k in item_pos.size():
+		var d: float = p.distance_to(item_pos[k]) - KIND_SIZE[item_kind[k]]
+		if d < radius and d < best_d:
+			best = k
+			best_d = d
+	return best
 
 
 func _spawn(t: int) -> void:
@@ -126,7 +187,7 @@ func _spawn(t: int) -> void:
 	team.append(t)
 	timer.append(rng.randf() * 6.0)  # salen escalonadas
 	carry_t.append(0.0)
-	has_leaf.append(0)
+	carry.append(-1)
 
 
 func count() -> int:
@@ -135,7 +196,7 @@ func count() -> int:
 
 ## ¿La hormiga está en el exterior (true) o dentro de tu nido (false)?
 func outside(i: int) -> bool:
-	return state[i] == SEARCH or state[i] == RETURN or state[i] == INSIDE
+	return state[i] == SEARCH or state[i] == RETURN or state[i] == INSIDE or state[i] == CUT
 
 
 ## Salida más cercana a `x` (índice en entrances_px), o -1 si no hay ninguna.
@@ -252,12 +313,18 @@ func step(dt: float) -> void:
 		for t in 2:
 			trails[t].decay(_decay_acc, 1.0)
 		_decay_acc = 0.0
-	for k in leaves.size():
-		if leaves[k] < LEAF_MAX:
-			leaf_timer[k] += dt
-			if leaf_timer[k] >= LEAF_REGROW_S:
-				leaf_timer[k] = 0.0
-				leaves[k] += 1
+	_drop_t += dt
+	if _drop_t >= DROP_S:
+		_drop_t = 0.0
+		_tree_drop()
+	_bush_t += dt
+	if _bush_t >= BUSH_DROP_S:
+		_bush_t = 0.0
+		_bush_drop(rng.randi() % (bushes.size() / 2))
+	_bug_t += dt
+	if _bug_t >= BUG_S:
+		_bug_t = 0.0
+		_bug_drop()
 	for i in pos.size():
 		match state[i]:
 			INSIDE:
@@ -270,6 +337,8 @@ func step(dt: float) -> void:
 				_search(i, dt)
 			RETURN:
 				_return(i, dt)
+			CUT:
+				_cut(i, dt)
 			_:
 				_nest_step(i, dt)
 		# Descubrir cada pocos ticks (no hace falta cada uno, y así cuesta menos).
@@ -297,28 +366,47 @@ func _search(i: int, dt: float) -> void:
 	if best > 0.02:
 		a += clampf(best_da, -TURN * dt, TURN * dt)
 	a += rng.randf_range(-JITTER, JITTER) * dt
+	# Ver un objeto cerca le gana al olfato: va derecho a él.
+	var seen := item_near(p, SEE_ITEM)
+	if seen >= 0:
+		a = rotate_toward(a, (item_pos[seen] - p).angle(), TURN * 2.0 * dt)
 	ang[i] = a
 	_move(i, dt)
 	timer[i] += dt
 	if t == 0 and timer[i] > GIVE_UP_S:
 		state[i] = RETURN
-		has_leaf[i] = 0
+		carry[i] = -1
 		return
-	for k in leaves_pos.size():
-		if leaves[k] > 0 and pos[i].distance_squared_to(leaves_pos[k]) < PICK_RADIUS * PICK_RADIUS:
-			leaves[k] -= 1
-			state[i] = RETURN
-			has_leaf[i] = 1
-			carry_t[i] = 0.0
-			ang[i] += PI
-			return
+	if item_near(pos[i], 2.0) >= 0:
+		state[i] = CUT
+		timer[i] = 0.0
+
+
+## Parada junto a un objeto, cortando un trozo. Si otras se lo terminan antes, sigue buscando.
+func _cut(i: int, dt: float) -> void:
+	var k := item_near(pos[i], 3.0)
+	if k < 0:
+		state[i] = SEARCH
+		timer[i] = 0.0
+		return
+	ang[i] = rotate_toward(ang[i], (item_pos[k] - pos[i]).angle(), TURN * dt)
+	timer[i] += dt
+	if timer[i] < KIND_CUT_S[item_kind[k]]:
+		return
+	carry[i] = item_kind[k]
+	item_left[k] -= 1
+	if item_left[k] <= 0:
+		_remove_item(k)
+	state[i] = RETURN
+	carry_t[i] = 0.0
+	ang[i] += PI
 
 
 func _return(i: int, dt: float) -> void:
 	var t := team[i]
 	carry_t[i] += dt
 	# Rastro de comida: más fuerte cerca de la hoja, así la pendiente apunta a la comida.
-	if has_leaf[i] == 1:
+	if carry[i] >= 0:
 		trails[t].set_max(_cell(pos[i]), maxf(0.15, 1.0 - carry_t[i] * 0.04))
 	var home := nests[t]
 	var k := -1
@@ -331,8 +419,9 @@ func _return(i: int, dt: float) -> void:
 	_move(i, dt)
 	if pos[i].distance_to(home) < HOME_RADIUS:
 		if t == 1:
-			food[t] += has_leaf[i]
-			has_leaf[i] = 0
+			if carry[i] >= 0:
+				food[t] += KIND_FOOD[carry[i]]
+			carry[i] = -1
 			state[i] = INSIDE
 			timer[i] = UNLOAD_S
 		elif k >= 0:
@@ -349,8 +438,10 @@ func _nest_step(i: int, dt: float) -> void:
 	match state[i]:
 		N_IN:
 			if _walk(i, nest.to_chamber, dt):
-				food[0] += has_leaf[i]
-				has_leaf[i] = 0
+				if carry[i] >= 0:
+					food[0] += KIND_FOOD[carry[i]]
+					stock[carry[i]] += 1
+				carry[i] = -1
 				_choose_task(i)
 		N_OUT:
 			if nest.to_exit[c] < 0:
